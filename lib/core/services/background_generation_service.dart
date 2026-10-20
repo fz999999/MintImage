@@ -38,7 +38,7 @@ class BackgroundGenerationService {
           autoStartOnBoot: false,
           isForegroundMode: true,
           notificationChannelId: _channelId,
-          initialNotificationTitle: 'MintImage',
+          initialNotificationTitle: '大川生图工具',
           initialNotificationContent: '生成任务运行中',
           foregroundServiceNotificationId: 112233,
           foregroundServiceTypes: const [AndroidForegroundType.dataSync],
@@ -101,7 +101,7 @@ void backgroundServiceOnStart(ServiceInstance service) {
 
   if (service is AndroidServiceInstance) {
     service.setForegroundNotificationInfo(
-      title: 'MintImage',
+      title: '大川生图工具',
       content: '生成任务运行中',
     );
   }

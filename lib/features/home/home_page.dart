@@ -75,7 +75,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'MintImage',
+                  '大川生图工具',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 if (updateState.hasUpdate) ...[

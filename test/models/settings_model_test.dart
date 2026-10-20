@@ -127,4 +127,107 @@ void main() {
 
     expect(decoded.responseFormat, isNull);
   });
+
+  test('legacy single model json parses into models list', () {
+    final profile = ApiProfile.fromJson({
+      'id': '1',
+      'name': '默认',
+      'baseUrl': 'https://api.openai.com',
+      'apiKey': 'key',
+      'model': 'gpt-image-2',
+    });
+
+    expect(profile.models, ['gpt-image-2']);
+    expect(profile.model, 'gpt-image-2');
+  });
+
+  test('models list round-trips through json', () {
+    final profile = ApiProfile(
+      id: '1',
+      name: '默认',
+      baseUrl: 'https://api.openai.com',
+      apiKey: 'key',
+      models: const ['a', 'b'],
+    );
+
+    final decoded = ApiProfile.fromJson(profile.toJson());
+
+    expect(decoded.models, ['a', 'b']);
+    expect(decoded.toJson()['model'], 'a');
+  });
+
+  test('models are trimmed and de-duplicated', () {
+    final profile = ApiProfile(
+      id: '1',
+      name: '默认',
+      baseUrl: 'https://api.openai.com',
+      apiKey: 'key',
+      models: const [' a ', 'a', '', 'b'],
+    );
+
+    expect(profile.models, ['a', 'b']);
+  });
+
+  test('copyWith model locks the profile to a single model', () {
+    final profile = ApiProfile(
+      id: '1',
+      name: '默认',
+      baseUrl: 'https://api.openai.com',
+      apiKey: 'key',
+      models: const ['a', 'b'],
+    );
+
+    final locked = profile.copyWith(model: 'b');
+
+    expect(locked.models, ['b']);
+    expect(locked.model, 'b');
+  });
+
+  test('active model selection round-trips', () {
+    final settings = SettingsModel.initial();
+    final profile = settings.activeProfile.copyWith(models: const ['a', 'b']);
+    final updated = settings.copyWith(
+      profiles: [profile],
+      activeModelByProfileId: {profile.id: 'b'},
+    );
+
+    final decoded = SettingsModel.decode(updated.encode());
+
+    expect(decoded.activeModelByProfileId, {profile.id: 'b'});
+    expect(decoded.modelForProfile(decoded.activeProfile), 'b');
+  });
+
+  test('invalid active model selections are dropped on decode', () {
+    final decoded = SettingsModel.fromJson({
+      'profiles': [
+        {
+          'id': '1',
+          'name': '默认',
+          'baseUrl': 'https://api.openai.com',
+          'apiKey': 'key',
+          'models': ['a', 'b'],
+        },
+      ],
+      'activeProfileId': '1',
+      'activeModelByProfileId': {'1': 'missing', 'unknown': 'a', '2': 'a'},
+    });
+
+    expect(decoded.activeModelByProfileId, isEmpty);
+    expect(decoded.modelForProfile(decoded.activeProfile), 'a');
+  });
+
+  test('modelForProfile falls back to the first model', () {
+    final settings = SettingsModel.initial();
+    final profile = settings.activeProfile.copyWith(models: const ['a', 'b']);
+    final withSelection = settings.copyWith(
+      profiles: [profile],
+      activeModelByProfileId: {profile.id: 'b'},
+    );
+
+    expect(withSelection.modelForProfile(profile), 'b');
+    expect(
+      withSelection.modelForProfile(profile.copyWith(models: const ['a'])),
+      'a',
+    );
+  });
 }

@@ -216,7 +216,7 @@ class BackupService {
     final archive = ZipDecoder().decodeBytes(await archiveFile.readAsBytes());
     final manifest = _readJsonMap(archive, _manifestPath);
     if (manifest['format'] != _backupFormat) {
-      throw const BackupException('这不是 MintImage 备份文件。');
+      throw const BackupException('这不是 大川生图工具 的备份文件。');
     }
     if (manifest['formatVersion'] != _backupFormatVersion) {
       throw const BackupException('备份格式版本不支持。');

@@ -903,7 +903,7 @@ class _AppInfoCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '关于 MintImage',
+                  '关于 大川生图工具',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
@@ -1344,7 +1344,9 @@ class _ImageProfileCard extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                '模型：${profile.model}',
+                profile.models.length > 1
+                    ? '模型：${profile.model} 等 ${profile.models.length} 个模型'
+                    : '模型：${profile.model}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],

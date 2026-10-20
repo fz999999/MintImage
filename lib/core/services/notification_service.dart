@@ -10,7 +10,7 @@ class NotificationService {
   static final NotificationService instance = NotificationService._();
 
   static const String _channelId = 'mint_image_generation';
-  static const String _channelName = 'MintImage 生成结果';
+  static const String _channelName = '大川生图工具 生成结果';
   static const String _channelDescription = '生成任务完成后的本地通知';
 
   final FlutterLocalNotificationsPlugin _plugin =

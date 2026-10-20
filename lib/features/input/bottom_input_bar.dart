@@ -454,6 +454,13 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                     activeProfile: activeProfile,
                                     onTap: _showApiProfileSwitchSheet,
                                   ),
+                                  const SizedBox(width: 6),
+                                  _ModelSwitchButton(
+                                    model: settings.modelForProfile(
+                                      activeProfile,
+                                    ),
+                                    onTap: _showModelSwitchSheet,
+                                  ),
                                 ],
                               ),
                             ),
@@ -901,6 +908,116 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     unfocusPrompt();
   }
 
+  Future<void> _showModelSwitchSheet() async {
+    if (_optimizingPrompt) {
+      return;
+    }
+
+    final settings = ref.read(settingsProvider);
+    final activeProfile = settings.activeProfile;
+    final models = activeProfile.models;
+    if (models.isEmpty) {
+      _showMessage('当前生图 API 未配置模型。');
+      return;
+    }
+    final currentModel = settings.modelForProfile(activeProfile);
+
+    unfocusPrompt();
+    final selectedModel = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '切换模型',
+                          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          activeProfile.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                            color: AppThemeTokens.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                for (final model in models)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.smart_toy_outlined,
+                      color: AppThemeTokens.primaryStrong,
+                    ),
+                    title: Text(
+                      model,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: model == currentModel
+                        ? const Text('当前使用')
+                        : null,
+                    trailing: model == currentModel
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: AppThemeTokens.primary,
+                          )
+                        : null,
+                    onTap: () => Navigator.of(ctx).pop(model),
+                  ),
+                if (models.length <= 1)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '当前 API 只配置了一个模型，可在设置里添加更多。',
+                        style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                          color: AppThemeTokens.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted) {
+      return;
+    }
+    unfocusPrompt();
+    if (selectedModel == null || selectedModel == currentModel) {
+      return;
+    }
+
+    await ref
+        .read(settingsProvider.notifier)
+        .setActiveProfileModel(activeProfile.id, selectedModel);
+
+    unfocusPrompt();
+  }
+
   Future<void> _handlePromptOptimizationTap() async {
     if (_optimizingPrompt) {
       final cancelToken = _optimizationCancelToken;
@@ -1308,6 +1425,60 @@ class _ApiProfileSwitchButton extends StatelessWidget {
                 Flexible(
                   child: Text(
                     activeProfile.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppThemeTokens.primaryStrong,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModelSwitchButton extends StatelessWidget {
+  const _ModelSwitchButton({required this.model, required this.onTap});
+
+  final String model;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: '切换模型',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 110),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 28),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppThemeTokens.surfaceSoft,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppThemeTokens.border.withValues(alpha: 0.7),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.smart_toy_outlined,
+                  size: 13,
+                  color: AppThemeTokens.primaryStrong,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    model,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(

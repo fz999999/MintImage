@@ -153,7 +153,7 @@ class _StartupError extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              'MintImage 启动失败\n$error',
+              '大川生图工具 启动失败\n$error',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFF0B1C30),

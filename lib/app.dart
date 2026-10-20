@@ -58,7 +58,7 @@ class _GptImageAppState extends ConsumerState<GptImageApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigatorKey,
-      title: 'MintImage',
+      title: '大川生图工具',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       home: widget.home ?? const HomePage(),

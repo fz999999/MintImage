@@ -56,10 +56,13 @@ class GenerationController extends StateNotifier<GenerationState> {
     String? favoriteFolderId,
   }) async {
     final settings = _ref.read(settingsProvider);
-    final profile = settings.profileById(request.apiProfileId);
-    if (profile == null) {
+    final baseProfile = settings.profileById(request.apiProfileId);
+    if (baseProfile == null) {
       throw const ApiException('当前 API 配置不存在，请重新选择。');
     }
+    final profile = baseProfile.copyWith(
+      models: <String>[settings.modelForProfile(baseProfile)],
+    );
 
     final records = List.generate(
       request.count,

@@ -48,6 +48,7 @@ class SettingsController extends StateNotifier<SettingsModel> {
     String? baseUrl,
     String? apiKey,
     String? model,
+    List<String>? models,
     ImageGenerationApiMode apiMode = ImageGenerationApiMode.images,
     bool useStreaming = false,
   }) async {
@@ -57,7 +58,7 @@ class SettingsController extends StateNotifier<SettingsModel> {
       name: name ?? '配置 $nextIndex',
       baseUrl: baseUrl ?? 'https://api.openai.com',
       apiKey: apiKey ?? '',
-      model: model ?? apiMode.defaultModel,
+      models: models ?? <String>[model ?? apiMode.defaultModel],
       apiMode: apiMode,
       useStreaming: useStreaming,
     );
@@ -74,7 +75,18 @@ class SettingsController extends StateNotifier<SettingsModel> {
       for (final item in state.profiles)
         if (item.id == profile.id) profile else item,
     ];
-    state = state.copyWith(profiles: profiles);
+    // 模型列表可能被删减，顺手清掉已失效的选中项，避免持久化里留下脏值。
+    final activeModelByProfileId = {
+      for (final entry in state.activeModelByProfileId.entries)
+        if (profiles.any(
+          (item) => item.id == entry.key && item.models.contains(entry.value),
+        ))
+          entry.key: entry.value,
+    };
+    state = state.copyWith(
+      profiles: profiles,
+      activeModelByProfileId: activeModelByProfileId,
+    );
     await _persist();
   }
 
@@ -89,10 +101,15 @@ class SettingsController extends StateNotifier<SettingsModel> {
     final activeProfileId = state.activeProfileId == id
         ? profiles.first.id
         : state.activeProfileId;
+    final activeModelByProfileId = {
+      for (final entry in state.activeModelByProfileId.entries)
+        if (entry.key != id) entry.key: entry.value,
+    };
 
     state = state.copyWith(
       profiles: profiles,
       activeProfileId: activeProfileId,
+      activeModelByProfileId: activeModelByProfileId,
     );
     await _persist();
   }
@@ -102,6 +119,27 @@ class SettingsController extends StateNotifier<SettingsModel> {
       return;
     }
     state = state.copyWith(activeProfileId: id);
+    await _persist();
+  }
+
+  Future<void> setActiveProfileModel(String profileId, String model) async {
+    ApiProfile? profile;
+    for (final item in state.profiles) {
+      if (item.id == profileId) {
+        profile = item;
+        break;
+      }
+    }
+    if (profile == null || !profile.models.contains(model)) {
+      return;
+    }
+
+    state = state.copyWith(
+      activeModelByProfileId: {
+        ...state.activeModelByProfileId,
+        profileId: model,
+      },
+    );
     await _persist();
   }
 

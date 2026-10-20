@@ -208,23 +208,51 @@ void main() {
     );
     expect(container.read(settingsProvider).activeProfileId, 'api-2');
   });
+
+  testWidgets('shows model switch button and persists selected model', (
+    tester,
+  ) async {
+    await _pumpInputBar(tester, settings: _settingsWithMultipleModels);
+
+    expect(find.byTooltip('切换模型'), findsOneWidget);
+    expect(find.text('model-a'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('切换模型'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('model-a'), findsWidgets);
+    expect(find.text('model-b'), findsOneWidget);
+
+    await tester.tap(find.text('model-b'));
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(BottomInputBar)),
+    );
+    final settings = container.read(settingsProvider);
+    final profile = settings.profiles.firstWhere(
+      (item) => item.id == _multiModelProfile.id,
+    );
+    expect(settings.modelForProfile(profile), 'model-b');
+  });
 }
 
 Future<void> _pumpInputBar(
   WidgetTester tester, {
   PromptOptimizationApi? promptOptimizationApi,
-  SettingsModel settings = _settings,
+  SettingsModel? settings,
   GlobalKey<BottomInputBarState>? inputBarKey,
   Future<void> Function(GenerationRequest request)? onSubmit,
 }) async {
   SharedPreferences.setMockInitialValues(const {});
   final preferences = await SharedPreferences.getInstance();
+  final initialSettings = settings ?? _settings;
 
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(preferences),
-        initialSettingsModelProvider.overrideWithValue(settings),
+        initialSettingsModelProvider.overrideWithValue(initialSettings),
         promptOptimizationApiProvider.overrideWithValue(
           promptOptimizationApi ?? const PromptOptimizationApi(),
         ),
@@ -248,12 +276,12 @@ Future<void> _pumpInputBar(
   await tester.pump();
 }
 
-const _apiProfile = ApiProfile(
+final _apiProfile = ApiProfile(
   id: 'api',
   name: 'API',
   baseUrl: 'https://api.openai.com',
   apiKey: 'test-key',
-  model: 'gpt-image-2',
+  models: const ['gpt-image-2'],
 );
 
 const _promptOptimizationProfile = PromptOptimizationProfile(
@@ -265,41 +293,56 @@ const _promptOptimizationProfile = PromptOptimizationProfile(
   protocol: PromptOptimizationProtocol.openAiResponses,
 );
 
-const _settings = SettingsModel(
+final _settings = SettingsModel(
   profiles: [_apiProfile],
   activeProfileId: 'api',
   promptOptimizationProfiles: [_promptOptimizationProfile],
   activePromptOptimizationProfileId: 'optimizer',
 );
 
-const _settingsWithTwoProfiles = SettingsModel(
+final _settingsWithTwoProfiles = SettingsModel(
   profiles: [_apiProfile, _apiProfile2],
   activeProfileId: 'api',
   promptOptimizationProfiles: [_promptOptimizationProfile],
   activePromptOptimizationProfileId: 'optimizer',
 );
 
-const _settingsWithThreeProfiles = SettingsModel(
+final _settingsWithThreeProfiles = SettingsModel(
   profiles: [_apiProfile, _apiProfile2, _apiProfile3],
   activeProfileId: 'api',
   promptOptimizationProfiles: [_promptOptimizationProfile],
   activePromptOptimizationProfileId: 'optimizer',
 );
 
-const _apiProfile2 = ApiProfile(
+final _multiModelProfile = ApiProfile(
+  id: 'api-multi',
+  name: '多模型',
+  baseUrl: 'https://api.openai.com',
+  apiKey: 'test-key-multi',
+  models: const ['model-a', 'model-b'],
+);
+
+final _settingsWithMultipleModels = SettingsModel(
+  profiles: [_multiModelProfile],
+  activeProfileId: 'api-multi',
+  promptOptimizationProfiles: [_promptOptimizationProfile],
+  activePromptOptimizationProfileId: 'optimizer',
+);
+
+final _apiProfile2 = ApiProfile(
   id: 'api-2',
   name: '备用',
   baseUrl: 'https://api.openai.com',
   apiKey: 'test-key-2',
-  model: 'gpt-image-2',
+  models: const ['gpt-image-2'],
 );
 
-const _apiProfile3 = ApiProfile(
+final _apiProfile3 = ApiProfile(
   id: 'api-3',
   name: '第三',
   baseUrl: 'https://api.openai.com',
   apiKey: 'test-key-3',
-  model: 'gpt-image-2',
+  models: const ['gpt-image-2'],
 );
 
 final _webpRecord = ImageRecord(

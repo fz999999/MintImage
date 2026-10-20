@@ -157,12 +157,12 @@ Future<void> _pumpImageCell(
   await tester.pump();
 }
 
-const _settings = SettingsModel(
+final _settings = SettingsModel(
   profiles: [_apiProfile],
   activeProfileId: 'api',
 );
 
-const _apiProfile = ApiProfile(
+final _apiProfile = ApiProfile(
   id: 'api',
   name: 'API',
   baseUrl: 'https://api.openai.com',

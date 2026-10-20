@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="icon/icon-windows-透明背景.png" width="120" alt="MintImage" />
+<img src="icon/icon-windows-透明背景.png" width="120" alt="大川生图工具" />
 
-# MintImage
+# 大川生图工具
 
 **跨平台 AI 图像生成客户端**
 

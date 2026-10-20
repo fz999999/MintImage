@@ -43,16 +43,50 @@ enum ImageGenerationApiMode {
   }
 }
 
+List<String> _normalizeModels(
+  List<String>? models, {
+  required String? fallbackModel,
+  required ImageGenerationApiMode apiMode,
+}) {
+  final source = <String>[];
+  if (models != null) {
+    source.addAll(models);
+  }
+  if (source.isEmpty && fallbackModel != null) {
+    source.add(fallbackModel);
+  }
+
+  final normalized = <String>[];
+  for (final model in source) {
+    final trimmed = model.trim();
+    if (trimmed.isEmpty || normalized.contains(trimmed)) {
+      continue;
+    }
+    normalized.add(trimmed);
+  }
+
+  if (normalized.isEmpty) {
+    normalized.add(apiMode.defaultModel);
+  }
+
+  return List<String>.unmodifiable(normalized);
+}
+
 class ApiProfile {
-  const ApiProfile({
+  ApiProfile({
     required this.id,
     required this.name,
     required this.baseUrl,
     required this.apiKey,
-    required this.model,
+    List<String>? models,
+    String? model,
     this.apiMode = ImageGenerationApiMode.images,
     this.useStreaming = false,
-  });
+  }) : models = _normalizeModels(
+         models,
+         fallbackModel: model,
+         apiMode: apiMode,
+       );
 
   factory ApiProfile.initial() {
     final apiMode = ImageGenerationApiMode.fromStorageValue(
@@ -67,18 +101,28 @@ class ApiProfile {
         defaultValue: 'https://api.openai.com',
       ),
       apiKey: const String.fromEnvironment('API_KEY'),
-      model: configuredModel.isEmpty ? apiMode.defaultModel : configuredModel,
+      models: [
+        configuredModel.isEmpty ? apiMode.defaultModel : configuredModel,
+      ],
       apiMode: apiMode,
     );
   }
 
   factory ApiProfile.fromJson(Map<String, dynamic> json) {
     final apiMode = ImageGenerationApiMode.fromStorageValue(json['apiMode']);
+    final rawModels = json['models'];
+    final models = rawModels is List
+        ? [
+            for (final item in rawModels)
+              if (item is String) item,
+          ]
+        : null;
     return ApiProfile(
       id: json['id'] as String,
       name: json['name'] as String? ?? '默认',
       baseUrl: json['baseUrl'] as String? ?? 'https://api.openai.com',
       apiKey: json['apiKey'] as String? ?? '',
+      models: models,
       model: json['model'] as String? ?? apiMode.defaultModel,
       apiMode: apiMode,
       useStreaming: json['useStreaming'] as bool? ?? false,
@@ -89,9 +133,14 @@ class ApiProfile {
   final String name;
   final String baseUrl;
   final String apiKey;
-  final String model;
+
+  /// 该配置下可供选择的模型名列表（非空、去重、已 trim）。
+  final List<String> models;
   final ImageGenerationApiMode apiMode;
   final bool useStreaming;
+
+  /// 兼容旧入口：等价于 [models] 的第一个模型。
+  String get model => models.first;
 
   String get normalizedBaseUrl => baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
 
@@ -110,6 +159,7 @@ class ApiProfile {
     String? name,
     String? baseUrl,
     String? apiKey,
+    List<String>? models,
     String? model,
     ImageGenerationApiMode? apiMode,
     bool? useStreaming,
@@ -119,7 +169,7 @@ class ApiProfile {
       name: name ?? this.name,
       baseUrl: baseUrl ?? this.baseUrl,
       apiKey: apiKey ?? this.apiKey,
-      model: model ?? this.model,
+      models: models ?? (model != null ? <String>[model] : this.models),
       apiMode: apiMode ?? this.apiMode,
       useStreaming: useStreaming ?? this.useStreaming,
     );
@@ -131,6 +181,8 @@ class ApiProfile {
       'name': name,
       'baseUrl': baseUrl,
       'apiKey': apiKey,
+      'models': models,
+      // 保留单模型字段，便于回滚到旧版本。
       'model': model,
       'apiMode': apiMode.storageValue,
       'useStreaming': useStreaming,
@@ -306,6 +358,7 @@ class SettingsModel {
   const SettingsModel({
     required this.profiles,
     required this.activeProfileId,
+    this.activeModelByProfileId = const {},
     this.promptOptimizationProfiles = const [],
     this.activePromptOptimizationProfileId,
     this.responseFormat,
@@ -324,6 +377,7 @@ class SettingsModel {
     return SettingsModel(
       profiles: [defaultProfile],
       activeProfileId: defaultProfile.id,
+      activeModelByProfileId: const {},
       promptOptimizationProfiles: const [],
       activePromptOptimizationProfileId: null,
       responseFormat: null,
@@ -378,6 +432,10 @@ class SettingsModel {
     return SettingsModel(
       profiles: profiles,
       activeProfileId: resolvedActiveProfileId,
+      activeModelByProfileId: _normalizeActiveModelByProfileId(
+        json['activeModelByProfileId'],
+        profiles,
+      ),
       promptOptimizationProfiles: promptOptimizationProfiles,
       activePromptOptimizationProfileId:
           resolvedActivePromptOptimizationProfileId,
@@ -405,6 +463,9 @@ class SettingsModel {
 
   final List<ApiProfile> profiles;
   final String activeProfileId;
+
+  /// profileId -> 当前选中的模型名。非法项在解析时会被丢弃。
+  final Map<String, String> activeModelByProfileId;
   final List<PromptOptimizationProfile> promptOptimizationProfiles;
   final String? activePromptOptimizationProfileId;
   final String? responseFormat;
@@ -431,6 +492,14 @@ class SettingsModel {
       }
     }
     return null;
+  }
+
+  String modelForProfile(ApiProfile profile) {
+    final selected = activeModelByProfileId[profile.id];
+    if (selected != null && profile.models.contains(selected)) {
+      return selected;
+    }
+    return profile.model;
   }
 
   PromptOptimizationProfile? get activePromptOptimizationProfile {
@@ -464,6 +533,7 @@ class SettingsModel {
   SettingsModel copyWith({
     List<ApiProfile>? profiles,
     String? activeProfileId,
+    Map<String, String>? activeModelByProfileId,
     List<PromptOptimizationProfile>? promptOptimizationProfiles,
     String? activePromptOptimizationProfileId,
     bool clearActivePromptOptimizationProfileId = false,
@@ -482,6 +552,8 @@ class SettingsModel {
     return SettingsModel(
       profiles: profiles ?? this.profiles,
       activeProfileId: activeProfileId ?? this.activeProfileId,
+      activeModelByProfileId:
+          activeModelByProfileId ?? this.activeModelByProfileId,
       promptOptimizationProfiles:
           promptOptimizationProfiles ?? this.promptOptimizationProfiles,
       activePromptOptimizationProfileId: clearActivePromptOptimizationProfileId
@@ -509,6 +581,7 @@ class SettingsModel {
     return {
       'profiles': profiles.map((profile) => profile.toJson()).toList(),
       'activeProfileId': activeProfileId,
+      'activeModelByProfileId': activeModelByProfileId,
       'promptOptimizationProfiles': promptOptimizationProfiles
           .map((profile) => profile.toJson())
           .toList(),
@@ -611,6 +684,42 @@ class SettingsModel {
       num value => value != 0,
       _ => fallback,
     };
+  }
+
+  static Map<String, String> _normalizeActiveModelByProfileId(
+    Object? rawValue,
+    List<ApiProfile> profiles,
+  ) {
+    if (rawValue is! Map) {
+      return const {};
+    }
+
+    final normalized = <String, String>{};
+    for (final entry in rawValue.entries) {
+      final profileId = entry.key;
+      final model = entry.value;
+      if (profileId is! String || profileId.isEmpty) {
+        continue;
+      }
+      if (model is! String || model.trim().isEmpty) {
+        continue;
+      }
+
+      ApiProfile? profile;
+      for (final item in profiles) {
+        if (item.id == profileId) {
+          profile = item;
+          break;
+        }
+      }
+      if (profile == null || !profile.models.contains(model)) {
+        continue;
+      }
+
+      normalized[profileId] = model;
+    }
+
+    return Map<String, String>.unmodifiable(normalized);
   }
 
   static WebDavBackupConfig? _normalizeWebDavBackupConfig(Object? rawValue) {
