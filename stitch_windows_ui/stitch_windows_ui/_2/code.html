@@ -1,0 +1,240 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {"colors": {"surface-light": "#F8FAFC", "on-secondary-fixed": "#001d31", "outline": "#899297", "surface-tint": "#81d1f0", "outline-variant": "#3f484c", "secondary-fixed": "#cce5ff", "secondary": "#93ccff", "surface-container-lowest": "#0b0f11", "surface-container": "#1c2022", "tertiary-fixed": "#ffdcbd", "on-secondary-container": "#002c47", "on-surface": "#e0e3e5", "primary-fixed-dim": "#81d1f0", "on-secondary": "#003351", "surface-dark": "#0F172A", "background": "#101416", "on-tertiary": "#4a2800", "secondary-container": "#3198dc", "on-tertiary-container": "#ffe8d6", "on-error": "#690005", "on-primary": "#003544", "surface-dim": "#101416", "on-primary-fixed-variant": "#004d62", "tertiary-fixed-dim": "#ffb86f", "error-container": "#93000a", "on-tertiary-fixed": "#2c1600", "on-surface-variant": "#bec8cd", "tertiary": "#ffb86f", "inverse-primary": "#006781", "secondary-fixed-dim": "#93ccff", "tertiary-container": "#965e1c", "border-subtle": "rgba(255, 255, 255, 0.08)", "surface-container-highest": "#313537", "primary": "#81d1f0", "on-primary-container": "#d3f1ff", "on-primary-fixed": "#001f29", "surface-container-high": "#272b2c", "inverse-on-surface": "#2d3133", "primary-fixed": "#b9eaff", "error": "#ffb4ab", "surface-variant": "#313537", "primary-container": "#0e7490", "on-tertiary-fixed-variant": "#693c00", "surface-bright": "#363a3c", "surface": "#101416", "accent-teal": "#06B6D4", "on-secondary-fixed-variant": "#004b73", "surface-container-low": "#181c1e", "inverse-surface": "#e0e3e5", "on-background": "#e0e3e5", "on-error-container": "#ffdad6"}, "borderRadius": {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"}, "spacing": {"space-sm": "8px", "gutter": "16px", "space-lg": "24px", "space-xl": "32px", "space-xs": "4px", "space-md": "16px", "margin": "24px"}, "fontFamily": {"label-md": ["Manrope"], "headline-sm": ["Manrope"], "label-sm": ["Manrope"], "body-lg": ["Manrope"], "body-md": ["Manrope"], "body-sm": ["Manrope"], "headline-lg": ["Manrope"], "headline-md": ["Manrope"]}, "fontSize": {"label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}], "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}], "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}], "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}], "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}], "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}], "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}], "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}]}}}};</script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@100..900&amp;display=swap" rel="stylesheet"></head><body class="bg-surface font-body text-on-surface select-none"><header class="fixed top-0 left-0 right-0 h-10 bg-surface-container-low/90 backdrop-blur-md z-50 flex items-center justify-between px-3"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary text-[16px]">neurology</span><span class="text-xs font-label-md text-on-surface-variant">大川生图工作台 v2.4</span></div><div class="flex items-center h-full"><button class="h-full px-4 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">remove</span></button><button class="h-full px-4 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">check_box_outline_blank</span></button><button class="h-full px-4 text-on-surface-variant hover:bg-error-container hover:text-on-error-container transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">close</span></button></div></header><aside class="fixed left-0 top-10 h-[calc(100vh-2.5rem)] w-64 bg-surface-container-low/80 backdrop-blur-xl z-40 flex flex-col pt-space-lg pb-space-lg"><div class="px-space-lg mb-space-lg flex items-center gap-space-sm"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col"><span class="text-label-md text-on-surface">大川</span><span class="text-body-sm text-outline">生图工作台</span></div></div><nav class="flex-1 px-space-md space-y-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-bold"><a class="flex items-center px-space-md py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="workspace" href="#"><span class="material-symbols-outlined mr-space-md text-[20px]">palette</span>主界面</a><a class="flex items-center px-space-md py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="request-logs" href="#"><span class="material-symbols-outlined mr-space-md text-[20px]">terminal</span>日志</a><a aria-current="page" class="flex items-center px-space-md py-space-sm rounded-xl transition-all bg-primary-container text-on-primary-container font-bold" data-path="settings" href="#"><span class="material-symbols-outlined mr-space-md text-[20px]">settings</span>设置</a></nav></aside><div class="pl-64"><main class="relative pt-10 min-h-screen bg-surface bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-surface to-surface"><div class="flex flex-col w-full max-w-5xl mx-auto px-space-xl py-space-xl pb-32">
+<!-- Top section header -->
+<div class="flex items-center justify-between mb-space-xl">
+<div>
+<h1 class="font-headline-lg text-on-surface">系统设置&nbsp;</h1>
+<p class="font-body-md text-outline mt-space-xs">管理应用程序首选项、API 凭证、模型端点和数据持久化。</p>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="px-space-md py-space-xs rounded-full bg-primary-container text-on-primary-container text-label-sm flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-accent-teal animate-pulse"></span>
+        本地守护进程运行中
+      </span>
+</div>
+</div>
+<div class="flex flex-col space-y-space-lg">
+<!-- About Card -->
+<div class="bg-surface-container-low rounded-xl p-space-lg transition-all duration-300 hover:bg-surface-container hover:shadow-xl relative overflow-hidden group">
+<div class="absolute -right-10 -bottom-10 w-40 h-40 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-all"></div>
+<div class="flex items-start justify-between relative z-10">
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded-xl bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: &quot;FILL&quot; 1;">neurology</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-on-surface">关于 大川生图工具</h2>
+<div class="flex items-center gap-space-sm mt-space-xs">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant text-label-sm font-mono">v2.4.0</span>
+
+</div>
+</div>
+</div>
+<a class="px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-label-md flex items-center gap-space-sm transition-colors" href="https://github.com" target="_blank">
+<span class="material-symbols-outlined text-[18px]">code</span>
+          GitHub 仓库
+        </a>
+</div>
+</div>
+<!-- Request Timeout Card -->
+<div class="bg-surface-container-low rounded-xl p-space-lg transition-all duration-300 hover:bg-surface-container hover:shadow-xl">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[24px]">timer</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-on-surface">请求超时（秒）</h2>
+<p class="font-body-sm text-outline mt-space-xs">设置生图 API 请求的最大等待时间阈值</p>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="px-space-md py-space-xs bg-surface-container-high rounded-xl text-on-surface font-mono font-bold text-body-md">
+            120 s
+          </div>
+<button class="px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-primary text-on-primary-container hover:text-on-primary font-label-md transition-all flex items-center gap-2 shadow-sm" onclick="openTimeoutModal()"><span class="material-symbols-outlined text-[16px]">save</span>保存</button>
+</div>
+</div>
+</div>
+<!-- Request Logs Card -->
+
+<!-- Data Backup & Restore Card -->
+<div class="bg-surface-container-low rounded-xl p-space-lg transition-all duration-300 hover:bg-surface-container hover:shadow-xl">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[24px]">database</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-on-surface">数据备份与同步</h2>
+<p class="font-body-sm text-outline mt-space-xs">导出本地历史生成记录、收藏夹配置或通过 WebDAV 云端同步</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md mt-space-lg pt-space-md">
+<button class="px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-label-md flex items-center justify-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[18px]">download</span>
+          导出本地备份 (.json)
+        </button>
+<button class="px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-label-md flex items-center justify-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[18px]">upload</span>
+          从文件恢复
+        </button>
+<button class="px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-primary text-on-primary-container hover:text-on-primary font-label-md flex items-center justify-center gap-2 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[18px]">cloud_sync</span>
+          WebDAV 同步 &amp; 恢复
+        </button>
+</div>
+</div>
+<!-- API Profiles Section -->
+<div class="bg-surface-container-low rounded-xl p-space-lg transition-all duration-300 hover:bg-surface-container">
+<div class="flex items-center justify-between mb-space-lg">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">api</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-on-surface">生图 API 端点配置</h2>
+<p class="font-body-sm text-outline">配置 Stable Diffusion / ComfyUI / Midjourney 代理服务</p>
+</div>
+</div>
+<button class="px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-primary text-on-primary-container hover:text-on-primary font-label-md flex items-center gap-2 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[16px]">add</span>
+          添加生图 API
+        </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Profile Card 1 -->
+<div class="bg-surface-container-high rounded-xl p-space-md relative flex flex-col justify-between group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="w-2.5 h-2.5 rounded-full bg-accent-teal shadow-[0_0_8px_rgba(6,182,212,0.6)]"></span>
+<span class="font-headline-sm text-on-surface text-[16px]">Local ComfyUI Node</span>
+<span class="px-2 py-0.5 rounded bg-primary-container text-on-primary-container text-label-sm">活动</span>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 rounded-lg hover:bg-surface-bright text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+</button>
+<button class="p-1.5 rounded-lg hover:bg-error-container text-on-surface-variant hover:text-on-error-container transition-colors">
+<span class="material-symbols-outlined text-[16px]">delete</span>
+</button>
+</div>
+</div>
+<div class="mt-space-md space-y-2">
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-outline">Base URL</span>
+<span class="font-mono text-on-surface-variant">http://127.0.0.1:8188</span>
+</div>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-outline">支持模型</span>
+<span class="font-mono text-on-surface-variant">SDXL Turbo, Flux.1 Dev</span>
+</div>
+</div>
+</div>
+<!-- Profile Card 2 -->
+<div class="bg-surface-container-high/50 rounded-xl p-space-md relative flex flex-col justify-between group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="w-2.5 h-2.5 rounded-full bg-outline"></span>
+<span class="font-headline-sm text-on-surface text-[16px]">SiliconFlow Cloud API</span>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 rounded-lg hover:bg-surface-bright text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+</button>
+<button class="p-1.5 rounded-lg hover:bg-error-container text-on-surface-variant hover:text-on-error-container transition-colors">
+<span class="material-symbols-outlined text-[16px]">delete</span>
+</button>
+</div>
+</div>
+<div class="mt-space-md space-y-2">
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-outline">Base URL</span>
+<span class="font-mono text-on-surface-variant">https://api.siliconflow.cn/v1</span>
+</div>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-outline">支持模型</span>
+<span class="font-mono text-on-surface-variant">Stable Diffusion 3.5</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Prompt Optimization API Section -->
+<div class="bg-surface-container-low rounded-xl p-space-lg transition-all duration-300 hover:bg-surface-container">
+<div class="flex items-center justify-between mb-space-lg">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[20px]">auto_awesome</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-on-surface">提示词优化 API (LLM)</h2>
+<p class="font-body-sm text-outline">配置用于扩展与精炼生图提示词的大语言模型服务</p>
+</div>
+</div>
+<button class="px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-label-md flex items-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[16px]">add</span>
+          添加优化 API
+        </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Prompt Profile Card -->
+<div class="bg-surface-container-high rounded-xl p-space-md relative flex flex-col justify-between group">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="w-2.5 h-2.5 rounded-full bg-accent-teal shadow-[0_0_8px_rgba(6,182,212,0.6)]"></span>
+<span class="font-headline-sm text-on-surface text-[16px]">DeepSeek V3 Prompt Agent</span>
+<span class="px-2 py-0.5 rounded bg-primary-container text-on-primary-container text-label-sm">活动</span>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 rounded-lg hover:bg-surface-bright text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+</button>
+<button class="p-1.5 rounded-lg hover:bg-error-container text-on-surface-variant hover:text-on-error-container transition-colors">
+<span class="material-symbols-outlined text-[16px]">delete</span>
+</button>
+</div>
+</div>
+<div class="mt-space-md space-y-2">
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-outline">Base URL</span>
+<span class="font-mono text-on-surface-variant">https://api.deepseek.com/v1</span>
+</div>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-outline">模型名称</span>
+<span class="font-mono text-on-surface-variant">deepseek-chat</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Local Data Section -->
+<div class="bg-surface-container-low rounded-xl p-space-lg transition-all duration-300 hover:bg-surface-container flex items-center justify-between">
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded-xl bg-error-container/40 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-[24px]">delete_sweep</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-on-surface">清理历史记录</h2>
+<p class="font-body-sm text-outline mt-space-xs">释放磁盘空间，清除所有生成的历史预览图片记录（不可恢复）</p>
+</div>
+</div>
+<button class="px-space-lg py-space-sm rounded-xl bg-error hover:bg-error/90 text-on-error font-label-md transition-all flex items-center gap-2 shadow-sm" onclick="confirmClearHistory()">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+        清除历史记录
+      </button>
+</div>
+</div>
+</div>
+<script>
+  function openTimeoutModal() {
+    console.log("Opening timeout configuration dialog...");
+  }
+  function confirmClearHistory() {
+    if (confirm("确定要永久清除所有历史生成记录吗？此操作无法撤销。")) {
+      console.log("History cleared.");
+    }
+  }
+</script></main></div></body></html>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/generation_request.dart';
 import '../../core/models/model_capabilities.dart';
+import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 import 'selector_chip_label.dart';
 
@@ -73,7 +74,7 @@ class BackgroundSelector extends StatelessWidget {
             color: _active
                 ? AppThemeTokens.primarySoft.withValues(alpha: 0.55)
                 : AppThemeTokens.surfaceSoft,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
               color: _active
                   ? AppThemeTokens.primary.withValues(alpha: 0.55)

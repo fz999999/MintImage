@@ -18,6 +18,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/attachment_picker_service.dart';
 import '../../core/services/image_clipboard_service.dart';
+import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 import 'attachment_preview_strip.dart';
 import 'background_selector.dart';
@@ -255,7 +256,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       child: SafeArea(
         top: false,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Material(
@@ -290,7 +291,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                 return DecoratedBox(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.circular(18),
+                                    borderRadius: BorderRadius.circular(AppRadius.sm),
                                     border: Border.all(
                                       color: focused
                                           ? AppThemeTokens.primary
@@ -788,7 +789,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                         onTap: () => Navigator.of(ctx).pop(profile.id),
                         child: Container(
                           width: double.infinity,
@@ -798,7 +799,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                           ),
                           decoration: BoxDecoration(
                             color: AppThemeTokens.surfaceSoft,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
                             border: Border.all(color: AppThemeTokens.border),
                           ),
                           child: Row(
@@ -1149,7 +1150,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                         onTap: () => Navigator.of(context).pop(direction),
                         child: Container(
                           width: double.infinity,
@@ -1159,7 +1160,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                           ),
                           decoration: BoxDecoration(
                             color: AppThemeTokens.surfaceSoft,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
                             border: Border.all(color: AppThemeTokens.border),
                           ),
                           child: Row(
@@ -1390,7 +1391,7 @@ class _PromptOptimizeButtonState extends State<_PromptOptimizeButton>
             color: Colors.transparent,
             child: InkWell(
               onTap: active ? widget.onTap : null,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               child: Center(child: widget.loading ? loadingWidget : iconWidget),
             ),
           ),
@@ -1420,7 +1421,7 @@ class _AttachmentInputButton extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               onTap: enabled ? onTap : null,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               child: const Center(
                 child: Icon(
                   Icons.attach_file_rounded,
@@ -1452,14 +1453,14 @@ class _ApiProfileSwitchButton extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 130),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           onTap: onTap,
           child: Container(
             constraints: const BoxConstraints(minHeight: 28),
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
             decoration: BoxDecoration(
               color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(
                 color: AppThemeTokens.border.withValues(alpha: 0.7),
               ),
@@ -1501,14 +1502,14 @@ class _ModelSwitchButton extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 170),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           onTap: onTap,
           child: Container(
             constraints: const BoxConstraints(minHeight: 28),
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
             decoration: BoxDecoration(
               color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(
                 color: AppThemeTokens.border.withValues(alpha: 0.7),
               ),
@@ -1558,7 +1559,7 @@ class _SendButton extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: colors),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: SizedBox(
           width: _primaryInputHeight,
@@ -1568,7 +1569,7 @@ class _SendButton extends StatelessWidget {
             child: InkWell(
               onTap: enabled ? onTap : null,
               onLongPress: enabled ? onLongPress : null,
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               child: const Center(
                 child: Icon(
                   Icons.arrow_upward_rounded,

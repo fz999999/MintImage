@@ -16,6 +16,7 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/backup_service.dart';
 import '../../core/services/webdav_backup_service.dart';
 import '../../core/version/app_version.dart';
+import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 import '../logs/request_log_page.dart';
 import 'api_profile_edit_page.dart';
@@ -896,7 +897,7 @@ class _AppInfoCard extends StatelessWidget {
                 height: 42,
                 decoration: BoxDecoration(
                   color: AppThemeTokens.surfaceSoft,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: const Icon(Icons.info_outline_rounded),
               ),
@@ -981,7 +982,7 @@ class _DataBackupCard extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: AppThemeTokens.surfaceSoft,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: const Icon(Icons.cloud_sync_rounded, size: 20),
               ),
@@ -1128,7 +1129,7 @@ class _InfoRow extends StatelessWidget {
     }
 
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1176,14 +1177,14 @@ class _AddConfigButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: AppThemeTokens.border),
         ),
         child: Row(
@@ -1217,7 +1218,7 @@ class _EmptyConfigHint extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: AppThemeTokens.border),
       ),
       child: Text(
@@ -1251,7 +1252,7 @@ class _ImageProfileCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Container(
           decoration: AppDecorations.card(radius: 18, color: tint),
           padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
@@ -1277,7 +1278,7 @@ class _ImageProfileCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1318,7 +1319,7 @@ class _ImageProfileCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: AppThemeTokens.surfaceMuted,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                     child: Text(
                       profile.apiMode.shortLabel,
@@ -1377,7 +1378,7 @@ class _PromptOptimizationProfileCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Container(
           decoration: AppDecorations.card(radius: 18, color: tint),
           padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
@@ -1405,7 +1406,7 @@ class _PromptOptimizationProfileCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1446,7 +1447,7 @@ class _PromptOptimizationProfileCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: AppThemeTokens.surfaceMuted,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                     child: Text(
                       profile.protocol.label,
@@ -1506,7 +1507,7 @@ class _RequestTimeoutCard extends StatelessWidget {
             height: 36,
             decoration: BoxDecoration(
               color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: const Icon(Icons.timer_outlined, size: 20),
           ),
@@ -1566,7 +1567,7 @@ class _ActionCard extends StatelessWidget {
             height: 36,
             decoration: BoxDecoration(
               color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: Icon(icon, size: 20),
           ),

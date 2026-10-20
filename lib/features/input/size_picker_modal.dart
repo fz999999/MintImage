@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 
 // --- Data models ---
@@ -225,7 +226,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: SafeArea(
@@ -277,7 +278,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: AppThemeTokens.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Text(
             size.$1 == 0 ? '自动' : '${size.$1}×${size.$2}',
@@ -296,7 +297,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: AppThemeTokens.surfaceSoft,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         children: [
@@ -322,7 +323,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
             color: active ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             boxShadow: active
                 ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4)]
                 : null,
@@ -423,7 +424,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: active ? AppThemeTokens.primary.withValues(alpha: 0.08) : AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
             color: active ? AppThemeTokens.primary : AppThemeTokens.border.withValues(alpha: 0.5),
           ),
@@ -460,7 +461,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
         decoration: BoxDecoration(
           color: active ? AppThemeTokens.primary.withValues(alpha: 0.08) : AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
             color: active ? AppThemeTokens.primary : AppThemeTokens.border.withValues(alpha: 0.5),
           ),
@@ -579,7 +580,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
             ),
             child: const Text('取消'),
@@ -594,7 +595,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
             ),
             child: const Text('确定'),

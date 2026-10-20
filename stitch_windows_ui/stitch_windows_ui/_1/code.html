@@ -1,0 +1,262 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {"colors": {"surface-light": "#F8FAFC", "on-secondary-fixed": "#001d31", "outline": "#899297", "surface-tint": "#81d1f0", "outline-variant": "#3f484c", "secondary-fixed": "#cce5ff", "secondary": "#93ccff", "surface-container-lowest": "#0b0f11", "surface-container": "#1c2022", "tertiary-fixed": "#ffdcbd", "on-secondary-container": "#002c47", "on-surface": "#e0e3e5", "primary-fixed-dim": "#81d1f0", "on-secondary": "#003351", "surface-dark": "#0F172A", "background": "#101416", "on-tertiary": "#4a2800", "secondary-container": "#3198dc", "on-tertiary-container": "#ffe8d6", "on-error": "#690005", "on-primary": "#003544", "surface-dim": "#101416", "on-primary-fixed-variant": "#004d62", "tertiary-fixed-dim": "#ffb86f", "error-container": "#93000a", "on-tertiary-fixed": "#2c1600", "on-surface-variant": "#bec8cd", "tertiary": "#ffb86f", "inverse-primary": "#006781", "secondary-fixed-dim": "#93ccff", "tertiary-container": "#965e1c", "border-subtle": "rgba(255, 255, 255, 0.08)", "surface-container-highest": "#313537", "primary": "#81d1f0", "on-primary-container": "#d3f1ff", "on-primary-fixed": "#001f29", "surface-container-high": "#272b2c", "inverse-on-surface": "#2d3133", "primary-fixed": "#b9eaff", "error": "#ffb4ab", "surface-variant": "#313537", "primary-container": "#0e7490", "on-tertiary-fixed-variant": "#693c00", "surface-bright": "#363a3c", "surface": "#101416", "accent-teal": "#06B6D4", "on-secondary-fixed-variant": "#004b73", "surface-container-low": "#181c1e", "inverse-surface": "#e0e3e5", "on-background": "#e0e3e5", "on-error-container": "#ffdad6"}, "borderRadius": {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"}, "spacing": {"space-sm": "8px", "gutter": "16px", "space-lg": "24px", "space-xl": "32px", "space-xs": "4px", "space-md": "16px", "margin": "24px"}, "fontFamily": {"label-md": ["Manrope"], "headline-sm": ["Manrope"], "label-sm": ["Manrope"], "body-lg": ["Manrope"], "body-md": ["Manrope"], "body-sm": ["Manrope"], "headline-lg": ["Manrope"], "headline-md": ["Manrope"]}, "fontSize": {"label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}], "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}], "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}], "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}], "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}], "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}], "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}], "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}]}}}};</script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@100..900&amp;display=swap" rel="stylesheet"></head><body class="bg-surface font-body text-on-surface select-none"><header class="fixed top-0 left-0 right-0 h-10 bg-surface-container-low/90 backdrop-blur-md z-50 flex items-center justify-between px-3"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary text-[16px]">neurology</span><span class="text-xs font-label-md text-on-surface-variant">大川生图工作台 v2.4</span></div><div class="flex items-center h-full"><button class="h-full px-4 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">remove</span></button><button class="h-full px-4 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">check_box_outline_blank</span></button><button class="h-full px-4 text-on-surface-variant hover:bg-error-container hover:text-on-error-container transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">close</span></button></div></header><aside class="fixed left-0 top-10 h-[calc(100vh-2.5rem)] w-64 bg-surface-container-low/80 backdrop-blur-xl z-40 flex flex-col pt-space-lg pb-space-lg"><div class="px-space-lg mb-space-lg flex items-center gap-space-sm"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col"><span class="text-label-md text-on-surface">大川</span><span class="text-body-sm text-outline">生图工作台</span></div></div><nav class="flex-1 px-space-md space-y-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-bold"><a aria-current="page" class="flex items-center px-space-md py-space-sm rounded-xl transition-all bg-primary-container text-on-primary-container font-bold" data-path="workspace" href="#"><span class="material-symbols-outlined mr-space-md text-[20px]">palette</span>主界面</a><a class="flex items-center px-space-md py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="request-logs" href="#"><span class="material-symbols-outlined mr-space-md text-[20px]">terminal</span>日志&nbsp;</a><a class="flex items-center px-space-md py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all" data-path="settings" href="#"><span class="material-symbols-outlined mr-space-md text-[20px]">settings</span>设置&nbsp;</a></nav></aside><div class="pl-64"><main class="relative pt-10 min-h-screen bg-surface bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-surface to-surface"><div class="flex flex-col w-full pb-36">
+<!-- Top Bar -->
+<div class="sticky top-10 z-30 flex items-center justify-between px-space-lg py-space-md bg-surface-container-low/90 backdrop-blur-xl">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-sm">
+
+
+</div>
+<div class="h-4 w-px bg-border-subtle"></div>
+<div class="flex items-center gap-space-xs text-body-sm text-outline">
+<span class="material-symbols-outlined text-[16px]">grid_view</span>
+<span class="">全部作品 (248)</span>
+</div>
+</div>
+
+<div class="flex items-center gap-space-sm"><button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors" id="search-toggle" title="搜索"><span class="material-symbols-outlined text-[16px]">search</span></button><button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors" title="收藏夹"><span class="material-symbols-outlined text-[16px]">star</span></button><button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors" title="多选"><span class="material-symbols-outlined text-[16px]">checklist</span></button></div></div>
+<!-- Collapsible Search Bar -->
+<div class="max-h-0 overflow-hidden transition-all duration-300 px-space-lg" id="search-bar-container">
+<div class="py-space-md flex items-center gap-space-md bg-surface-container/50 backdrop-blur-md rounded-xl px-space-md my-space-sm">
+<span class="material-symbols-outlined text-outline">search</span>
+<input class="bg-transparent border-none outline-none text-on-surface w-full text-body-md placeholder:text-outline" placeholder="搜索提示词、分辨率、或模型标签..." type="text">
+<button class="text-xs text-outline hover:text-on-surface">清空</button>
+</div>
+</div>
+<!-- Image Wall Grid (6 Columns) -->
+<div class="px-space-lg pt-space-md grid grid-cols-6 gap-space-md">
+<!-- Card 1: Completed -->
+<div class="group relative flex flex-col rounded-xl overflow-hidden bg-surface-container/80 backdrop-blur-md shadow-xl hover:-translate-y-1 transition-all duration-300">
+<div class="relative aspect-[16/9] w-full overflow-hidden">
+<div class="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-500" data-alt="一只戴着炫酷雷朋墨镜的柴犬，身处霓虹闪烁的赛博朋克未来城市街道，背景有巨幅全息广告牌，细雨蒙蒙，街道反射着粉蓝交织的光芒，虚幻引擎5渲染，超高细节，8k分辨率，大师级杰作。" style="background-image: url(&quot;https://lh3.googleusercontent.com/aida-public/AB6AXuAf6snn35HPaEIbSqCUbpNGVrxOD8DCDXjtlX_r4mC0s9Cy7leCXOh4z-s3RNj34DE3OzcsFnditY7cUFDKUC5fsI-sezotZlK6dLa8r51pDpo0mLdgIMTkwsm4RfLawCroey4qMPtgWlep1UVMN564XTnEAFjlK-CW_BpfiNvV0g7aAuyVMJpqUnQtpmF8utU8tyl5oIyZ920AZmVBljdkCnt541uS6Z93y1FF2Ehz4zRCesmBq8bu&quot;);"></div>
+<div class="absolute top-space-xs left-space-xs px-space-xs py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[10px] text-on-surface font-mono">2048x1152</div>
+<div class="absolute top-space-xs right-space-xs px-space-xs py-0.5 rounded bg-accent-teal/20 text-accent-teal text-[10px] backdrop-blur-md">完成</div>
+<div class="absolute inset-0 bg-surface-dim/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-space-sm">
+<button class="w-8 h-8 rounded-full bg-surface-container-highest text-on-surface flex items-center justify-center hover:scale-110 transition-transform"><span class="material-symbols-outlined text-[16px]">visibility</span></button>
+<button class="w-8 h-8 rounded-full bg-surface-container-highest text-on-surface flex items-center justify-center hover:scale-110 transition-transform"><span class="material-symbols-outlined text-[16px]">download</span></button>
+</div>
+</div>
+<div class="p-space-sm flex flex-col gap-space-xs">
+<p class="text-body-sm text-on-surface line-clamp-2">一只戴墨镜的柴犬，赛博朋克风格...</p>
+<div class="flex items-center justify-between text-[11px] text-outline">
+<span class="">16:9 • 高 • PNG</span>
+<span class="">12秒</span>
+</div>
+<div class="flex items-center justify-between pt-1 text-outline">
+<span class="text-[10px]">10分钟前</span>
+<div class="flex items-center gap-space-xs">
+<button class="hover:text-primary"><span class="material-symbols-outlined text-[14px]" style="font-variation-settings: &quot;FILL&quot; 1;">star</span></button>
+<button class="hover:text-on-surface"><span class="material-symbols-outlined text-[14px]">more_vert</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 2: Generating In Progress -->
+<div class="group relative flex flex-col rounded-xl overflow-hidden bg-surface-container/80 backdrop-blur-md shadow-xl border border-primary/20">
+<div class="relative aspect-[16/9] w-full overflow-hidden bg-surface-container-high flex flex-col items-center justify-center">
+<div class="absolute inset-0 bg-cover bg-center opacity-30 blur-sm" data-alt="生成中的虚幻风景图预览版..." style="background-image: url(&quot;https://lh3.googleusercontent.com/aida-public/AB6AXuDgz5_KXHqLNmij8Xp1clRNs09AjMa33ywiBuhYjMUIOJM5D8ZrNFICXSZnC5FJoD7rEjxJslo_ec5nSmhj8Q5mZ2ioTl66mKPZcqMSRmAAuaLbU-i_smM_MuHHLI8ojpMnnAFDGqW2Eq-sw0SFj1dahCgh4HDJC21444iYnlhzxulVakwrakbvY74SQevhLIJg73WeWO6d1VI72FPft6Fq0hZECHrE1g_aoRfaBveWuyZM2aDwxUIs&quot;);"></div>
+<div class="relative z-10 flex flex-col items-center gap-space-xs">
+<div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
+<span class="text-xs text-primary font-label-md">生成中 68%</span>
+</div>
+<div class="absolute top-space-xs left-space-xs px-space-xs py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[10px] text-on-surface font-mono">1024x1024</div>
+</div>
+<div class="p-space-sm flex flex-col gap-space-xs">
+<p class="text-body-sm text-on-surface line-clamp-2">水墨风格的远古巨龙腾空而起...</p>
+<div class="flex items-center justify-between text-[11px] text-outline">
+<span class="">1:1 • 标准 • JPG</span>
+<span class="text-primary animate-pulse">进行中</span>
+</div>
+<div class="flex items-center justify-between pt-1 text-outline">
+<span class="text-[10px]">刚刚</span>
+<div class="flex items-center gap-space-xs">
+<button class="hover:text-primary"><span class="material-symbols-outlined text-[14px]">star</span></button>
+<button class="hover:text-on-surface"><span class="material-symbols-outlined text-[14px]">more_vert</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 3: Failed State -->
+<div class="group relative flex flex-col rounded-xl overflow-hidden bg-surface-container/80 backdrop-blur-md shadow-xl">
+<div class="relative aspect-[16/9] w-full overflow-hidden bg-error-container/20 flex flex-col items-center justify-center p-space-sm text-center">
+<span class="material-symbols-outlined text-error text-[28px] mb-space-xs">error</span>
+<span class="text-xs text-error font-bold">上游错误</span>
+<button class="mt-space-xs px-2 py-1 rounded bg-error text-on-error text-[10px] hover:opacity-90">查看日志</button>
+<div class="absolute top-space-xs left-space-xs px-space-xs py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[10px] text-on-surface font-mono">4096x4096</div>
+</div>
+<div class="p-space-sm flex flex-col gap-space-xs">
+<p class="text-body-sm text-on-surface line-clamp-2">超高清未来机械星际战舰母舰...</p>
+<div class="flex items-center justify-between text-[11px] text-outline">
+<span class="">1:1 • 极高 • PNG</span>
+<span class="text-error">失败</span>
+</div>
+<div class="flex items-center justify-between pt-1 text-outline">
+<span class="text-[10px]">5分钟前</span>
+<div class="flex items-center gap-space-xs">
+<button class="hover:text-primary"><span class="material-symbols-outlined text-[14px]">star</span></button>
+<button class="hover:text-on-surface"><span class="material-symbols-outlined text-[14px]">more_vert</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="group relative flex flex-col rounded-xl overflow-hidden bg-surface-container/80 backdrop-blur-md shadow-xl hover:-translate-y-1 transition-all duration-300">
+<div class="relative aspect-[16/9] w-full overflow-hidden">
+<div class="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-500" data-alt="北欧极简主义现代客厅，阳光透过落地窗洒在木质地板上，绿植点缀，温暖舒适，室内设计摄影，4k。" style="background-image: url(&quot;https://lh3.googleusercontent.com/aida-public/AB6AXuAdk-MLXK3iXUYkdEc7mDwbWLff_WbD0rLp578NzwdZaV3Q1OcdJLUcIWJS2fxwPeJ6hRvoRP0Su-hKjym00x-wQLLS-ejTNAc8A4xD9nyiDqiQcpvFydADnzixFyKFbLUUodr7Yb4qnATjhPt_Wtd9CMkuDpkLFbtVUocFD1YNkh4Kx0ur7UG-qgzN_DeypMy-MKsvX8NIFcAw2a6n5bYZI47kqlWiFwXcXiyd1o1PvJaWekFL5wk_&quot;);"></div>
+<div class="absolute top-space-xs left-space-xs px-space-xs py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[10px] text-on-surface font-mono">2048x1152</div>
+<div class="absolute top-space-xs right-space-xs px-space-xs py-0.5 rounded bg-accent-teal/20 text-accent-teal text-[10px] backdrop-blur-md">完成</div>
+</div>
+<div class="p-space-sm flex flex-col gap-space-xs">
+<p class="text-body-sm text-on-surface line-clamp-2">北欧极简客厅，阳光落地窗...</p>
+<div class="flex items-center justify-between text-[11px] text-outline">
+<span class="">16:9 • 高 • PNG</span>
+<span class="">8秒</span>
+</div>
+<div class="flex items-center justify-between pt-1 text-outline">
+<span class="text-[10px]">1小时前</span>
+<div class="flex items-center gap-space-xs">
+<button class="hover:text-primary"><span class="material-symbols-outlined text-[14px]">star</span></button>
+<button class="hover:text-on-surface"><span class="material-symbols-outlined text-[14px]">more_vert</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="group relative flex flex-col rounded-xl overflow-hidden bg-surface-container/80 backdrop-blur-md shadow-xl hover:-translate-y-1 transition-all duration-300">
+<div class="relative aspect-[16/9] w-full overflow-hidden">
+<div class="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-500" data-alt="神秘的魔法森林，巨大的发光蘑菇，萤火虫在树干间飞舞，梦幻奇幻风格，电影级光影效果。" style="background-image: url(&quot;https://lh3.googleusercontent.com/aida-public/AB6AXuD21apSJrFR7QinmPejNW0daywtesXocRrLqFXqqfI35IlfEDh9PrfCOtfWxDfy-EW7m_tHSigePfVx8U1NLlEhyRuKhhdIQsDJDIgGbksW57KR9Be6nyx974Tw7SlMXo6Rhb_4wUgiL4qyJYWBBPe3D-qwgVBFs8nGRDnNJ_KNzWYfwVxdA3Dx2PJv9ioJNqeu6TSzFnmQtjkpIJBJnW-hKJNZe03vqDXsTXCWiQMQDWEoBGk304Tt&quot;);"></div>
+<div class="absolute top-space-xs left-space-xs px-space-xs py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[10px] text-on-surface font-mono">1920x1080</div>
+<div class="absolute top-space-xs right-space-xs px-space-xs py-0.5 rounded bg-accent-teal/20 text-accent-teal text-[10px] backdrop-blur-md">完成</div>
+</div>
+<div class="p-space-sm flex flex-col gap-space-xs">
+<p class="text-body-sm text-on-surface line-clamp-2">神秘魔法森林，发光蘑菇与萤火虫...</p>
+<div class="flex items-center justify-between text-[11px] text-outline">
+<span class="">16:9 • 高 • PNG</span>
+<span class="">14秒</span>
+</div>
+<div class="flex items-center justify-between pt-1 text-outline">
+<span class="text-[10px]">2小时前</span>
+<div class="flex items-center gap-space-xs">
+<button class="hover:text-primary"><span class="material-symbols-outlined text-[14px]" style="font-variation-settings: &quot;FILL&quot; 1;">star</span></button>
+<button class="hover:text-on-surface"><span class="material-symbols-outlined text-[14px]">more_vert</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 6 -->
+<div class="group relative flex flex-col rounded-xl overflow-hidden bg-surface-container/80 backdrop-blur-md shadow-xl hover:-translate-y-1 transition-all duration-300">
+<div class="relative aspect-[16/9] w-full overflow-hidden">
+<div class="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-500" data-alt="宇航员在火星表面弹吉他，远处是蓝色的地球，孤独而浪漫的科幻插画。" style="background-image: url(&quot;https://lh3.googleusercontent.com/aida-public/AB6AXuBolQ5jLlv8N_-qwOYFrbU_W56AWvMeX9XLcKQmERnQSFWUsemjzE5QPxSdAWq4-xwp_0Gh1I6VKyU4_eUcxmcUbXl18AqjceHrLfZ2ngFZHBo33mCJJ_37UipFNdqXnZot4GOo167G3x4k5t1pHaQ9DpRuFJvsP6aN5DI5La7uNC-20OmTskCRIeepg5-13lmWAZJwyut8dKCC_BnsuRIf8cLrBgw0f8XGED3M9BYYNOOSU90Ln-s2&quot;);"></div>
+<div class="absolute top-space-xs left-space-xs px-space-xs py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-md text-[10px] text-on-surface font-mono">1024x1024</div>
+<div class="absolute top-space-xs right-space-xs px-space-xs py-0.5 rounded bg-accent-teal/20 text-accent-teal text-[10px] backdrop-blur-md">完成</div>
+</div>
+<div class="p-space-sm flex flex-col gap-space-xs">
+<p class="text-body-sm text-on-surface line-clamp-2">火星表面弹吉他的宇航员...</p>
+<div class="flex items-center justify-between text-[11px] text-outline">
+<span class="">1:1 • 标准 • JPG</span>
+<span class="">9秒</span>
+</div>
+<div class="flex items-center justify-between pt-1 text-outline">
+<span class="text-[10px]">昨天</span>
+<div class="flex items-center gap-space-xs">
+<button class="hover:text-primary"><span class="material-symbols-outlined text-[14px]">star</span></button>
+<button class="hover:text-on-surface"><span class="material-symbols-outlined text-[14px]">more_vert</span></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Floating Bottom Input Bar -->
+<div class="fixed bottom-space-lg left-[calc(16rem+1.5rem)] right-space-lg z-40">
+<div class="flex flex-col gap-space-xs p-space-md rounded-[22px] bg-surface-container-high/90 backdrop-blur-2xl shadow-2xl border border-border-subtle">
+<!-- Attachment thumbnail row (supporting up to 8 images) -->
+<div class="flex items-center gap-space-xs overflow-x-auto pb-1 hidden" id="attachment-row">
+<div class="relative w-12 h-12 rounded-xl overflow-hidden bg-surface-container group flex-shrink-0">
+<div class="w-full h-full bg-cover bg-center" data-alt="附件参考图缩略图..." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCqfxlI-XAqyW7gnhhTge0eIhJnVO4wwtaMbOCWzjoA0sJaJtslVXDzvx8RI7fyGH2sR17y8muogghkkEgk6_Bm5nXpukdA3y62td9RGrKbiuRSq6XaWCLyGmzvuphCA2uvdNs6Z0AeweCmDqfP866w0dMmCoSOIfYzrQBzj_RD_K9VbckmPepoF7_UlQUvPdB8-xYWiKqIB0P45XtOEFtlxsVHOMOFTy5RltbeIIi13uF_JCm7xo0a')"></div>
+<button class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-surface-dim/80 text-on-surface flex items-center justify-center text-[10px] hover:bg-error">×</button>
+</div>
+<div class="relative w-12 h-12 rounded-xl overflow-hidden bg-surface-container group flex-shrink-0">
+<div class="w-full h-full bg-cover bg-center" data-alt="第二个附件参考图缩略图..." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBnomj3-_Fn710qLlkAz3PgtIljO_KwWNbPToTDM4YZ_HSonjQuW9c4gljKOtd024vjx16Sa_7MnuAWa2jV0BRFjhqfzQYmrn8FOqIgkPydBFSCiTdy8xoUwnfgjWs41Fn5j5JJfMmKA1P_CkSLPzd7C_lOkvpMdfoP9FvFsK5CMkGIHsJqWj3I2GFIcZHv_1SsV2XRq-2iklGo_PnmbtbdHBtyeKraORSlX4_wGZS8cVyNFSzZte1s')"></div>
+<button class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-surface-dim/80 text-on-surface flex items-center justify-center text-[10px] hover:bg-error">×</button>
+</div>
+</div>
+<!-- Main Input Area -->
+<div class="flex items-center gap-space-md">
+<button class="w-10 h-10 rounded-xl bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors" id="add-attachment-btn">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</button>
+<div class="flex-1 flex items-center">
+<textarea class="w-full bg-transparent border-none outline-none text-on-surface text-body-md placeholder:text-outline resize-none max-h-24" placeholder="描述你想生成的画面..." rows="2"></textarea>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 via-pink-400 to-cyan-400 text-on-primary flex items-center justify-center hover:opacity-90 transition-opacity shadow-lg shadow-primary-container/20" title="Prompt 智能优化"><span class="material-symbols-outlined text-[20px]">auto_awesome</span></button>
+<button class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-teal to-primary text-on-primary flex items-center justify-center hover:opacity-90 transition-opacity shadow-lg shadow-accent-teal/20" title="开始生成">
+<span class="material-symbols-outlined text-[20px]">arrow_upward</span>
+</button>
+</div>
+</div>
+<!-- Bottom Parameter Bar (FittedBox with 7 pill dropdowns/selectors) -->
+<div class="pt-space-xs border-t border-border-subtle flex items-center justify-between text-body-sm overflow-x-auto">
+<div class="flex items-center gap-space-xs">
+<!-- Aspect Ratio -->
+<div class="px-space-sm py-1 rounded-lg bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px]">aspect_ratio</span>
+<span class="text-label-sm">1:1</span>
+</div>
+<!-- Quality -->
+<div class="px-space-sm py-1 rounded-lg bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px]">high_quality</span>
+<span class="text-label-sm">高</span>
+</div>
+<!-- Format -->
+<div class="px-space-sm py-1 rounded-lg bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px]">image</span>
+<span class="text-label-sm">PNG</span>
+</div>
+<!-- Background -->
+<div class="px-space-sm py-1 rounded-lg bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px]">layers</span>
+<span class="text-label-sm">自动背景</span>
+</div>
+<!-- Quantity -->
+<div class="px-space-sm py-1 rounded-lg bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px]">copy_all</span>
+<span class="text-label-sm">1张</span>
+</div>
+<!-- Channel -->
+<div class="px-space-sm py-1 rounded-lg bg-surface-container hover:bg-surface-container-highest text-on-surface-variant flex items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px]">hub</span>
+<span class="text-label-sm">默认渠道</span>
+</div>
+<!-- Model -->
+<div class="px-space-sm py-1 rounded-lg bg-primary-container/30 text-primary flex items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px]">neurology</span>
+<span class="text-label-sm">gpt-image-2.5</span>
+</div>
+</div>
+<div class="text-[11px] text-outline px-space-xs">余额: <span class="text-primary font-mono">1,420 元</span></div>
+</div>
+</div>
+</div>
+<script>
+    const searchToggle = document.getElementById('search-toggle');
+    const searchBarContainer = document.getElementById('search-bar-container');
+    const addAttachmentBtn = document.getElementById('add-attachment-btn');
+    const attachmentRow = document.getElementById('attachment-row');
+
+    searchToggle.addEventListener('click', () => {
+      if (searchBarContainer.style.maxHeight && searchBarContainer.style.maxHeight !== '0px') {
+        searchBarContainer.style.maxHeight = '0px';
+      } else {
+        searchBarContainer.style.maxHeight = searchBarContainer.scrollHeight + 20 + 'px';
+      }
+    });
+
+    addAttachmentBtn.addEventListener('click', () => {
+      attachmentRow.classList.toggle('hidden');
+    });
+  </script>
+</div></main></div>
+
+</body></html>

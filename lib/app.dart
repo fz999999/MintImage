@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/providers/generation_provider.dart';
 import 'features/home/home_page.dart';
+import 'shared/actions/app_shortcuts.dart';
 import 'shared/theme.dart';
 import 'shared/window_lifecycle_channel.dart';
 
@@ -23,6 +24,7 @@ class GptImageApp extends ConsumerStatefulWidget {
 
 class _GptImageAppState extends ConsumerState<GptImageApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
+  final _homePageKey = GlobalKey<HomePageState>();
   AppLifecycleListener? _appLifecycleListener;
   Future<bool>? _pendingExitConfirmation;
 
@@ -61,8 +63,47 @@ class _GptImageAppState extends ConsumerState<GptImageApp> {
       title: '大川生图工具',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: widget.home ?? const HomePage(),
+      darkTheme: buildAppDarkTheme(),
+      themeMode: ThemeMode.system,
+      builder: (context, child) {
+        // 全局快捷键：桌面端补齐键盘效率，现状只有 Enter / Ctrl+V 两处。
+        final app = child ?? const SizedBox.shrink();
+        return AppShortcutsScope(
+          onAction: (action) => _handleShortcut(context, action),
+          child: app,
+        );
+      },
+      home: widget.home ?? HomePage(),
     );
+  }
+
+  /// 分发全局快捷键。页面级动作通过 `HomePage` 暴露的 GlobalKey 转发，
+  /// 避免 app 层反向依赖 feature 层。
+  void _handleShortcut(BuildContext context, AppShortcutAction action) {
+    switch (action) {
+      case AppShortcutAction.showHelp:
+        showShortcutHelpDialog(context);
+      case AppShortcutAction.openSettings:
+        final homeState = _homePageKey.currentState;
+        if (homeState != null) {
+          homeState.openSettings();
+        }
+      case AppShortcutAction.refresh:
+        final homeState = _homePageKey.currentState;
+        if (homeState != null) {
+          homeState.refreshList();
+        }
+      case AppShortcutAction.focusSearch:
+      case AppShortcutAction.newTask:
+      case AppShortcutAction.selectAll:
+      case AppShortcutAction.favoriteSelected:
+      case AppShortcutAction.toggleMultiSelect:
+      case AppShortcutAction.deleteSelected:
+        final homeState = _homePageKey.currentState;
+        if (homeState != null) {
+          homeState.dispatchShortcut(action);
+        }
+    }
   }
 
   /// 由 native runner 在收到窗口关闭请求时调用。

@@ -12,6 +12,9 @@ import '../../core/providers/image_list_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/providers/update_check_provider.dart';
 import '../../core/version/app_version.dart';
+import '../../shared/actions/app_shortcuts.dart';
+import '../../shared/design/tokens.dart';
+import '../../shared/design/app_colors.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../favorites/favorite_folder_sheet.dart';
@@ -23,10 +26,10 @@ class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  ConsumerState<HomePage> createState() => _HomePageState();
+  HomePageState createState() => HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> {
+class HomePageState extends ConsumerState<HomePage> {
   final GlobalKey<BottomInputBarState> _inputBarKey =
       GlobalKey<BottomInputBarState>();
   final TextEditingController _searchController = TextEditingController();
@@ -117,7 +120,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               onPressed: hasActiveFavoriteFolder
                   ? _clearFavoriteFolderFilter
                   : _openFavoriteFolders,
-              color: hasActiveFavoriteFolder ? Colors.orange.shade700 : null,
+              color: hasActiveFavoriteFolder ? AppColors.favorite(Theme.of(context).brightness) : null,
               icon: Icon(
                 hasActiveFavoriteFolder
                     ? Icons.star_rounded
@@ -178,7 +181,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surface,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide.none,
                         ),
                       ),
@@ -280,6 +283,46 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------
+  // 全局快捷键入口：供 app.dart 的 AppShortcutsScope 回调
+  // ---------------------------------------------------------------------
+
+  /// 分发全局快捷键动作。
+  void dispatchShortcut(AppShortcutAction action) {
+    switch (action) {
+      case AppShortcutAction.focusSearch:
+        _toggleSearchPanel();
+      case AppShortcutAction.newTask:
+        _newTask();
+      case AppShortcutAction.selectAll:
+        _enterSelectionMode();
+      case AppShortcutAction.toggleMultiSelect:
+        _selectionMode ? _exitSelectionMode() : _enterSelectionMode();
+      case AppShortcutAction.deleteSelected:
+        _confirmDeleteSelectedRecords();
+      case AppShortcutAction.favoriteSelected:
+      case AppShortcutAction.openSettings:
+      case AppShortcutAction.refresh:
+      case AppShortcutAction.showHelp:
+        break;
+    }
+  }
+
+  /// 打开设置页（供全局快捷键调用）。
+  void openSettings() {
+    _openSettings();
+  }
+
+  /// 刷新图墙列表。
+  void refreshList() {
+    ref.read(imageListProvider.notifier).reload();
+  }
+
+  /// 新建任务：聚焦输入栏并清空现有内容。
+  void _newTask() {
+    _inputBarKey.currentState?.prefillPrompt('');
   }
 
   Future<void> _submitRequest(GenerationRequest request) async {
@@ -563,12 +606,12 @@ class _NewVersionBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(AppRadius.full),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
           color: const Color(0xFFE4F6EE),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: const Color(0xFF93D7B5)),
         ),
         child: Text(

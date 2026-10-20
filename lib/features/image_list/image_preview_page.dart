@@ -12,6 +12,7 @@ import 'package:photo_view/photo_view_gallery.dart';
 import '../../core/models/image_record.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/checkerboard_background.dart';
 
@@ -346,7 +347,7 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
       key: const ValueKey('preview-info-expanded'),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Padding(
@@ -710,7 +711,7 @@ class _PreviewChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppThemeTokens.primaryStrong.withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         label,
@@ -812,7 +813,7 @@ class _ZoomBadge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Text(

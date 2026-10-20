@@ -1,3 +1,5 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -168,19 +170,26 @@ class _ImageListWidgetState extends ConsumerState<ImageListWidget> {
             },
           );
 
-          if (!widget.selectionMode) {
-            return grid;
+          // 桌面端必须有可见滚动条：720p 窗口下图墙通常只露出一行半，
+          // 没有滚动条用户不知道下面还有多少内容。
+          Widget scrollableGrid = grid;
+
+          if (widget.selectionMode) {
+            scrollableGrid = Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (_) => _dragSelectedIds.clear(),
+              onPointerMove: (event) {
+                _selectAtPosition(event.localPosition, metrics, records);
+              },
+              onPointerUp: (_) => _dragSelectedIds.clear(),
+              onPointerCancel: (_) => _dragSelectedIds.clear(),
+              child: grid,
+            );
           }
 
-          return Listener(
-            behavior: HitTestBehavior.opaque,
-            onPointerDown: (_) => _dragSelectedIds.clear(),
-            onPointerMove: (event) {
-              _selectAtPosition(event.localPosition, metrics, records);
-            },
-            onPointerUp: (_) => _dragSelectedIds.clear(),
-            onPointerCancel: (_) => _dragSelectedIds.clear(),
-            child: grid,
+          return ScrollConfiguration(
+            behavior: const _DesktopScrollBehavior(),
+            child: scrollableGrid,
           );
         },
       ),
@@ -309,4 +318,32 @@ class _GridMetrics {
       gap: gap,
     );
   }
+}
+
+/// 桌面端滚动行为：始终显示滚动条，并支持滚轮 + 触控板。
+class _DesktopScrollBehavior extends MaterialScrollBehavior {
+  const _DesktopScrollBehavior();
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return Scrollbar(
+      controller: details.controller,
+      // 桌面端常驻显示，否则用户无法判断图墙还有多少内容
+      thumbVisibility: true,
+      interactive: true,
+      child: child,
+    );
+  }
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
 }
