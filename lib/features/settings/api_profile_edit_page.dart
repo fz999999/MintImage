@@ -69,6 +69,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final previewBaseUrl = _baseUrlController.text.trim().replaceAll(
       RegExp(r'/+$'),
       '',
@@ -80,20 +81,20 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
     return Scaffold(
       appBar: AppBar(title: Text(_editingProfile == null ? '新增配置' : '编辑配置')),
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [AppThemeTokens.canvas, AppThemeTokens.canvasTint],
+            colors: [AppColors.canvas(b), AppColors.canvasTint(b)],
           ),
         ),
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpace.md),
             children: [
               Container(
-                decoration: AppDecorations.card(radius: 30),
+                decoration: AppDecorations.card(brightness: b, radius: AppRadius.lg),
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,7 +104,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
                     Text(
                       '这里维护 Base URL、多个模型、API Key 与生图 API。保存后可在主页底部切换 API 与模型。',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppThemeTokens.textSecondary,
+                        color: AppColors.textSecondary(b),
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -133,13 +134,13 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppThemeTokens.surfaceSoft,
-                        borderRadius: BorderRadius.circular(16),
+                        color: AppColors.surfaceSoft(b),
+                        borderRadius: AppRadius.mdAll,
                       ),
                       child: Text(
                         '最终生成接口：$finalUrl',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppThemeTokens.textSecondary,
+                          color: AppColors.textSecondary(b),
                         ),
                       ),
                     ),
@@ -208,7 +209,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
                     Text(
                       '至少保留一个模型。主页底部展示的模型都来自这里。',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppThemeTokens.textSecondary,
+                        color: AppColors.textSecondary(b),
                       ),
                     ),
                     const SizedBox(height: 10),

@@ -184,6 +184,10 @@ class SettingsController extends StateNotifier<SettingsModel> {
   }
 
   Future<void> deletePromptOptimizationProfile(String id) async {
+    // 兜底：至少保留 1 个配置（与 UI 层 canDelete 判断一致）。
+    if (state.promptOptimizationProfiles.length <= 1) {
+      return;
+    }
     final profiles = state.promptOptimizationProfiles
         .where((profile) => profile.id != id)
         .toList();

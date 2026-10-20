@@ -70,6 +70,7 @@ class _PromptOptimizationProfileEditPageState
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final finalUrl = _previewEndpoint();
 
     return Scaffold(
@@ -77,20 +78,20 @@ class _PromptOptimizationProfileEditPageState
         title: Text(_editingProfile == null ? '新增提示词优化 API' : '编辑提示词优化 API'),
       ),
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [AppThemeTokens.canvas, AppThemeTokens.canvasTint],
+            colors: [AppColors.canvas(b), AppColors.canvasTint(b)],
           ),
         ),
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpace.md),
             children: [
               Container(
-                decoration: AppDecorations.card(radius: 24),
+                decoration: AppDecorations.card(brightness: b, radius: AppRadius.lg),
                 padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,7 +101,7 @@ class _PromptOptimizationProfileEditPageState
                     Text(
                       '这里维护提示词优化专用的协议、Base URL、模型名与 API Key。',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppThemeTokens.textSecondary,
+                        color: AppColors.textSecondary(b),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -163,13 +164,13 @@ class _PromptOptimizationProfileEditPageState
                       width: double.infinity,
                       padding: const EdgeInsets.all(11),
                       decoration: BoxDecoration(
-                        color: AppThemeTokens.surfaceSoft,
-                        borderRadius: BorderRadius.circular(14),
+                        color: AppColors.surfaceSoft(b),
+                        borderRadius: AppRadius.smAll,
                       ),
                       child: Text(
                         '最终请求接口：$finalUrl',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppThemeTokens.textSecondary,
+                          color: AppColors.textSecondary(b),
                         ),
                       ),
                     ),

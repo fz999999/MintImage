@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,45 +16,56 @@ import '../../core/services/backup_service.dart';
 import '../../core/services/webdav_backup_service.dart';
 import '../../core/version/app_version.dart';
 import '../../shared/theme.dart';
-import '../logs/request_log_page.dart';
 import 'api_profile_edit_page.dart';
 import 'prompt_optimization_profile_edit_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
+  /// 请求超时允许的最小秒数。
+  static const int _minTimeoutSeconds = 5;
+
+  /// 请求超时允许的最大秒数。
+  static const int _maxTimeoutSeconds = 3600;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    final b = Theme.of(context).brightness;
+    // 「至少保留 1 个配置」的保护：只剩 1 个时禁用删除按钮。
+    final canDeleteImageProfile = settings.profiles.length > 1;
+    final canDeleteOptimizationProfile =
+        settings.promptOptimizationProfiles.length > 1;
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [AppThemeTokens.canvas, AppThemeTokens.canvasTint],
+            colors: [AppColors.canvas(b), AppColors.canvasTint(b)],
           ),
         ),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpace.sm,
+            AppSpace.sm,
+            AppSpace.sm,
+            AppSpace.xl,
+          ),
           children: [
             const _AppInfoCard(),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpace.sm),
             _RequestTimeoutCard(
               timeoutSeconds: settings.requestTimeoutSeconds,
-              onEdit: () => _editRequestTimeout(context, ref, settings),
+              minSeconds: _minTimeoutSeconds,
+              maxSeconds: _maxTimeoutSeconds,
+              onSave: (seconds) => ref
+                  .read(settingsProvider.notifier)
+                  .setRequestTimeoutSeconds(seconds),
             ),
-            const SizedBox(height: 12),
-            _ActionCard(
-              icon: Icons.receipt_long_rounded,
-              title: '请求日志',
-              description: '查看当前进程记录的请求、响应和错误详情。',
-              actionLabel: '查看日志',
-              onAction: () => _openRequestLogs(context),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpace.sm),
             _DataBackupCard(
               webDavConfig: settings.webDavBackupConfig,
               onExportToFile: () => _exportBackupToFile(context, ref, settings),
@@ -66,105 +76,103 @@ class SettingsPage extends ConsumerWidget {
               onRestoreFromWebDav: () =>
                   _restoreBackupFromWebDav(context, ref, settings),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpace.md),
             _SectionTitle(
-              icon: Icons.auto_awesome_motion_rounded,
+              icon: Icon(
+                Icons.auto_awesome_motion_rounded,
+                size: AppIconSize.sm,
+                color: AppColors.primaryStrong(b),
+              ),
               title: '生图API',
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpace.xs),
             for (final profile in settings.profiles)
-              Slidable(
-                key: ValueKey('image-${profile.id}'),
-                endActionPane: settings.profiles.length <= 1
-                    ? null
-                    : ActionPane(
-                        motion: const ScrollMotion(),
-                        children: [
-                          SlidableAction(
-                            onPressed: (_) async {
-                              await ref
-                                  .read(settingsProvider.notifier)
-                                  .deleteProfile(profile.id);
-                            },
-                            backgroundColor: Colors.red.shade400,
-                            foregroundColor: Colors.white,
-                            icon: Icons.delete_rounded,
-                            label: '删除',
-                          ),
-                        ],
-                      ),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _ImageProfileCard(
-                    profile: profile,
-                    isActive: profile.id == settings.activeProfileId,
-                    onTap: () async {
-                      await ref
-                          .read(settingsProvider.notifier)
-                          .setActiveProfile(profile.id);
-                    },
-                    onEdit: () => _openImageEditor(context, profile: profile),
-                  ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpace.xs),
+                child: _ImageProfileCard(
+                  profile: profile,
+                  isActive: profile.id == settings.activeProfileId,
+                  canDelete: canDeleteImageProfile,
+                  onTap: () async {
+                    await ref
+                        .read(settingsProvider.notifier)
+                        .setActiveProfile(profile.id);
+                  },
+                  onEdit: () => _openImageEditor(context, profile: profile),
+                  onDelete: () async {
+                    final confirmed = await _confirmDeleteConfig(
+                      context,
+                      kind: '生图 API',
+                      name: profile.name,
+                    );
+                    if (confirmed != true) {
+                      return;
+                    }
+                    await ref
+                        .read(settingsProvider.notifier)
+                        .deleteProfile(profile.id);
+                  },
                 ),
               ),
             _AddConfigButton(
-              icon: Icons.add_rounded,
+              icon: const Icon(Icons.add_rounded, size: AppIconSize.sm),
               label: '添加生图 API',
               onTap: () => _openImageEditor(context),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpace.md),
             const Divider(),
-            const SizedBox(height: 14),
-            _SectionTitle(icon: Icons.auto_fix_high_rounded, title: '提示词优化API'),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpace.sm),
+            _SectionTitle(
+              icon: Icon(
+                Icons.auto_fix_high_rounded,
+                size: AppIconSize.sm,
+                color: AppColors.primaryStrong(b),
+              ),
+              title: '提示词优化API',
+            ),
+            const SizedBox(height: AppSpace.xs),
             if (settings.promptOptimizationProfiles.isEmpty) ...[
               _EmptyConfigHint(text: '还没有提示词优化 API。添加后，首页输入框右侧会启用提示词优化。'),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpace.xs),
             ],
             for (final profile in settings.promptOptimizationProfiles)
-              Slidable(
-                key: ValueKey('optimizer-${profile.id}'),
-                endActionPane: ActionPane(
-                  motion: const ScrollMotion(),
-                  children: [
-                    SlidableAction(
-                      onPressed: (_) async {
-                        await ref
-                            .read(settingsProvider.notifier)
-                            .deletePromptOptimizationProfile(profile.id);
-                      },
-                      backgroundColor: Colors.red.shade400,
-                      foregroundColor: Colors.white,
-                      icon: Icons.delete_rounded,
-                      label: '删除',
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _PromptOptimizationProfileCard(
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpace.xs),
+                child: _PromptOptimizationProfileCard(
+                  profile: profile,
+                  isActive:
+                      profile.id == settings.activePromptOptimizationProfileId,
+                  canDelete: canDeleteOptimizationProfile,
+                  onTap: () async {
+                    await ref
+                        .read(settingsProvider.notifier)
+                        .setActivePromptOptimizationProfile(profile.id);
+                  },
+                  onEdit: () => _openPromptOptimizationEditor(
+                    context,
                     profile: profile,
-                    isActive:
-                        profile.id ==
-                        settings.activePromptOptimizationProfileId,
-                    onTap: () async {
-                      await ref
-                          .read(settingsProvider.notifier)
-                          .setActivePromptOptimizationProfile(profile.id);
-                    },
-                    onEdit: () => _openPromptOptimizationEditor(
-                      context,
-                      profile: profile,
-                    ),
                   ),
+                  onDelete: () async {
+                    final confirmed = await _confirmDeleteConfig(
+                      context,
+                      kind: '提示词优化 API',
+                      name: profile.name,
+                    );
+                    if (confirmed != true) {
+                      return;
+                    }
+                    await ref
+                        .read(settingsProvider.notifier)
+                        .deletePromptOptimizationProfile(profile.id);
+                  },
                 ),
               ),
             _AddConfigButton(
-              icon: Icons.add_rounded,
+              icon: const Icon(Icons.add_rounded, size: AppIconSize.sm),
               label: '添加提示词优化 API',
               onTap: () => _openPromptOptimizationEditor(context),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpace.md),
             FilledButton.tonalIcon(
               onPressed: () async {
                 final confirmed = await showDialog<bool>(
@@ -202,8 +210,8 @@ class SettingsPage extends ConsumerWidget {
               icon: const Icon(Icons.delete_sweep_rounded),
               label: const Text('清除历史记录'),
               style: FilledButton.styleFrom(
-                backgroundColor: AppThemeTokens.dangerSurface,
-                foregroundColor: AppThemeTokens.dangerText,
+                backgroundColor: AppColors.dangerSurface(b),
+                foregroundColor: AppColors.dangerText(b),
               ),
             ),
           ],
@@ -234,80 +242,36 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _editRequestTimeout(
-    BuildContext context,
-    WidgetRef ref,
-    SettingsModel settings,
-  ) async {
-    final controller = TextEditingController(
-      text: settings.requestTimeoutSeconds.toString(),
-    );
-
-    final timeoutSeconds = await showDialog<int>(
+  /// 删除配置前的二次确认。返回 true 表示用户确认删除。
+  Future<bool?> _confirmDeleteConfig(
+    BuildContext context, {
+    required String kind,
+    required String name,
+  }) {
+    return showDialog<bool>(
       context: context,
       builder: (context) {
-        String? errorText;
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('请求超时（秒）'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.number,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: '超时时间',
-                      suffixText: '秒',
-                      errorText: errorText,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '默认 600 秒。生成较慢时可以适当调高。',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
+        final b = Theme.of(context).brightness;
+        return AlertDialog(
+          title: const Text('删除配置'),
+          content: Text('删除$kind「$name」？此操作不可撤销。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.dangerSurface(b),
+                foregroundColor: AppColors.dangerText(b),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final parsed = int.tryParse(controller.text.trim());
-                    if (parsed == null || parsed <= 0) {
-                      setState(() {
-                        errorText = '请输入大于 0 的整数';
-                      });
-                      return;
-                    }
-
-                    Navigator.of(context).pop(parsed);
-                  },
-                  child: const Text('保存'),
-                ),
-              ],
-            );
-          },
+              child: const Text('删除'),
+            ),
+          ],
         );
       },
     );
-
-    controller.dispose();
-
-    if (timeoutSeconds == null) {
-      return;
-    }
-
-    await ref
-        .read(settingsProvider.notifier)
-        .setRequestTimeoutSeconds(timeoutSeconds);
   }
 
   Future<void> _exportBackupToFile(
@@ -427,6 +391,7 @@ class SettingsPage extends ConsumerWidget {
 
         return StatefulBuilder(
           builder: (context, setState) {
+            final b = Theme.of(context).brightness;
             return AlertDialog(
               title: const Text('WebDAV 设置'),
               content: SingleChildScrollView(
@@ -478,8 +443,8 @@ class SettingsPage extends ConsumerWidget {
                         errorText!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: statusIsSuccess
-                              ? AppThemeTokens.primaryStrong
-                              : Colors.red.shade700,
+                              ? AppColors.primaryStrong(b)
+                              : AppColors.dangerText(b),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -852,30 +817,194 @@ class SettingsPage extends ConsumerWidget {
     }
     return '操作失败：$error';
   }
+}
 
-  Future<void> _openRequestLogs(BuildContext context) async {
-    if (_supportsDetachedLogWindow) {
-      try {
-        await Process.start(Platform.resolvedExecutable, const [
-          '--log-window',
-        ], mode: ProcessStartMode.detached);
-        return;
-      } catch (_) {
-        // Fall back to in-app viewing when detached launch fails.
-      }
-    }
+/// 卡片左侧的方角图标底。
+class _CardIcon extends StatelessWidget {
+  const _CardIcon({required this.child});
 
-    if (!context.mounted) {
-      return;
-    }
+  final Widget child;
 
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const RequestLogPage()));
+  @override
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    return Container(
+      width: 36,
+      height: 36,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft(b),
+        borderRadius: AppRadius.smAll,
+      ),
+      child: child,
+    );
   }
+}
 
-  bool get _supportsDetachedLogWindow =>
-      Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+/// 卡片右上角的小圆角图标按钮（32×32，hover 底色 `surfaceMuted`）。
+///
+/// 图标由调用方以 `const Icon(Icons.xxx)` 内联传入，避免 release 图标被裁掉。
+class _HoverIconButton extends StatefulWidget {
+  const _HoverIconButton({
+    required this.tooltip,
+    required this.onPressed,
+    required this.child,
+  });
+
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final Widget child;
+
+  @override
+  State<_HoverIconButton> createState() => _HoverIconButtonState();
+}
+
+class _HoverIconButtonState extends State<_HoverIconButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    final enabled = widget.onPressed != null;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: AppRadius.xsAll,
+          child: InkWell(
+            onTap: widget.onPressed,
+            borderRadius: AppRadius.xsAll,
+            hoverColor: Colors.transparent,
+            child: AnimatedContainer(
+              duration: AppMotion.fast,
+              curve: AppMotion.curve,
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _hovered && enabled
+                    ? AppColors.surfaceMuted(b)
+                    : Colors.transparent,
+                borderRadius: AppRadius.xsAll,
+              ),
+              child: widget.child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 配置卡右上角的编辑 / 删除按钮组。
+class _ConfigActions extends StatelessWidget {
+  const _ConfigActions({
+    required this.canDelete,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final bool canDelete;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _HoverIconButton(
+          tooltip: '编辑',
+          onPressed: onEdit,
+          child: Icon(
+            Icons.edit_outlined,
+            size: AppIconSize.sm,
+            color: AppColors.primaryStrong(b),
+          ),
+        ),
+        const SizedBox(width: AppSpace.xxs),
+        _HoverIconButton(
+          tooltip: canDelete ? '删除' : '至少保留 1 个配置',
+          onPressed: canDelete ? onDelete : null,
+          child: Icon(
+            Icons.delete_outline,
+            size: AppIconSize.sm,
+            color: canDelete
+                ? AppColors.dangerText(b)
+                : AppColors.textTertiary(b),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 「使用中」徽章。
+class _ActiveBadge extends StatelessWidget {
+  const _ActiveBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.xs + 2,
+        vertical: AppSpace.xxs + 1,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface(b),
+        borderRadius: AppRadius.fullAll,
+        border: Border.all(color: AppColors.border(b)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.check_circle_rounded,
+            size: AppIconSize.xs + 2,
+            color: AppColors.primary(b),
+          ),
+          const SizedBox(width: AppSpace.xxs + 2),
+          Text('使用中', style: Theme.of(context).textTheme.labelSmall),
+        ],
+      ),
+    );
+  }
+}
+
+/// 协议 / 模式的小胶囊。
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.xs - 1,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted(b),
+        borderRadius: AppRadius.fullAll,
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppColors.primaryStrong(b),
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
 }
 
 class _AppInfoCard extends StatelessWidget {
@@ -883,9 +1012,10 @@ class _AppInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return Container(
-      decoration: AppDecorations.card(radius: 28),
-      padding: const EdgeInsets.all(18),
+      decoration: AppDecorations.card(brightness: b, radius: AppRadius.lg),
+      padding: const EdgeInsets.all(AppSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -894,13 +1024,14 @@ class _AppInfoCard extends StatelessWidget {
               Container(
                 width: 42,
                 height: 42,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: AppThemeTokens.surfaceSoft,
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.surfaceSoft(b),
+                  borderRadius: AppRadius.smAll,
                 ),
                 child: const Icon(Icons.info_outline_rounded),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: Text(
                   '关于 大川生图工具',
@@ -909,15 +1040,23 @@ class _AppInfoCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpace.sm),
           _InfoRow(
-            icon: Icons.sell_outlined,
+            icon: Icon(
+              Icons.sell_outlined,
+              size: AppIconSize.sm,
+              color: AppColors.primaryStrong(b),
+            ),
             label: '版本',
             value: AppVersion.current,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpace.xs),
           _InfoRow(
-            icon: Icons.code_rounded,
+            icon: Icon(
+              Icons.code_rounded,
+              size: AppIconSize.sm,
+              color: AppColors.primaryStrong(b),
+            ),
             label: '开源地址',
             value: AppVersion.repositoryUrl,
             onTap: () => _openRepository(context),
@@ -965,27 +1104,22 @@ class _DataBackupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final configured = webDavConfig?.isConfigured ?? false;
     final status = configured ? webDavConfig!.remoteDirectory : '未配置';
 
     return Container(
-      decoration: AppDecorations.card(radius: 22),
-      padding: const EdgeInsets.all(14),
+      decoration: AppDecorations.card(brightness: b, radius: AppRadius.lg),
+      padding: const EdgeInsets.all(AppSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppThemeTokens.surfaceSoft,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.cloud_sync_rounded, size: 20),
+              const _CardIcon(
+                child: Icon(Icons.cloud_sync_rounded, size: AppIconSize.md),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1000,7 +1134,7 @@ class _DataBackupCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppThemeTokens.textSecondary,
+                        color: AppColors.textSecondary(b),
                       ),
                     ),
                   ],
@@ -1008,33 +1142,55 @@ class _DataBackupCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
+          const SizedBox(height: AppSpace.sm),
+          // 本地备份：导出 / 从文件恢复。
+          _BackupGroup(
+            title: '本地',
+            actions: [
               _BackupActionButton(
-                icon: Icons.upload_file_rounded,
-                label: '导出到文件',
+                icon: const Icon(
+                  Icons.upload_file_rounded,
+                  size: AppIconSize.sm,
+                ),
+                label: '导出本地备份（.mintbackup）',
                 onPressed: onExportToFile,
               ),
               _BackupActionButton(
-                icon: Icons.restore_page_rounded,
+                icon: const Icon(
+                  Icons.restore_page_rounded,
+                  size: AppIconSize.sm,
+                ),
                 label: '从文件恢复',
                 onPressed: onRestoreFromFile,
               ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.sm),
+          // 云端备份：WebDAV 设置 / 同步 / 恢复。
+          _BackupGroup(
+            title: '云端（WebDAV）',
+            actions: [
               _BackupActionButton(
-                icon: Icons.settings_input_component_rounded,
+                icon: const Icon(
+                  Icons.settings_input_component_rounded,
+                  size: AppIconSize.sm,
+                ),
                 label: 'WebDAV 设置',
                 onPressed: onEditWebDav,
               ),
               _BackupActionButton(
-                icon: Icons.cloud_upload_rounded,
+                icon: const Icon(
+                  Icons.cloud_upload_rounded,
+                  size: AppIconSize.sm,
+                ),
                 label: '同步到 WebDAV',
                 onPressed: onSyncToWebDav,
               ),
               _BackupActionButton(
-                icon: Icons.cloud_download_rounded,
+                icon: const Icon(
+                  Icons.cloud_download_rounded,
+                  size: AppIconSize.sm,
+                ),
                 label: '从 WebDAV 恢复',
                 onPressed: onRestoreFromWebDav,
               ),
@@ -1046,6 +1202,38 @@ class _DataBackupCard extends StatelessWidget {
   }
 }
 
+/// 备份动作分组：组标题 + 一行可换行的按钮。
+class _BackupGroup extends StatelessWidget {
+  const _BackupGroup({required this.title, required this.actions});
+
+  final String title;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            fontSize: AppFontSize.label,
+            color: AppColors.textTertiary(b),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: AppSpace.xs),
+        Wrap(
+          spacing: AppSpace.xs,
+          runSpacing: AppSpace.xs,
+          children: actions,
+        ),
+      ],
+    );
+  }
+}
+
 class _BackupActionButton extends StatelessWidget {
   const _BackupActionButton({
     required this.icon,
@@ -1053,7 +1241,7 @@ class _BackupActionButton extends StatelessWidget {
     required this.onPressed,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String label;
   final VoidCallback onPressed;
 
@@ -1061,10 +1249,13 @@ class _BackupActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilledButton.tonalIcon(
       onPressed: onPressed,
-      icon: Icon(icon, size: 18),
+      icon: icon,
       label: Text(label),
       style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.sm,
+          vertical: AppSpace.xs,
+        ),
       ),
     );
   }
@@ -1078,27 +1269,28 @@ class _InfoRow extends StatelessWidget {
     this.onTap,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String label;
   final String value;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final content = Row(
       children: [
-        Icon(icon, size: 18, color: AppThemeTokens.primaryStrong),
-        const SizedBox(width: 10),
+        icon,
+        const SizedBox(width: AppSpace.xs + 2),
         SizedBox(
           width: 64,
           child: Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppThemeTokens.textSecondary,
+              color: AppColors.textSecondary(b),
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpace.xs),
         Expanded(
           child: Text(
             value,
@@ -1106,18 +1298,18 @@ class _InfoRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: onTap == null
-                  ? AppThemeTokens.textPrimary
-                  : AppThemeTokens.primaryStrong,
+                  ? AppColors.textPrimary(b)
+                  : AppColors.primaryStrong(b),
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
         if (onTap != null) ...[
-          const SizedBox(width: 8),
-          const Icon(
+          const SizedBox(width: AppSpace.xs),
+          Icon(
             Icons.open_in_new_rounded,
-            size: 16,
-            color: AppThemeTokens.primaryStrong,
+            size: AppIconSize.sm,
+            color: AppColors.primaryStrong(b),
           ),
         ],
       ],
@@ -1128,7 +1320,7 @@ class _InfoRow extends StatelessWidget {
     }
 
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: AppRadius.smAll,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1141,19 +1333,20 @@ class _InfoRow extends StatelessWidget {
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.icon, required this.title});
 
-  final IconData icon;
+  final Widget icon;
   final String title;
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return Row(
       children: [
-        Icon(icon, size: 17, color: AppThemeTokens.primaryStrong),
-        const SizedBox(width: 7),
+        icon,
+        const SizedBox(width: AppSpace.xs),
         Text(
           title,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: AppThemeTokens.textPrimary,
+            color: AppColors.textPrimary(b),
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1169,32 +1362,36 @@ class _AddConfigButton extends StatelessWidget {
     required this.onTap,
   });
 
-  final IconData icon;
+  final Widget icon;
   final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: AppRadius.mdAll,
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.sm,
+          vertical: AppSpace.sm,
+        ),
         decoration: BoxDecoration(
-          color: AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppThemeTokens.border),
+          color: AppColors.surfaceSoft(b),
+          borderRadius: AppRadius.mdAll,
+          border: Border.all(color: AppColors.border(b)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: AppThemeTokens.primaryStrong),
-            const SizedBox(width: 6),
+            icon,
+            const SizedBox(width: AppSpace.xs - 2),
             Text(
               label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppThemeTokens.primaryStrong,
+                color: AppColors.primaryStrong(b),
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -1212,18 +1409,22 @@ class _EmptyConfigHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.sm,
+        vertical: AppSpace.xs + 2,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppThemeTokens.border),
+        color: AppColors.surfaceSoft(b),
+        borderRadius: AppRadius.mdAll,
+        border: Border.all(color: AppColors.border(b)),
       ),
       child: Text(
         text,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: AppThemeTokens.textSecondary,
+          color: AppColors.textSecondary(b),
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -1235,26 +1436,40 @@ class _ImageProfileCard extends StatelessWidget {
   const _ImageProfileCard({
     required this.profile,
     required this.isActive,
+    required this.canDelete,
     required this.onTap,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final ApiProfile profile;
   final bool isActive;
+  final bool canDelete;
   final VoidCallback onTap;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final tint = isActive ? AppThemeTokens.surfaceSoft : Colors.white;
+    final b = Theme.of(context).brightness;
+    final tint = isActive ? AppColors.surfaceSoft(b) : AppColors.surface(b);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.mdAll,
         child: Container(
-          decoration: AppDecorations.card(radius: 18, color: tint),
-          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          decoration: AppDecorations.card(
+            brightness: b,
+            radius: AppRadius.md,
+            color: tint,
+          ),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpace.sm,
+            AppSpace.xs,
+            AppSpace.xs,
+            AppSpace.xs,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1265,77 +1480,31 @@ class _ImageProfileCard extends StatelessWidget {
                       profile.name,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: AppThemeTokens.textPrimary,
+                        color: AppColors.textPrimary(b),
                       ),
                     ),
                   ),
-                  if (isActive)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            size: 14,
-                            color: AppThemeTokens.primary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '使用中',
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: '编辑',
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_rounded, size: 19),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 34,
-                      height: 34,
-                    ),
+                  if (isActive) const _ActiveBadge(),
+                  const SizedBox(width: AppSpace.xs),
+                  _ConfigActions(
+                    canDelete: canDelete,
+                    onEdit: onEdit,
+                    onDelete: onDelete,
                   ),
                 ],
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: AppSpace.xxs),
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppThemeTokens.surfaceMuted,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      profile.apiMode.shortLabel,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppThemeTokens.primaryStrong,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
+                  _MetaPill(label: profile.apiMode.shortLabel),
+                  const SizedBox(width: AppSpace.xs - 1),
                   Expanded(
                     child: Text(
                       profile.normalizedBaseUrl,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppThemeTokens.textPrimary,
+                        color: AppColors.textPrimary(b),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1361,26 +1530,40 @@ class _PromptOptimizationProfileCard extends StatelessWidget {
   const _PromptOptimizationProfileCard({
     required this.profile,
     required this.isActive,
+    required this.canDelete,
     required this.onTap,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final PromptOptimizationProfile profile;
   final bool isActive;
+  final bool canDelete;
   final VoidCallback onTap;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final tint = isActive ? AppThemeTokens.surfaceSoft : Colors.white;
+    final b = Theme.of(context).brightness;
+    final tint = isActive ? AppColors.surfaceSoft(b) : AppColors.surface(b);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.mdAll,
         child: Container(
-          decoration: AppDecorations.card(radius: 18, color: tint),
-          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          decoration: AppDecorations.card(
+            brightness: b,
+            radius: AppRadius.md,
+            color: tint,
+          ),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpace.sm,
+            AppSpace.xs,
+            AppSpace.xs,
+            AppSpace.xs,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1393,77 +1576,31 @@ class _PromptOptimizationProfileCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: AppThemeTokens.textPrimary,
+                        color: AppColors.textPrimary(b),
                       ),
                     ),
                   ),
-                  if (isActive)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            size: 14,
-                            color: AppThemeTokens.primary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '使用中',
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: '编辑',
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_rounded, size: 19),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 34,
-                      height: 34,
-                    ),
+                  if (isActive) const _ActiveBadge(),
+                  const SizedBox(width: AppSpace.xs),
+                  _ConfigActions(
+                    canDelete: canDelete,
+                    onEdit: onEdit,
+                    onDelete: onDelete,
                   ),
                 ],
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: AppSpace.xxs),
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppThemeTokens.surfaceMuted,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      profile.protocol.label,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppThemeTokens.primaryStrong,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
+                  _MetaPill(label: profile.protocol.label),
+                  const SizedBox(width: AppSpace.xs - 1),
                   Expanded(
                     child: Text(
                       profile.normalizedBaseUrl,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppThemeTokens.textSecondary,
+                        color: AppColors.textSecondary(b),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1485,34 +1622,67 @@ class _PromptOptimizationProfileCard extends StatelessWidget {
   }
 }
 
-class _RequestTimeoutCard extends StatelessWidget {
+/// 请求超时：卡片内行内输入 + 保存。
+class _RequestTimeoutCard extends StatefulWidget {
   const _RequestTimeoutCard({
     required this.timeoutSeconds,
-    required this.onEdit,
+    required this.minSeconds,
+    required this.maxSeconds,
+    required this.onSave,
   });
 
   final int timeoutSeconds;
-  final VoidCallback onEdit;
+  final int minSeconds;
+  final int maxSeconds;
+  final ValueChanged<int> onSave;
+
+  @override
+  State<_RequestTimeoutCard> createState() => _RequestTimeoutCardState();
+}
+
+class _RequestTimeoutCardState extends State<_RequestTimeoutCard> {
+  late final TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.timeoutSeconds}');
+  }
+
+  @override
+  void didUpdateWidget(covariant _RequestTimeoutCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 外部值变化（比如从备份恢复）时同步输入框，但不打断正在编辑的用户。
+    if (!_focusNode.hasFocus &&
+        widget.timeoutSeconds != oldWidget.timeoutSeconds) {
+      _controller.text = '${widget.timeoutSeconds}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return Container(
-      decoration: AppDecorations.card(radius: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: AppDecorations.card(brightness: b, radius: AppRadius.lg),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.sm,
+      ),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.timer_outlined, size: 20),
-          ),
-          const SizedBox(width: 12),
+          const _CardIcon(child: Icon(Icons.timer_outlined, size: AppIconSize.md)),
+          const SizedBox(width: AppSpace.sm),
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '请求超时',
@@ -1520,68 +1690,77 @@ class _RequestTimeoutCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(height: 2),
                 Text(
-                  '$timeoutSeconds 秒',
+                  '默认 600 秒，可填 ${widget.minSeconds}–${widget.maxSeconds} 秒',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppThemeTokens.textSecondary,
+                    color: AppColors.textSecondary(b),
                   ),
                 ),
               ],
             ),
           ),
-          FilledButton.tonal(onPressed: onEdit, child: const Text('修改')),
+          const SizedBox(width: AppSpace.sm),
+          SizedBox(
+            width: 120,
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              textAlign: TextAlign.end,
+              onSubmitted: (_) => _handleSave(),
+              style: Theme.of(context).textTheme.bodyMedium,
+              decoration: const InputDecoration(
+                isDense: true,
+                suffixText: 's',
+                hintText: '600',
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpace.xs),
+          FilledButton(onPressed: _handleSave, child: const Text('保存')),
         ],
       ),
     );
   }
-}
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.actionLabel,
-    required this.onAction,
-  });
+  void _handleSave() {
+    final parsed = int.tryParse(_controller.text.trim());
+    if (parsed == null) {
+      _controller.text = '${widget.timeoutSeconds}';
+      _showMessage('请输入整数秒数，已恢复为 ${widget.timeoutSeconds} 秒。');
+      return;
+    }
 
-  final IconData icon;
-  final String title;
-  final String description;
-  final String actionLabel;
-  final VoidCallback onAction;
+    final clamped = parsed < widget.minSeconds
+        ? widget.minSeconds
+        : (parsed > widget.maxSeconds ? widget.maxSeconds : parsed);
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: AppDecorations.card(radius: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ),
-          FilledButton.tonal(onPressed: onAction, child: Text(actionLabel)),
-        ],
-      ),
-    );
+    _controller.text = '$clamped';
+    _focusNode.unfocus();
+
+    if (clamped != parsed) {
+      _showMessage(
+        '请求超时需在 ${widget.minSeconds}–${widget.maxSeconds} 秒之间，已按 $clamped 秒保存。',
+      );
+    } else if (clamped == widget.timeoutSeconds) {
+      _showMessage('请求超时保持 $clamped 秒。');
+    } else {
+      _showMessage('请求超时已保存：$clamped 秒。');
+    }
+
+    widget.onSave(clamped);
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

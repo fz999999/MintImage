@@ -115,7 +115,7 @@ class _ModelNameFieldState extends State<ModelNameField> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppThemeTokens.textPrimary,
+                  color: AppColors.textPrimary(Theme.of(context).brightness),
                 ),
               ),
             ),
