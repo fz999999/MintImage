@@ -456,6 +456,7 @@ class SettingsModel {
       ),
       lastQuality: _normalizeImageQuality(json['lastQuality']),
       lastOutputFormat: _normalizeImageOutputFormat(json['lastOutputFormat']),
+      lastBackground: _normalizeImageBackground(json['lastBackground']),
       previewInfoCollapsed: _normalizeBool(json['previewInfoCollapsed']),
       webDavBackupConfig: _normalizeWebDavBackupConfig(
         json['webDavBackupConfig'],

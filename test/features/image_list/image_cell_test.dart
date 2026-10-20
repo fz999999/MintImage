@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mint_image/core/models/image_record.dart';
 import 'package:mint_image/core/models/settings_model.dart';
 import 'package:mint_image/core/providers/app_providers.dart';
+import 'package:mint_image/core/providers/generation_provider.dart';
 import 'package:mint_image/features/image_list/image_cell.dart';
 import 'package:mint_image/features/image_list/image_preview_page.dart';
 
@@ -105,6 +108,45 @@ void main() {
     expect(navigatedThroughCallback, isTrue);
     expect(find.byType(ImagePreviewPage), findsOneWidget);
   });
+  testWidgets('shows the streamed preview while an image is still loading', (
+    tester,
+  ) async {
+    // 1x1 透明 PNG，只要能解码成一张图即可。
+    final preview = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAE'
+      'hQGAhKmMIQAAAABJRU5ErkJggg==',
+    );
+
+    await _pumpImageCell(
+      tester,
+      _record.copyWith(status: ImageRecordStatus.loading),
+      partialImages: {'record-error': preview},
+    );
+    await tester.pump();
+
+    expect(find.text('正在生成'), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
+  });
+
+  testWidgets('keeps the spinner when no preview has arrived yet', (
+    tester,
+  ) async {
+    await _pumpImageCell(
+      tester,
+      _record.copyWith(status: ImageRecordStatus.loading),
+    );
+
+    expect(find.text('正在生成'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsWidgets);
+  });
+}
+
+class _SeededGenerationController extends GenerationController {
+  // 基类构造参数是私有的 `_ref`，无法用 super 参数转发。
+  // ignore: use_super_parameters
+  _SeededGenerationController(Ref ref, GenerationState initial) : super(ref) {
+    state = initial;
+  }
 }
 
 Future<void> _pumpImageCell(
@@ -113,6 +155,7 @@ Future<void> _pumpImageCell(
   VoidCallback? onRegenerate,
   VoidCallback? onAppendCurrentImageToAttachments,
   Future<void> Function(Future<void> Function() navigate)? onPreviewNavigation,
+  Map<String, Uint8List> partialImages = const {},
 }) async {
   SharedPreferences.setMockInitialValues(const {});
   final preferences = await SharedPreferences.getInstance();
@@ -122,6 +165,12 @@ Future<void> _pumpImageCell(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(preferences),
         initialSettingsModelProvider.overrideWithValue(_settings),
+        generationProvider.overrideWith(
+          (ref) => _SeededGenerationController(
+            ref,
+            GenerationState(partialImages: partialImages),
+          ),
+        ),
       ],
       child: MaterialApp(
         home: Scaffold(

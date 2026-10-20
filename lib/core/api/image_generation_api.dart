@@ -18,12 +18,16 @@ class ImageGenerationApi {
     String? responseFormat,
     required int timeoutSeconds,
     CancelToken? cancelToken,
+    void Function(String b64Json)? onPartialImage,
   }) async {
     final client = OpenAiClient(
       profile,
       timeoutSeconds: timeoutSeconds,
       requestLogService: requestLogService,
     );
+
+    // 想要过程图就必须走流式：非流式要等最终图才返回。
+    final wantsStreaming = profile.useStreaming || onPartialImage != null;
 
     if (profile.apiMode == ImageGenerationApiMode.responses) {
       final body = buildResponsesImageBody(
@@ -32,11 +36,12 @@ class ImageGenerationApi {
         input: request.prompt,
         action: 'generate',
       );
-      final response = profile.useStreaming
+      final response = wantsStreaming
           ? await client.postJsonStreaming(
               '/v1/responses',
               body,
               cancelToken: cancelToken,
+              onPartialImage: onPartialImage,
             )
           : await client.postJson(
               '/v1/responses',
@@ -84,20 +89,76 @@ class ImageGenerationApi {
       );
     }
 
-    final response = profile.useStreaming
-        ? await client.postJsonStreaming(
-            '/v1/images/generations',
-            body,
-            cancelToken: cancelToken,
-            isImagesApi: true,
-          )
-        : await client.postJson(
-            '/v1/images/generations',
-            body,
-            cancelToken: cancelToken,
-          );
+    final response = await _requestImages(
+      client,
+      body,
+      useStreaming: wantsStreaming,
+      onPartialImage: onPartialImage,
+      cancelToken: cancelToken,
+    );
 
     return _parseResults(response);
+  }
+
+  Future<Map<String, dynamic>> _requestImages(
+    OpenAiClient client,
+    Map<String, dynamic> body, {
+    required bool useStreaming,
+    required void Function(String b64Json)? onPartialImage,
+    CancelToken? cancelToken,
+  }) async {
+    if (!useStreaming) {
+      return client.postJson(
+        '/v1/images/generations',
+        body,
+        cancelToken: cancelToken,
+      );
+    }
+
+    try {
+      return await client.postJsonStreaming(
+        '/v1/images/generations',
+        body,
+        cancelToken: cancelToken,
+        isImagesApi: true,
+        // 过程图：让界面在等最终图时先看到画面。1 张足够，要太多反而拖慢。
+        partialImages: onPartialImage == null ? 0 : 1,
+        onPartialImage: onPartialImage,
+      );
+    } on ApiException catch (error) {
+      // 少数中转站不认 stream / partial_images，会在出图之前直接 400。
+      // 这种错误发生在生成之前，回退成普通请求不会重复计费。
+      if (!_looksLikeStreamUnsupported(error.message)) {
+        rethrow;
+      }
+
+      return client.postJson(
+        '/v1/images/generations',
+        body,
+        cancelToken: cancelToken,
+      );
+    }
+  }
+
+  bool _looksLikeStreamUnsupported(String message) {
+    final value = message.toLowerCase();
+    if (value.contains('stream') ||
+        value.contains('partial_image') ||
+        value.contains('unsupported parameter') ||
+        value.contains('unknown parameter') ||
+        value.contains('unrecognized')) {
+      return true;
+    }
+
+    // 中转站拒绝 stream 时不一定提“stream”这个词，常见就是 400 / 415 / 422。
+    // 这些状态说明请求在生成之前就被拒了，回退成普通请求不会重复计费。
+    final status = _statusCodeOf(message);
+    return status == 400 || status == 415 || status == 422;
+  }
+
+  int? _statusCodeOf(String message) {
+    final match = RegExp(r'^HTTP (\d{3})').firstMatch(message.trim());
+    return match == null ? null : int.tryParse(match.group(1)!);
   }
 
   bool _isRightApiDraw(ApiProfile profile) {

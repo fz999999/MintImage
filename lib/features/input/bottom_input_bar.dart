@@ -1061,7 +1061,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
         _quality = coerced;
       });
       _persistLastGenerationOptions();
-      _showMessage('「」画质仅 gpt-image-2.5 支持，已回退到「」。');
+      _showMessage(
+        '「${previous.label}」画质仅 gpt-image-2.5 支持，已回退到「${coerced.label}」。',
+      );
     }
 
     unfocusPrompt();

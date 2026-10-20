@@ -19,6 +19,7 @@ class ImageEditApi {
     String? responseFormat,
     required int timeoutSeconds,
     CancelToken? cancelToken,
+    void Function(String b64Json)? onPartialImage,
   }) async {
     if (request.imagePaths.isEmpty) {
       throw const ApiException('图生图请求缺少附件。');
@@ -29,6 +30,9 @@ class ImageEditApi {
       timeoutSeconds: timeoutSeconds,
       requestLogService: requestLogService,
     );
+
+    // 想要过程图就必须走流式：非流式要等最终图才返回。
+    final wantsStreaming = profile.useStreaming || onPartialImage != null;
 
     if (profile.apiMode == ImageGenerationApiMode.responses) {
       final body = buildResponsesImageBody(
@@ -49,11 +53,12 @@ class ImageEditApi {
         ],
         action: 'edit',
       );
-      final response = profile.useStreaming
+      final response = wantsStreaming
           ? await client.postJsonStreaming(
               '/v1/responses',
               body,
               cancelToken: cancelToken,
+              onPartialImage: onPartialImage,
             )
           : await client.postJson(
               '/v1/responses',
@@ -118,11 +123,14 @@ class ImageEditApi {
       );
     }
 
-    final response = profile.useStreaming
+    final response = wantsStreaming
         ? await client.postMultipartStreaming(
             '/v1/images/edits',
             formData,
             cancelToken: cancelToken,
+            // 过程图：让界面在等最终图时先看到画面。
+            partialImages: onPartialImage == null ? 0 : 1,
+            onPartialImage: onPartialImage,
           )
         : await client.postMultipart(
             '/v1/images/edits',

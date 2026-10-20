@@ -106,16 +106,21 @@ class OpenAiClient {
   /// 返回格式与 Images API 非流式响应一致 `{data: [{b64_json: ...}]}`。
   /// 为 false 时（Responses API）解析 `response.completed` / `response.output_item.done`，
   /// 返回格式 `{output: [...]}` 与 `parseResponsesImageResults` 兼容。
+  ///
+  /// [partialImages] 是向服务器索要的过程图数量（Images API 的 `partial_images`，
+  /// 只有 0~3 有效；0 表示只要最终图）。收到过程图时会回调 [onPartialImage]，
+  /// 让界面在等待最终图时就能显示进度。
   Future<Map<String, dynamic>> postJsonStreaming(
     String path,
     Map<String, dynamic> body, {
     CancelToken? cancelToken,
     bool isImagesApi = false,
+    int partialImages = 0,
+    void Function(String b64Json)? onPartialImage,
   }) async {
     final streamBody = Map<String, dynamic>.from(body)..['stream'] = true;
     if (isImagesApi) {
-      // partial_images: 0 = 只接收最终图片，不要中间帧
-      streamBody['partial_images'] = 0;
+      streamBody['partial_images'] = partialImages;
     }
 
     final stopwatch = Stopwatch()..start();
@@ -141,9 +146,10 @@ class OpenAiClient {
         cancelToken: cancelToken,
       );
 
-      final result = await _readStreamingResult(
-        response.data,
+      final result = await _readStreamResponse(
+        response,
         isImagesApi: isImagesApi,
+        onPartialImage: onPartialImage,
       );
       stopwatch.stop();
 
@@ -191,10 +197,12 @@ class OpenAiClient {
     String path,
     FormData formData, {
     CancelToken? cancelToken,
+    int partialImages = 0,
+    void Function(String b64Json)? onPartialImage,
   }) async {
     formData.fields.addAll([
       const MapEntry('stream', 'true'),
-      const MapEntry('partial_images', '0'),
+      MapEntry('partial_images', '$partialImages'),
     ]);
 
     final stopwatch = Stopwatch()..start();
@@ -216,9 +224,10 @@ class OpenAiClient {
         options: Options(responseType: ResponseType.stream),
         cancelToken: cancelToken,
       );
-      final result = await _readStreamingResult(
-        response.data,
+      final result = await _readStreamResponse(
+        response,
         isImagesApi: true,
+        onPartialImage: onPartialImage,
       );
       stopwatch.stop();
       final data = result['data'];
@@ -295,15 +304,74 @@ class OpenAiClient {
     }
   }
 
+  /// 读取流式响应。
+  ///
+  /// 绝大多数中转站会按 SSE 推送；但也有实现忽略 `stream` 参数、直接返回一整包
+  /// JSON。这时按普通 JSON 解析，避免白等一场之后报“没有图片数据”。
+  Future<Map<String, dynamic>> _readStreamResponse(
+    Response<ResponseBody> response, {
+    required bool isImagesApi,
+    void Function(String b64Json)? onPartialImage,
+  }) async {
+    final contentType =
+        response.headers.value(Headers.contentTypeHeader)?.toLowerCase() ?? '';
+
+    if (!contentType.contains('event-stream')) {
+      final body = response.data;
+      String? text;
+      if (body != null) {
+        final buffer = <int>[];
+        await for (final chunk in body.stream) {
+          buffer.addAll(chunk);
+        }
+        text = utf8.decode(buffer, allowMalformed: true);
+      }
+
+      final decoded = text == null ? null : _tryDecodeJsonObject(text);
+      if (decoded != null) {
+        return decoded;
+      }
+
+      final preview = (text ?? '').trim();
+      throw ApiException(
+        preview.isEmpty
+            ? '接口返回了空响应。'
+            : '接口返回了无法解析的内容：${_truncate(preview, 300)}',
+      );
+    }
+
+    return _readStreamingResult(
+      response.data,
+      isImagesApi: isImagesApi,
+      onPartialImage: onPartialImage,
+    );
+  }
+
+  Map<String, dynamic>? _tryDecodeJsonObject(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(trimmed);
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> _readStreamingResult(
     ResponseBody? responseBody, {
     required bool isImagesApi,
+    void Function(String b64Json)? onPartialImage,
   }) async {
     if (responseBody == null) {
       return isImagesApi ? {'data': []} : {'output': []};
     }
 
     String? lastImagesB64;
+    String? lastPartialB64;
     final outputItems = <Map<String, dynamic>>[];
     Map<String, dynamic>? completedResponse;
     String? currentEventType;
@@ -341,7 +409,13 @@ class OpenAiClient {
           if (_isImageStreamResultEvent(eventType)) {
             final b64 = data['b64_json'] as String?;
             if (b64 != null && b64.isNotEmpty) {
-              lastImagesB64 = b64;
+              final isPartial = eventType?.endsWith('.partial_image') ?? false;
+              if (isPartial) {
+                lastPartialB64 = b64;
+                onPartialImage?.call(b64);
+              } else {
+                lastImagesB64 = b64;
+              }
             }
           }
         } else if (eventType == 'response.completed') {
@@ -358,6 +432,7 @@ class OpenAiClient {
             'response.image_generation_call.partial_image') {
           final b64 = data['b64_json'] as String?;
           if (b64 != null && b64.isNotEmpty) {
+            onPartialImage?.call(b64);
             outputItems.add({
               'type': 'image_generation_call',
               'result': {'b64_json': b64},
@@ -368,9 +443,12 @@ class OpenAiClient {
     }
 
     if (isImagesApi) {
+      // 有些中转站只推过程图、不推 completed 事件；这时用最后一张过程图兜底，
+      // 否则用户等了几十秒却拿到“没有可展示的图片数据”。
+      final imageB64 = lastImagesB64 ?? lastPartialB64;
       return {
         'data': [
-          if (lastImagesB64 != null) {'b64_json': lastImagesB64},
+          if (imageB64 != null) {'b64_json': imageB64},
         ],
       };
     }

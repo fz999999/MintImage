@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -59,6 +60,10 @@ class ImageCell extends ConsumerWidget {
     final requestStartedAt = ref.watch(
       generationProvider.select((state) => state.requestStartedAts[record.id]),
     );
+    // 流式生成时服务器推来的过程图；没有就是 null（走原来的 loading 占位）。
+    final partialImage = ref.watch(
+      generationProvider.select((state) => state.partialImages[record.id]),
+    );
 
     return Material(
       color: AppThemeTokens.surface,
@@ -94,7 +99,10 @@ class ImageCell extends ConsumerWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Hero(tag: 'image-${record.id}', child: _buildImage()),
+                      Hero(
+                        tag: 'image-${record.id}',
+                        child: _buildImage(partialImage),
+                      ),
                       Positioned(
                         top: 6,
                         right: 6,
@@ -218,10 +226,10 @@ class ImageCell extends ConsumerWidget {
         record.sourceAttachmentPaths.isNotEmpty;
   }
 
-  Widget _buildImage() {
+  Widget _buildImage(Uint8List? partialImage) {
     if (record.status == ImageRecordStatus.loading ||
         record.status == ImageRecordStatus.pending) {
-      return const _LoadingThumb();
+      return _LoadingThumb(preview: partialImage);
     }
 
     if (record.resultImagePath != null &&
@@ -842,10 +850,61 @@ class _StatusPill extends StatelessWidget {
 }
 
 class _LoadingThumb extends StatelessWidget {
-  const _LoadingThumb();
+  const _LoadingThumb({this.preview});
+
+  /// 流式生成时服务器推来的过程图（模糊/未完成）。有就先显示它，
+  /// 让用户知道「已经在画了」，而不是盯着一个转圈等一分钟。
+  final Uint8List? preview;
 
   @override
   Widget build(BuildContext context) {
+    final previewBytes = preview;
+    if (previewBytes != null && previewBytes.isNotEmpty) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.memory(
+            previewBytes,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.low,
+          ),
+          Positioned(
+            left: 8,
+            bottom: 8,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppThemeTokens.surface.withValues(alpha: 0.86),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(strokeWidth: 1.6),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '正在生成',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppThemeTokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show Ref;
@@ -27,20 +29,27 @@ class GenerationState {
   const GenerationState({
     this.activeRequestIds = const <String>{},
     this.requestStartedAts = const <String, DateTime>{},
+    this.partialImages = const <String, Uint8List>{},
   });
 
   final Set<String> activeRequestIds;
   final Map<String, DateTime> requestStartedAts;
+
+  /// 流式生成过程中收到的过程图（按记录 id 索引）。只存在内存里，
+  /// 最终图落地后立即丢弃，不写数据库、不进备份。
+  final Map<String, Uint8List> partialImages;
 
   bool get isGenerating => activeRequestIds.isNotEmpty;
 
   GenerationState copyWith({
     Set<String>? activeRequestIds,
     Map<String, DateTime>? requestStartedAts,
+    Map<String, Uint8List>? partialImages,
   }) {
     return GenerationState(
       activeRequestIds: activeRequestIds ?? this.activeRequestIds,
       requestStartedAts: requestStartedAts ?? this.requestStartedAts,
+      partialImages: partialImages ?? this.partialImages,
     );
   }
 }
@@ -203,6 +212,7 @@ class GenerationController extends StateNotifier<GenerationState> {
           ? await _generateEditResult(
               request,
               profile,
+              recordId: record.id,
               responseFormat: responseFormat,
               timeoutSeconds: timeoutSeconds,
               cancelToken: cancelToken,
@@ -210,6 +220,7 @@ class GenerationController extends StateNotifier<GenerationState> {
           : await _generateTextResult(
               request,
               profile,
+              recordId: record.id,
               responseFormat: responseFormat,
               timeoutSeconds: timeoutSeconds,
               cancelToken: cancelToken,
@@ -322,6 +333,7 @@ class GenerationController extends StateNotifier<GenerationState> {
       }
     } finally {
       _cancelTokens.remove(record.id);
+      _clearPartialImage(record.id);
       await _removeActiveRequestId(record.id);
       _deletedRequestIds.remove(record.id);
     }
@@ -330,6 +342,7 @@ class GenerationController extends StateNotifier<GenerationState> {
   Future<GenerationResult> _generateTextResult(
     GenerationRequest request,
     ApiProfile profile, {
+    required String recordId,
     required String? responseFormat,
     required int timeoutSeconds,
     required CancelToken cancelToken,
@@ -342,6 +355,7 @@ class GenerationController extends StateNotifier<GenerationState> {
           responseFormat: responseFormat,
           timeoutSeconds: timeoutSeconds,
           cancelToken: cancelToken,
+          onPartialImage: (b64Json) => _updatePartialImage(recordId, b64Json),
         );
     return results.first;
   }
@@ -349,11 +363,15 @@ class GenerationController extends StateNotifier<GenerationState> {
   Future<GenerationResult> _generateEditResult(
     GenerationRequest request,
     ApiProfile profile, {
+    required String recordId,
     required String? responseFormat,
     required int timeoutSeconds,
     required CancelToken cancelToken,
   }) async {
     final editApi = _ref.read(imageEditApiProvider);
+
+    void onPartialImage(String b64Json) =>
+        _updatePartialImage(recordId, b64Json);
 
     try {
       final results = await editApi.edit(
@@ -362,6 +380,7 @@ class GenerationController extends StateNotifier<GenerationState> {
         responseFormat: responseFormat,
         timeoutSeconds: timeoutSeconds,
         cancelToken: cancelToken,
+        onPartialImage: onPartialImage,
       );
       return results.first;
     } on ApiException {
@@ -375,9 +394,45 @@ class GenerationController extends StateNotifier<GenerationState> {
         responseFormat: responseFormat,
         timeoutSeconds: timeoutSeconds,
         cancelToken: cancelToken,
+        onPartialImage: onPartialImage,
       );
       return fallbackResults.first.copyWith(retriedWithSingleImage: true);
     }
+  }
+
+  /// 收到一张过程图：解码后放进 state，界面立刻显示轮廓。
+  void _updatePartialImage(String recordId, String b64Json) {
+    if (_isRecordCancelled(recordId) || _isRecordDeleted(recordId)) {
+      return;
+    }
+
+    Uint8List bytes;
+    try {
+      bytes = base64Decode(b64Json);
+    } catch (_) {
+      return;
+    }
+
+    if (bytes.isEmpty) {
+      return;
+    }
+
+    state = state.copyWith(
+      partialImages: {...state.partialImages, recordId: bytes},
+    );
+  }
+
+  void _clearPartialImage(String recordId) {
+    if (!state.partialImages.containsKey(recordId)) {
+      return;
+    }
+
+    state = state.copyWith(
+      partialImages: {
+        for (final entry in state.partialImages.entries)
+          if (entry.key != recordId) entry.key: entry.value,
+      },
+    );
   }
 
   ImageRecord? _recordById(String recordId) {

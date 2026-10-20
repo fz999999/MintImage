@@ -388,6 +388,191 @@ void main() {
 
       expect(results.single.b64Json, responseImage);
     });
+
+    test('streams Images API partial images before the final image', () async {
+      final partial = base64Encode(<int>[1, 1, 1]);
+      final finalImage = base64Encode(<int>[2, 2, 2, 2]);
+
+      final server = await _startServer((request) async {
+        final body =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        // 只要调用方要过程图，就必须自动切成流式，并显式要 1 张过程图。
+        expect(body['stream'], isTrue);
+        expect(body['partial_images'], 1);
+
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+        );
+        request.response.write(
+          'event: image_generation.partial_image\n'
+          'data: ${jsonEncode({'b64_json': partial})}\n\n'
+          'event: image_generation.completed\n'
+          'data: ${jsonEncode({'b64_json': finalImage})}\n\n',
+        );
+        await request.response.close();
+      });
+      addTearDown(server.close);
+
+      final partials = <String>[];
+      final results = await const ImageGenerationApi().generate(
+        GenerationRequest(
+          prompt: 'a red apple',
+          imagePaths: const [],
+          sizePreset: SizePreset.square1k,
+          customWidth: 1024,
+          customHeight: 1024,
+          quality: ImageQuality.low,
+          count: 1,
+          apiProfileId: 'default',
+        ),
+        _profileFor(server),
+        timeoutSeconds: 600,
+        onPartialImage: partials.add,
+      );
+
+      expect(partials, [partial]);
+      expect(results.single.b64Json, finalImage);
+    });
+
+    test('falls back to plain JSON when the server ignores stream', () async {
+      final image = base64Encode(<int>[3, 3, 3]);
+
+      final server = await _startServer((request) async {
+        final body =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        expect(body['stream'], isTrue);
+
+        // 关键：没有 text/event-stream，返回一整包普通 JSON。
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'created': 1715000000,
+            'data': [
+              {'b64_json': image},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+      addTearDown(server.close);
+
+      final partials = <String>[];
+      final results = await const ImageGenerationApi().generate(
+        GenerationRequest(
+          prompt: 'a red apple',
+          imagePaths: const [],
+          sizePreset: SizePreset.square1k,
+          customWidth: 1024,
+          customHeight: 1024,
+          quality: ImageQuality.low,
+          count: 1,
+          apiProfileId: 'default',
+        ),
+        _profileFor(server),
+        timeoutSeconds: 600,
+        onPartialImage: partials.add,
+      );
+
+      expect(partials, isEmpty);
+      expect(results.single.b64Json, image);
+    });
+
+    test(
+      'uses the last partial image when no completed event arrives',
+      () async {
+        final partial = base64Encode(<int>[7, 7, 7]);
+
+        final server = await _startServer((request) async {
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write(
+            'event: image_generation.partial_image\n'
+            'data: ${jsonEncode({'b64_json': partial})}\n\n'
+            'data: [DONE]\n\n',
+          );
+          await request.response.close();
+        });
+        addTearDown(server.close);
+
+        final results = await const ImageGenerationApi().generate(
+          GenerationRequest(
+            prompt: 'a red apple',
+            imagePaths: const [],
+            sizePreset: SizePreset.square1k,
+            customWidth: 1024,
+            customHeight: 1024,
+            quality: ImageQuality.low,
+            count: 1,
+            apiProfileId: 'default',
+          ),
+          _profileFor(server),
+          timeoutSeconds: 600,
+          onPartialImage: (_) {},
+        );
+
+        expect(results.single.b64Json, partial);
+      },
+    );
+
+    test('retries without stream when the relay rejects it', () async {
+      final image = base64Encode(<int>[9, 9, 9, 9]);
+      var calls = 0;
+
+      final server = await _startServer((request) async {
+        calls++;
+        final body =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+
+        if (body['stream'] == true) {
+          request.response.statusCode = HttpStatus.badRequest;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'error': {'message': 'invalid request'},
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'created': 1715000000,
+            'data': [
+              {'b64_json': image},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+      addTearDown(server.close);
+
+      final results = await const ImageGenerationApi().generate(
+        GenerationRequest(
+          prompt: 'a red apple',
+          imagePaths: const [],
+          sizePreset: SizePreset.square1k,
+          customWidth: 1024,
+          customHeight: 1024,
+          quality: ImageQuality.low,
+          count: 1,
+          apiProfileId: 'default',
+        ),
+        _profileFor(server),
+        timeoutSeconds: 600,
+        onPartialImage: (_) {},
+      );
+
+      expect(calls, 2);
+      expect(results.single.b64Json, image);
+    });
   });
 }
 
