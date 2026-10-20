@@ -9,6 +9,7 @@ import '../api/openai_client.dart';
 import '../models/generation_request.dart';
 import '../models/generation_result.dart';
 import '../models/image_record.dart';
+import '../models/model_capabilities.dart';
 import '../models/settings_model.dart';
 import 'app_providers.dart';
 import 'favorite_folders_provider.dart';
@@ -64,11 +65,16 @@ class GenerationController extends StateNotifier<GenerationState> {
       models: <String>[settings.modelForProfile(baseProfile)],
     );
 
+    // 双保险：模型不支持 xhigh / max 时按 high 发，避免接口 400。
+    final effectiveRequest = request.copyWith(
+      quality: ModelCapabilities.coerceQuality(request.quality, profile.model),
+    );
+
     final records = List.generate(
-      request.count,
+      effectiveRequest.count,
       (index) => ImageRecord.pending(
         id: _uuid.v4(),
-        request: request,
+        request: effectiveRequest,
         model: profile.model,
         createdAt: DateTime.now().add(Duration(milliseconds: index)),
         isFavorite: favoriteFolderId != null,
@@ -96,7 +102,7 @@ class GenerationController extends StateNotifier<GenerationState> {
       unawaited(
         _executeSingle(
           record: record,
-          request: request,
+          request: effectiveRequest,
           profile: profile,
           responseFormat: settings.responseFormat,
           timeoutSeconds: settings.requestTimeoutSeconds,
@@ -114,7 +120,8 @@ class GenerationController extends StateNotifier<GenerationState> {
   }
 
   Future<void> _submitFromRecord(ImageRecord record) async {
-    final apiProfileId = _ref.read(settingsProvider).activeProfileId;
+    final settings = _ref.read(settingsProvider);
+    final apiProfileId = settings.activeProfileId;
     final isAutoSize = record.width == 0 || record.height == 0;
 
     await submit(
@@ -126,6 +133,8 @@ class GenerationController extends StateNotifier<GenerationState> {
         customHeight: record.height,
         quality: ImageQuality.fromApiValue(record.quality),
         outputFormat: ImageOutputFormat.fromApiValue(record.outputFormat),
+        // 记录里没有存背景选项，重试时沿用当前设置里的选择。
+        background: settings.lastBackground,
         count: 1,
         apiProfileId: apiProfileId,
       ),

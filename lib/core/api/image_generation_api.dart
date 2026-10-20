@@ -56,6 +56,10 @@ class ImageGenerationApi {
     if (request.apiSize != null) {
       body['size'] = request.apiSize;
     }
+    // 透明背景：只有 PNG / WEBP 才有效，apiBackground 已把 JPEG 过滤掉。
+    if (request.apiBackground != null) {
+      body['background'] = request.apiBackground;
+    }
     if (responseFormat != null && responseFormat.trim().isNotEmpty) {
       // GPT Image 2/2.5 and RightAPI reject the legacy response_format field.
       if (!_isGptImage2Family(profile.model) && !_isRightApiDraw(profile)) {

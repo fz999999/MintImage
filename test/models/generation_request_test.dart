@@ -108,5 +108,52 @@ void main() {
       expect(unknownFormat.outputFormat, ImageOutputFormat.png);
       expect(missingFormat.outputFormat, ImageOutputFormat.png);
     });
+
+    test('发送透明背景只对 PNG / WEBP 生效', () {
+      const base = GenerationRequest(
+        prompt: 'test',
+        imagePaths: [],
+        sizePreset: SizePreset.square1k,
+        customWidth: 1024,
+        customHeight: 1024,
+        quality: ImageQuality.auto,
+        count: 1,
+        apiProfileId: 'default',
+        background: ImageBackground.transparent,
+      );
+
+      expect(base.apiBackground, 'transparent');
+      expect(
+        base.copyWith(outputFormat: ImageOutputFormat.webp).apiBackground,
+        'transparent',
+      );
+      expect(
+        base.copyWith(outputFormat: ImageOutputFormat.jpeg).apiBackground,
+        isNull,
+      );
+      expect(
+        base.copyWith(background: ImageBackground.auto).apiBackground,
+        isNull,
+      );
+    });
+
+    test('background 能序列化和反序列化', () {
+      const request = GenerationRequest(
+        prompt: 'test',
+        imagePaths: [],
+        sizePreset: SizePreset.square1k,
+        customWidth: 1024,
+        customHeight: 1024,
+        quality: ImageQuality.xhigh,
+        count: 1,
+        apiProfileId: 'default',
+        background: ImageBackground.transparent,
+      );
+
+      final restored = GenerationRequest.fromJson(request.toJson());
+
+      expect(restored.background, ImageBackground.transparent);
+      expect(restored.quality, ImageQuality.xhigh);
+    });
   });
 }

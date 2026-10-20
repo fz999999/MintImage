@@ -368,6 +368,7 @@ class SettingsModel {
     this.lastCustomHeight = 0,
     this.lastQuality = ImageQuality.auto,
     this.lastOutputFormat = ImageOutputFormat.png,
+    this.lastBackground = ImageBackground.auto,
     this.previewInfoCollapsed = false,
     this.webDavBackupConfig,
   });
@@ -387,6 +388,7 @@ class SettingsModel {
       lastCustomHeight: 0,
       lastQuality: ImageQuality.auto,
       lastOutputFormat: ImageOutputFormat.png,
+      lastBackground: ImageBackground.auto,
       webDavBackupConfig: null,
     );
   }
@@ -475,6 +477,9 @@ class SettingsModel {
   final int lastCustomHeight;
   final ImageQuality lastQuality;
   final ImageOutputFormat lastOutputFormat;
+
+  /// 上次使用的背景选项（自动 / 透明）。
+  final ImageBackground lastBackground;
   final bool previewInfoCollapsed;
   final WebDavBackupConfig? webDavBackupConfig;
 
@@ -545,6 +550,7 @@ class SettingsModel {
     int? lastCustomHeight,
     ImageQuality? lastQuality,
     ImageOutputFormat? lastOutputFormat,
+    ImageBackground? lastBackground,
     bool? previewInfoCollapsed,
     WebDavBackupConfig? webDavBackupConfig,
     bool clearWebDavBackupConfig = false,
@@ -570,6 +576,7 @@ class SettingsModel {
       lastCustomHeight: lastCustomHeight ?? this.lastCustomHeight,
       lastQuality: lastQuality ?? this.lastQuality,
       lastOutputFormat: lastOutputFormat ?? this.lastOutputFormat,
+      lastBackground: lastBackground ?? this.lastBackground,
       previewInfoCollapsed: previewInfoCollapsed ?? this.previewInfoCollapsed,
       webDavBackupConfig: clearWebDavBackupConfig
           ? null
@@ -593,6 +600,7 @@ class SettingsModel {
       'lastCustomHeight': lastCustomHeight,
       'lastQuality': lastQuality.apiValue,
       'lastOutputFormat': lastOutputFormat.apiValue,
+      'lastBackground': lastBackground.apiValue,
       'previewInfoCollapsed': previewInfoCollapsed,
       'webDavBackupConfig': webDavBackupConfig?.toJson(),
     };
@@ -674,6 +682,14 @@ class SettingsModel {
     return ImageOutputFormat.values.firstWhere(
       (format) => format.apiValue == value,
       orElse: () => ImageOutputFormat.png,
+    );
+  }
+
+  static ImageBackground _normalizeImageBackground(Object? rawValue) {
+    final value = rawValue is String ? rawValue : '';
+    return ImageBackground.values.firstWhere(
+      (background) => background.apiValue == value,
+      orElse: () => ImageBackground.auto,
     );
   }
 

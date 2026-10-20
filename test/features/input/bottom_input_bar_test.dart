@@ -106,6 +106,65 @@ void main() {
     expect(submittedRequest!.outputFormat, ImageOutputFormat.webp);
   });
 
+  testWidgets('背景按钮可切换透明背景并随请求一起提交', (tester) async {
+    GenerationRequest? submittedRequest;
+    await _pumpInputBar(
+      tester,
+      settings: _settings.copyWith(
+        lastQuality: ImageQuality.high,
+        lastOutputFormat: ImageOutputFormat.png,
+      ),
+      onSubmit: (request) async {
+        submittedRequest = request;
+      },
+    );
+
+    expect(find.text('背景:自动'), findsOneWidget);
+
+    await tester.tap(find.text('背景:自动'));
+    await tester.pump();
+    expect(find.text('背景:透明'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('prompt-input')), '透明背景图标');
+    await tester.tap(find.byKey(const Key('submit-generation-button')));
+    await tester.pump();
+
+    expect(submittedRequest, isNotNull);
+    expect(submittedRequest!.background, ImageBackground.transparent);
+    expect(submittedRequest!.apiBackground, 'transparent');
+  });
+
+  testWidgets('切到 JPEG 时透明背景自动回退', (tester) async {
+    GenerationRequest? submittedRequest;
+    await _pumpInputBar(
+      tester,
+      settings: _settings.copyWith(
+        lastOutputFormat: ImageOutputFormat.png,
+        lastBackground: ImageBackground.transparent,
+      ),
+      onSubmit: (request) async {
+        submittedRequest = request;
+      },
+    );
+
+    expect(find.text('背景:透明'), findsOneWidget);
+
+    await tester.tap(find.text('格式:PNG'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('JPEG').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('背景:自动'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('prompt-input')), 'jpeg 图片');
+    await tester.tap(find.byKey(const Key('submit-generation-button')));
+    await tester.pump();
+
+    expect(submittedRequest!.outputFormat, ImageOutputFormat.jpeg);
+    expect(submittedRequest!.background, ImageBackground.auto);
+    expect(submittedRequest!.apiBackground, isNull);
+  });
+
   testWidgets('shift enter inserts newline without submitting', (tester) async {
     GenerationRequest? submittedRequest;
     await _pumpInputBar(

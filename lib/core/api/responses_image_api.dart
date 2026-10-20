@@ -38,6 +38,12 @@ Map<String, dynamic> buildResponsesImageTool({
     tool['size'] = size;
   }
 
+  // 透明背景：只有 PNG / WEBP 才有效，apiBackground 已把 JPEG 过滤掉。
+  final background = request.apiBackground;
+  if (background != null) {
+    tool['background'] = background;
+  }
+
   return tool;
 }
 

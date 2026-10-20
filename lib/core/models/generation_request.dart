@@ -31,7 +31,12 @@ enum ImageQuality {
   auto('auto', '自动'),
   low('low', '低'),
   medium('medium', '中'),
-  high('high', '高');
+  high('high', '高'),
+
+  // GPT Image 2.5 起支持的两档更高画质（xhigh / max）。
+  // 老模型不认这两个值，接口会报错，届时回退到 high 即可。
+  xhigh('xhigh', '超高'),
+  max('max', '最高');
 
   const ImageQuality(this.apiValue, this.label);
 
@@ -66,6 +71,27 @@ enum ImageOutputFormat {
   }
 }
 
+/// 生成背景。`transparent` 只有图像格式为 PNG / WEBP 时才有意义：
+/// JPEG 没有 alpha 通道，带上透明背景会被接口拒绝。
+enum ImageBackground {
+  auto('auto', '自动'),
+  transparent('transparent', '透明');
+
+  const ImageBackground(this.apiValue, this.label);
+
+  final String apiValue;
+  final String label;
+
+  bool get isTransparent => this == ImageBackground.transparent;
+
+  static ImageBackground fromApiValue(String value) {
+    return ImageBackground.values.firstWhere(
+      (background) => background.apiValue == value,
+      orElse: () => ImageBackground.auto,
+    );
+  }
+}
+
 class GenerationRequest {
   const GenerationRequest({
     required this.prompt,
@@ -75,6 +101,7 @@ class GenerationRequest {
     required this.customHeight,
     required this.quality,
     this.outputFormat = ImageOutputFormat.png,
+    this.background = ImageBackground.auto,
     required this.count,
     required this.apiProfileId,
   });
@@ -86,6 +113,7 @@ class GenerationRequest {
   final int customHeight;
   final ImageQuality quality;
   final ImageOutputFormat outputFormat;
+  final ImageBackground background;
   final int count;
   final String apiProfileId;
 
@@ -101,6 +129,12 @@ class GenerationRequest {
 
   String? get apiSize => isAutoSize ? null : '${resolvedWidth}x$resolvedHeight';
 
+  /// 实际发给接口的 background 值；JPEG 或未开启透明背景时为 null（不发送该字段）。
+  String? get apiBackground =>
+      background.isTransparent && outputFormat != ImageOutputFormat.jpeg
+      ? ImageBackground.transparent.apiValue
+      : null;
+
   GenerationRequest copyWith({
     String? prompt,
     List<String>? imagePaths,
@@ -109,6 +143,7 @@ class GenerationRequest {
     int? customHeight,
     ImageQuality? quality,
     ImageOutputFormat? outputFormat,
+    ImageBackground? background,
     int? count,
     String? apiProfileId,
   }) {
@@ -120,6 +155,7 @@ class GenerationRequest {
       customHeight: customHeight ?? this.customHeight,
       quality: quality ?? this.quality,
       outputFormat: outputFormat ?? this.outputFormat,
+      background: background ?? this.background,
       count: count ?? this.count,
       apiProfileId: apiProfileId ?? this.apiProfileId,
     );
@@ -134,6 +170,7 @@ class GenerationRequest {
       'customHeight': customHeight,
       'quality': quality.apiValue,
       'outputFormat': outputFormat.apiValue,
+      'background': background.apiValue,
       'count': count,
       'apiProfileId': apiProfileId,
     };
@@ -155,6 +192,9 @@ class GenerationRequest {
       ),
       outputFormat: ImageOutputFormat.fromApiValue(
         json['outputFormat'] as String? ?? ImageOutputFormat.png.apiValue,
+      ),
+      background: ImageBackground.fromApiValue(
+        json['background'] as String? ?? ImageBackground.auto.apiValue,
       ),
       count: json['count'] as int? ?? 1,
       apiProfileId: json['apiProfileId'] as String? ?? '',

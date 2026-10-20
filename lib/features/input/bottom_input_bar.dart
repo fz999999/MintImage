@@ -12,6 +12,7 @@ import '../../core/api/openai_client.dart';
 import '../../core/api/prompt_optimization_api.dart';
 import '../../core/models/generation_request.dart';
 import '../../core/models/image_record.dart';
+import '../../core/models/model_capabilities.dart';
 import '../../core/models/settings_model.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/providers/settings_provider.dart';
@@ -19,6 +20,7 @@ import '../../core/services/attachment_picker_service.dart';
 import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
 import 'attachment_preview_strip.dart';
+import 'background_selector.dart';
 import 'image_format_selector.dart';
 import 'quality_selector.dart';
 import 'quantity_selector.dart';
@@ -50,6 +52,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   SizePreset _sizePreset = SizePreset.auto;
   ImageQuality _quality = ImageQuality.auto;
   ImageOutputFormat _outputFormat = ImageOutputFormat.png;
+  ImageBackground _background = ImageBackground.auto;
   int _count = 1;
   int _customWidth = 0;
   int _customHeight = 0;
@@ -75,8 +78,12 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     _sizePreset = settings.lastSizePreset;
     _customWidth = settings.lastCustomWidth;
     _customHeight = settings.lastCustomHeight;
-    _quality = settings.lastQuality;
+    _quality = ModelCapabilities.coerceQuality(
+      settings.lastQuality,
+      settings.modelForProfile(settings.activeProfile),
+    );
     _outputFormat = settings.lastOutputFormat;
+    _background = settings.lastBackground;
   }
 
   @override
@@ -223,6 +230,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
             customHeight: _customHeight,
             quality: _quality,
             outputFormat: _outputFormat,
+            background: _background,
           ),
     );
   }
@@ -424,6 +432,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                   const SizedBox(width: 6),
                                   QualitySelector(
                                     selectedQuality: _quality,
+                                    model: settings.modelForProfile(
+                                      activeProfile,
+                                    ),
                                     onSelected: (quality) {
                                       setState(() {
                                         _quality = quality;
@@ -437,9 +448,33 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                     onSelected: (format) {
                                       setState(() {
                                         _outputFormat = format;
+                                        // JPEG 没有 alpha 通道，透明背景会被接口拒绝。
+                                        if (format == ImageOutputFormat.jpeg &&
+                                            _background.isTransparent) {
+                                          _background = ImageBackground.auto;
+                                        }
                                       });
                                       _persistLastGenerationOptions();
                                     },
+                                  ),
+                                  const SizedBox(width: 6),
+                                  BackgroundSelector(
+                                    background: _background,
+                                    outputFormat: _outputFormat,
+                                    model: settings.modelForProfile(
+                                      activeProfile,
+                                    ),
+                                    onSelected: (background) {
+                                      setState(() {
+                                        _background = background;
+                                      });
+                                      _persistLastGenerationOptions();
+                                    },
+                                    onUnsupported: () => _showMessage(
+                                      _outputFormat == ImageOutputFormat.jpeg
+                                          ? 'JPEG 没有透明通道，请把格式改成 PNG 或 WEBP。'
+                                          : '当前模型不支持透明背景。',
+                                    ),
                                   ),
                                   const SizedBox(width: 6),
                                   QuantitySelector(
@@ -677,6 +712,12 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       return;
     }
 
+    // 双保险：模型不支持 xhigh / max 时按 high 发，避免接口 400。
+    final effectiveQuality = ModelCapabilities.coerceQuality(
+      _quality,
+      settings.modelForProfile(activeProfile),
+    );
+
     setState(() {
       _submitting = true;
     });
@@ -689,8 +730,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
           sizePreset: _sizePreset,
           customWidth: _customWidth,
           customHeight: _customHeight,
-          quality: _quality,
+          quality: effectiveQuality,
           outputFormat: _outputFormat,
+          background: _background,
           count: _count,
           apiProfileId: selectedProfileId,
         ),
@@ -1015,6 +1057,17 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     await ref
         .read(settingsProvider.notifier)
         .setActiveProfileModel(activeProfile.id, selectedModel);
+
+    // 换到不支持 xhigh / max 的模型时，把画质收回支持范围。
+    final coerced = ModelCapabilities.coerceQuality(_quality, selectedModel);
+    if (coerced != _quality && mounted) {
+      final previous = _quality;
+      setState(() {
+        _quality = coerced;
+      });
+      _persistLastGenerationOptions();
+      _showMessage('「」画质仅 gpt-image-2.5 支持，已回退到「」。');
+    }
 
     unfocusPrompt();
   }

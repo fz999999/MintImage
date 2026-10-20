@@ -224,6 +224,7 @@ class SettingsController extends StateNotifier<SettingsModel> {
     required int customHeight,
     required ImageQuality quality,
     required ImageOutputFormat outputFormat,
+    required ImageBackground background,
   }) async {
     state = state.copyWith(
       lastSizePreset: sizePreset,
@@ -231,6 +232,7 @@ class SettingsController extends StateNotifier<SettingsModel> {
       lastCustomHeight: customHeight,
       lastQuality: quality,
       lastOutputFormat: outputFormat,
+      lastBackground: background,
     );
     await _persist();
   }

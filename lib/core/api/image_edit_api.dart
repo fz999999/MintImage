@@ -98,6 +98,10 @@ class ImageEditApi {
     if (request.apiSize != null) {
       fields.add(MapEntry('size', request.apiSize!));
     }
+    // 透明背景：只有 PNG / WEBP 才有效，apiBackground 已把 JPEG 过滤掉。
+    if (request.apiBackground != null) {
+      fields.add(MapEntry('background', request.apiBackground!));
+    }
     if (responseFormat != null &&
         responseFormat.trim().isNotEmpty &&
         !_isGptImage2Family(profile.model)) {
