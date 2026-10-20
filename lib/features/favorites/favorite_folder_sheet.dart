@@ -57,6 +57,7 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final state = ref.watch(favoriteFoldersProvider);
     final folders = state.folders;
     final selectedFolderIds = widget.record == null
@@ -82,7 +83,7 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
                 _isRecordMode ? '收藏到' : '收藏夹',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: AppThemeTokens.textPrimary,
+                  color: AppColors.textPrimary(b),
                 ),
               ),
               if (_isRecordMode) ...[
@@ -90,7 +91,7 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
                 Text(
                   '将结果收藏到：',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppThemeTokens.textSecondary,
+                    color: AppColors.textSecondary(b),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -125,9 +126,10 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
   }
 
   Widget _buildCreateRow(BuildContext context) {
+    final b = Theme.of(context).brightness;
     if (!_creating) {
       return InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.smAll,
         onTap: () {
           setState(() {
             _creating = true;
@@ -143,19 +145,19 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
-            color: AppThemeTokens.surfaceSoft,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppThemeTokens.border),
+            color: AppColors.surfaceSoft(b),
+            borderRadius: AppRadius.smAll,
+            border: Border.all(color: AppColors.border(b)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.add_rounded, color: AppThemeTokens.primaryStrong),
+              Icon(Icons.add_rounded, color: AppColors.primaryStrong(b)),
               const SizedBox(width: 6),
               Text(
                 '新建收藏夹',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppThemeTokens.primaryStrong,
+                  color: AppColors.primaryStrong(b),
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -189,14 +191,14 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
             _CreateActionButton(
               tooltip: '创建',
               icon: Icons.check_rounded,
-              color: AppThemeTokens.primaryStrong,
+              color: AppColors.primaryStrong(b),
               onPressed: _createFolder,
             ),
             const SizedBox(width: 4),
             _CreateActionButton(
               tooltip: '取消',
               icon: Icons.close_rounded,
-              color: AppThemeTokens.textSecondary,
+              color: AppColors.textSecondary(b),
               onPressed: _cancelCreate,
             ),
           ],
@@ -206,7 +208,9 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
           Text(
             _createError!,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.red.shade700,
+              color: AppColors.dangerText(
+                Theme.of(context).brightness,
+              ),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -302,19 +306,20 @@ class _FavoriteFolderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: AppRadius.smAll,
       onTap: onTap,
       onLongPress: onLongPress,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? Colors.orange.shade50
-              : AppThemeTokens.surfaceSoft.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(12),
+              ? AppColors.favorite(b).withValues(alpha: 0.16)
+              : AppColors.surfaceSoft(b).withValues(alpha: 0.72),
+          borderRadius: AppRadius.smAll,
           border: Border.all(
-            color: selected ? Colors.orange.shade300 : AppThemeTokens.border,
+            color: selected ? AppColors.favorite(b) : AppColors.border(b),
           ),
         ),
         child: Row(
@@ -325,7 +330,7 @@ class _FavoriteFolderRow extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppThemeTokens.textPrimary,
+                  color: AppColors.textPrimary(b),
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -335,7 +340,7 @@ class _FavoriteFolderRow extends StatelessWidget {
               Icon(
                 Icons.check_circle_rounded,
                 size: 18,
-                color: Colors.orange.shade700,
+                color: AppColors.favorite(b),
               ),
             ],
             const SizedBox(width: 10),
@@ -361,6 +366,7 @@ class _FolderPreviewStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     if (records.isEmpty) {
       return SizedBox(
         height: _thumbSize,
@@ -369,7 +375,7 @@ class _FolderPreviewStrip extends StatelessWidget {
           child: Text(
             '暂无收藏',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppThemeTokens.textSecondary,
+              color: AppColors.textSecondary(b),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -395,7 +401,7 @@ class _FolderPreviewStrip extends StatelessWidget {
               child: Transform.rotate(
                 angle: (i - centerIndex) * _angleStep,
                 alignment: Alignment.bottomCenter,
-                child: _buildCard(records[i], i, count),
+                child: _buildCard(records[i], i, count, b),
               ),
             ),
         ],
@@ -403,13 +409,13 @@ class _FolderPreviewStrip extends StatelessWidget {
     );
   }
 
-  Widget _buildCard(ImageRecord record, int index, int count) {
+  Widget _buildCard(ImageRecord record, int index, int count, Brightness b) {
     final depth = count <= 1 ? 1.0 : index / (count - 1);
     return Container(
       width: _thumbSize,
       height: _thumbSize,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: AppRadius.xsAll,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1 + depth * 0.17),
@@ -420,16 +426,16 @@ class _FolderPreviewStrip extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: AppRadius.xsAll,
         child: ColoredBox(
-          color: AppThemeTokens.surfaceSoft,
-          child: _buildImage(record),
+          color: AppColors.surfaceSoft(b),
+          child: _buildImage(record, b),
         ),
       ),
     );
   }
 
-  Widget _buildImage(ImageRecord record) {
+  Widget _buildImage(ImageRecord record, Brightness b) {
     final localPath = record.resultImagePath ?? record.sourceImagePath;
     if (localPath != null && File(localPath).existsSync()) {
       return Image.file(
@@ -450,15 +456,15 @@ class _FolderPreviewStrip extends StatelessWidget {
         fit: BoxFit.cover,
         memCacheWidth: 100,
         maxWidthDiskCache: 100,
-        placeholder: (_, _) => const ColoredBox(color: AppThemeTokens.surface),
+        placeholder: (_, _) => ColoredBox(color: AppColors.surface(b)),
         errorWidget: (_, _, _) =>
             const Icon(Icons.image_not_supported_rounded, size: 14),
       );
     }
 
-    return const ColoredBox(
-      color: AppThemeTokens.surfaceSoft,
-      child: Center(child: Icon(Icons.broken_image_rounded, size: 14)),
+    return ColoredBox(
+      color: AppColors.surfaceSoft(b),
+      child: const Center(child: Icon(Icons.broken_image_rounded, size: 14)),
     );
   }
 }

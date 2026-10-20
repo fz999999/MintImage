@@ -346,7 +346,7 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
       key: const ValueKey('preview-info-expanded'),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Padding(
@@ -469,8 +469,8 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
 
     final viewer = CheckerboardBackground(
       cellSize: 18,
-      lightColor: const Color(0xFF16181C),
-      darkColor: const Color(0xFF23272D),
+      lightColor: AppColors.viewerCanvas(Theme.of(context).brightness),
+      darkColor: AppColors.viewerCanvasAlt(Theme.of(context).brightness),
       child: gallery,
     );
 
@@ -706,17 +706,19 @@ class _PreviewChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppThemeTokens.primaryStrong.withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(999),
+        color: AppColors.primaryContainer(b).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         label,
-        style: Theme.of(
-          context,
-        ).textTheme.labelSmall?.copyWith(color: Colors.white),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppColors.onPrimaryContainer(b),
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -812,7 +814,7 @@ class _ZoomBadge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Text(

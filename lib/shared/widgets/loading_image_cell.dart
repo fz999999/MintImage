@@ -9,13 +9,14 @@ class LoadingImageCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(
-          colors: [AppThemeTokens.surfaceSoft, AppThemeTokens.primarySoft],
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        gradient: LinearGradient(
+          colors: [AppColors.surfaceSoft(b), AppColors.primarySoft(b)],
         ),
       ),
       child: const Center(

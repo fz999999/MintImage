@@ -126,6 +126,19 @@ class AppColors {
 
   // ---------------------------------------------------------------- 图片浮层
 
+  /// 全屏看图器的底色（该场景亮暗都用深色，故两值相同）。
+  static Color viewerCanvas(Brightness b) => const Color(0xFF16181C);
+
+  /// 全屏看图器的棋盘格另一色。
+  static Color viewerCanvasAlt(Brightness b) => const Color(0xFF23272D);
+
+  /// 「提示词优化」按钮的彩条渐变（亮暗通用，饱和度高，深色下也够醒目）。
+  static List<Color> optimizeGradient(Brightness b) => const [
+    Color(0xFFFFC857),
+    Color(0xFFFF6B6B),
+    Color(0xFF3B82F6),
+  ];
+
   /// 图上角标/状态徽章的半透明底。
   static Color imageChipFill(Brightness b) =>
       _dark(b) ? const Color(0xE60B0F11) : const Color(0xEBFFFFFF);
