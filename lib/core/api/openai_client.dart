@@ -146,10 +146,12 @@ class OpenAiClient {
         cancelToken: cancelToken,
       );
 
+      String? stats;
       final result = await _readStreamResponse(
         response,
         isImagesApi: isImagesApi,
         onPartialImage: onPartialImage,
+        onStats: (value) => stats = value,
       );
       stopwatch.stop();
 
@@ -161,7 +163,8 @@ class OpenAiClient {
             title,
             '耗时: ${stopwatch.elapsedMilliseconds} ms\n'
             '状态码: ${response.statusCode ?? 'unknown'}\n'
-            '流式响应，Images API，收到最终图片: $receivedImage',
+            '流式响应，Images API，收到最终图片: $receivedImage\n'
+            '流式统计: ${stats ?? '未知'}',
           ),
         );
       } else {
@@ -172,7 +175,8 @@ class OpenAiClient {
             title,
             '耗时: ${stopwatch.elapsedMilliseconds} ms\n'
             '状态码: ${response.statusCode ?? 'unknown'}\n'
-            '流式响应，Responses API，收到 $outputCount 个图片结果',
+            '流式响应，Responses API，收到 $outputCount 个图片结果\n'
+            '流式统计: ${stats ?? '未知'}',
           ),
         );
       }
@@ -180,7 +184,7 @@ class OpenAiClient {
       return result;
     } on DioException catch (error) {
       stopwatch.stop();
-      final message = extractErrorMessage(error);
+      final message = await _errorMessageFor(error);
       unawaited(
         _requestLogService?.logError(
           title,
@@ -224,10 +228,12 @@ class OpenAiClient {
         options: Options(responseType: ResponseType.stream),
         cancelToken: cancelToken,
       );
+      String? stats;
       final result = await _readStreamResponse(
         response,
         isImagesApi: true,
         onPartialImage: onPartialImage,
+        onStats: (value) => stats = value,
       );
       stopwatch.stop();
       final data = result['data'];
@@ -237,13 +243,14 @@ class OpenAiClient {
           title,
           '耗时: ${stopwatch.elapsedMilliseconds} ms\n'
           '状态码: ${response.statusCode ?? 'unknown'}\n'
-          '流式响应，Images API，收到最终图片: $receivedImage',
+          '流式响应，Images API，收到最终图片: $receivedImage\n'
+          '流式统计: ${stats ?? '未知'}',
         ),
       );
       return result;
     } on DioException catch (error) {
       stopwatch.stop();
-      final message = extractErrorMessage(error);
+      final message = await _errorMessageFor(error);
       unawaited(
         _requestLogService?.logError(
           title,
@@ -312,6 +319,7 @@ class OpenAiClient {
     Response<ResponseBody> response, {
     required bool isImagesApi,
     void Function(String b64Json)? onPartialImage,
+    void Function(String stats)? onStats,
   }) async {
     final contentType =
         response.headers.value(Headers.contentTypeHeader)?.toLowerCase() ?? '';
@@ -344,6 +352,7 @@ class OpenAiClient {
       response.data,
       isImagesApi: isImagesApi,
       onPartialImage: onPartialImage,
+      onStats: onStats,
     );
   }
 
@@ -365,6 +374,7 @@ class OpenAiClient {
     ResponseBody? responseBody, {
     required bool isImagesApi,
     void Function(String b64Json)? onPartialImage,
+    void Function(String stats)? onStats,
   }) async {
     if (responseBody == null) {
       return isImagesApi ? {'data': []} : {'output': []};
@@ -372,13 +382,20 @@ class OpenAiClient {
 
     String? lastImagesB64;
     String? lastPartialB64;
+    String? streamError;
     final outputItems = <Map<String, dynamic>>[];
     Map<String, dynamic>? completedResponse;
     String? currentEventType;
+    final eventNames = <String>{};
+    var totalBytes = 0;
+    var parseFailures = 0;
 
     await for (final rawLine
         in responseBody.stream
-            .map<List<int>>((chunk) => chunk)
+            .map<List<int>>((chunk) {
+              totalBytes += chunk.length;
+              return chunk;
+            })
             .transform(utf8.decoder)
             .transform(const LineSplitter())) {
       final line = rawLine.trim();
@@ -389,6 +406,9 @@ class OpenAiClient {
 
       if (line.startsWith('event:')) {
         currentEventType = line.substring('event:'.length).trim();
+        if (currentEventType.isNotEmpty) {
+          eventNames.add(currentEventType);
+        }
         continue;
       }
 
@@ -401,66 +421,218 @@ class OpenAiClient {
         continue;
       }
 
+      Map<String, dynamic>? data;
       try {
-        final data = jsonDecode(dataStr) as Map<String, dynamic>;
-        final eventType = currentEventType ?? data['type'] as String?;
+        final decoded = jsonDecode(dataStr);
+        if (decoded is Map<String, dynamic>) {
+          data = decoded;
+        }
+      } catch (_) {
+        // 半截行（连接被掐断）或非 JSON 的 data 段，跳过继续读。
+        parseFailures++;
+      }
 
-        if (isImagesApi) {
-          if (_isImageStreamResultEvent(eventType)) {
-            final b64 = data['b64_json'] as String?;
-            if (b64 != null && b64.isNotEmpty) {
-              final isPartial = eventType?.endsWith('.partial_image') ?? false;
-              if (isPartial) {
-                lastPartialB64 = b64;
-                onPartialImage?.call(b64);
-              } else {
-                lastImagesB64 = b64;
-              }
-            }
-          }
-        } else if (eventType == 'response.completed') {
-          final resp = data['response'];
-          if (resp is Map) {
-            completedResponse = Map<String, dynamic>.from(resp);
-          }
-        } else if (eventType == 'response.output_item.done') {
-          final item = data['item'];
-          if (item is Map) {
-            outputItems.add(Map<String, dynamic>.from(item));
-          }
-        } else if (eventType ==
-            'response.image_generation_call.partial_image') {
-          final b64 = data['b64_json'] as String?;
-          if (b64 != null && b64.isNotEmpty) {
+      if (data == null) {
+        continue;
+      }
+
+      final eventType = currentEventType ?? data['type'] as String?;
+
+      // 上游把失败也塞在 200 的流里（审核拒绝、参数不支持、通道报错等），
+      // 不捞出来用户就只能看到“没有图片数据”。
+      final errorMessage = _extractStreamError(data);
+      if (errorMessage != null) {
+        streamError ??= errorMessage;
+        continue;
+      }
+
+      if (isImagesApi) {
+        // 不按事件名硬匹配：中转站的命名五花八门（也常只给 type、不给 event），
+        // 只要 JSON 里带图片就认。否则 200 却“没图”，用户白等一分钟。
+        final b64 = _extractImageB64(data);
+        if (b64 != null) {
+          final isPartial = eventType?.endsWith('.partial_image') ?? false;
+          if (isPartial) {
+            lastPartialB64 = b64;
             onPartialImage?.call(b64);
-            outputItems.add({
-              'type': 'image_generation_call',
-              'result': {'b64_json': b64},
-            });
+          } else {
+            lastImagesB64 = b64;
           }
         }
-      } catch (_) {}
+      } else if (eventType == 'response.completed') {
+        final resp = data['response'];
+        if (resp is Map) {
+          completedResponse = Map<String, dynamic>.from(resp);
+        }
+      } else if (eventType == 'response.output_item.done') {
+        final item = data['item'];
+        if (item is Map) {
+          outputItems.add(Map<String, dynamic>.from(item));
+        }
+      } else if (eventType ==
+          'response.image_generation_call.partial_image') {
+        final b64 = _extractImageB64(data);
+        if (b64 != null) {
+          onPartialImage?.call(b64);
+          outputItems.add({
+            'type': 'image_generation_call',
+            'result': {'b64_json': b64},
+          });
+        }
+      }
     }
 
     if (isImagesApi) {
       // 有些中转站只推过程图、不推 completed 事件；这时用最后一张过程图兜底，
       // 否则用户等了几十秒却拿到“没有可展示的图片数据”。
       final imageB64 = lastImagesB64 ?? lastPartialB64;
+      onStats?.call(
+        '字节=$totalBytes 事件=${eventNames.join(',')} '
+        '解析失败=$parseFailures '
+        '完成图=${lastImagesB64 != null} 过程图=${lastPartialB64 != null}'
+        '${streamError == null ? '' : ' 错误=$streamError'}',
+      );
+      if (imageB64 == null) {
+        throw ApiException(
+          _withUpstreamHint(
+            streamError ??
+                '流式响应已经结束，但没有收到图片数据。'
+                    '常见原因是提示词被审核拒绝，或该模型不支持当前参数（尺寸/画质/透明背景）。',
+          ),
+        );
+      }
       return {
         'data': [
-          if (imageB64 != null) {'b64_json': imageB64},
+          {'b64_json': imageB64},
         ],
       };
     }
 
+    onStats?.call('字节=$totalBytes 事件=${eventNames.join(',')}');
     return completedResponse ?? {'output': outputItems};
   }
 
-  bool _isImageStreamResultEvent(String? eventType) {
-    return eventType == 'image_generation.completed' ||
-        eventType == 'image_generation.partial_image' ||
-        eventType == 'image_edit.completed' ||
-        eventType == 'image_edit.partial_image';
+  /// 从任意流式 JSON 片段里挖出 base64 图片，兼容几种常见的嵌套写法。
+  String? _extractImageB64(Map<String, dynamic> data) {
+    final direct = data['b64_json'];
+    if (direct is String && direct.isNotEmpty) {
+      return direct;
+    }
+
+    final nested = data['result'];
+    if (nested is Map) {
+      final inner = nested['b64_json'] ?? nested['base64'] ?? nested['image'];
+      if (inner is String && inner.isNotEmpty) {
+        return inner;
+      }
+    }
+
+    final list = data['data'];
+    if (list is List) {
+      for (final item in list) {
+        if (item is Map) {
+          final value = item['b64_json'] ?? item['base64'];
+          if (value is String && value.isNotEmpty) {
+            return value;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /// 从流式片段里识别上游错误，返回可直接展示的中文消息。
+  String? _extractStreamError(Map<String, dynamic> data) {
+    final error = data['error'];
+
+    if (error is Map) {
+      final message = error['message'] ?? error['detail'] ?? error['code'];
+      if (message is String && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+    }
+
+    if (error is String && error.trim().isNotEmpty) {
+      return error.trim();
+    }
+
+    final type = data['type'];
+    if (type == 'error') {
+      final message = data['message'] ?? data['detail'];
+      if (message is String && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+      return '上游返回了错误事件。';
+    }
+
+    // 没有图片、只有 message 的片段，多半也是错误提示。
+    if (_extractImageB64(data) == null) {
+      final message = data['message'];
+      if (message is String && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+    }
+
+    return null;
+  }
+
+  /// 上游把失败塞进 200 的流里时，原始消息往往只有一句英文
+  /// （例如 `upstream request failed`），补一句能落地的建议。
+  static String _withUpstreamHint(String message) {
+    final lower = message.toLowerCase();
+    final looksUpstream = lower.contains('upstream') ||
+        lower.contains('failed') ||
+        lower.contains('error');
+    if (!looksUpstream || message.contains('（')) {
+      return message;
+    }
+    return '$message（上游生成失败，常见原因是提示词被审核拦截或该参数不支持，换个描述或关掉透明背景再试）';
+  }
+
+  /// 流式请求失败时，错误体是 [ResponseBody]，得先把原始字节读出来才能拿到
+  /// 上游给的 message（否则只能显示“请求失败，请检查接口返回。”）。
+  Future<String> _errorMessageFor(DioException error) async {
+    final data = error.response?.data;
+
+    if (data is ResponseBody) {
+      try {
+        final buffer = <int>[];
+        await for (final chunk in data.stream) {
+          buffer.addAll(chunk);
+          if (buffer.length > 8192) {
+            break;
+          }
+        }
+
+        final text = utf8.decode(buffer, allowMalformed: true).trim();
+        final decoded = _tryDecodeJsonObject(text);
+        String? apiMessage;
+
+        if (decoded != null) {
+          final nested = decoded['error'];
+          if (nested is Map && nested['message'] is String) {
+            apiMessage = (nested['message'] as String).trim();
+          }
+          apiMessage ??= switch (decoded['message']) {
+            String value => value.trim(),
+            _ => null,
+          };
+        }
+
+        final detail = (apiMessage != null && apiMessage.isNotEmpty)
+            ? apiMessage
+            : (text.isEmpty ? null : _truncate(text, 300));
+
+        if (detail != null && detail.isNotEmpty) {
+          return _withStatusCode(detail, error.response?.statusCode);
+        }
+      } catch (_) {
+        // 读不到就用通用文案。
+      }
+    }
+
+    return extractErrorMessage(error);
   }
 
   static String extractErrorMessage(DioException error) {

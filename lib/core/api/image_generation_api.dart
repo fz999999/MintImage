@@ -142,7 +142,9 @@ class ImageGenerationApi {
 
   bool _looksLikeStreamUnsupported(String message) {
     final value = message.toLowerCase();
-    if (value.contains('stream') ||
+    // 注意别用 contains('stream')：'upstream request failed' 里也含 stream，
+    // 会把上游的真实失败误判成“不支持流式”，白白再发一次请求（可能重复计费）。
+    if (RegExp(r'\bstream(ing)?\b').hasMatch(value) ||
         value.contains('partial_image') ||
         value.contains('unsupported parameter') ||
         value.contains('unknown parameter') ||
@@ -250,6 +252,12 @@ class ImageGenerationApi {
     final payload = response['data'];
     if (payload is! List) {
       throw const ApiException('接口响应缺少图片数据。');
+    }
+    if (payload.isEmpty) {
+      throw const ApiException(
+        '接口返回成功，但响应里没有图片数据。'
+        '常见原因是提示词被审核拒绝，或该模型不支持当前参数。',
+      );
     }
 
     return payload.map((item) {

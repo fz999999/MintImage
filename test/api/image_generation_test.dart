@@ -436,6 +436,90 @@ void main() {
       expect(results.single.b64Json, finalImage);
     });
 
+    test('surfaces the upstream error event instead of a blank failure', () async {
+      final server = await _startServer((request) async {
+        await utf8.decoder.bind(request).join();
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+        );
+        // 真实中转站（chuanapi）就是这样：200 里先心跳，最后推一条 error 事件。
+        request.response.write(
+          'event: keepalive\n'
+          'data: ${jsonEncode({'type': 'keepalive'})}\n\n'
+          'event: error\n'
+          'data: ${jsonEncode({
+                'type': 'error',
+                'error': {'message': 'upstream request failed (request id: abc)'},
+              })}\n\n',
+        );
+        await request.response.close();
+      });
+      addTearDown(server.close);
+
+      await expectLater(
+        const ImageGenerationApi().generate(
+          GenerationRequest(
+            prompt: 'a red apple',
+            imagePaths: const [],
+            sizePreset: SizePreset.square1k,
+            customWidth: 1024,
+            customHeight: 1024,
+            quality: ImageQuality.low,
+            count: 1,
+            apiProfileId: 'default',
+          ),
+          _profileFor(server),
+          timeoutSeconds: 600,
+          onPartialImage: (_) {},
+        ),
+        throwsA(
+          isA<ApiException>().having(
+            (error) => error.message,
+            'message',
+            allOf(contains('upstream request failed'), contains('审核')),
+          ),
+        ),
+      );
+    });
+
+    test('accepts image data sent under an unknown event name', () async {
+      final image = base64Encode(<int>[9, 9, 9]);
+
+      final server = await _startServer((request) async {
+        await utf8.decoder.bind(request).join();
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+        );
+        // 中转站的命名五花八门，不能只认官方事件名。
+        request.response.write(
+          'event: relay.result\n'
+          'data: ${jsonEncode({'b64_json': image})}\n\n',
+        );
+        await request.response.close();
+      });
+      addTearDown(server.close);
+
+      final results = await const ImageGenerationApi().generate(
+        GenerationRequest(
+          prompt: 'a red apple',
+          imagePaths: const [],
+          sizePreset: SizePreset.square1k,
+          customWidth: 1024,
+          customHeight: 1024,
+          quality: ImageQuality.low,
+          count: 1,
+          apiProfileId: 'default',
+        ),
+        _profileFor(server),
+        timeoutSeconds: 600,
+        onPartialImage: (_) {},
+      );
+
+      expect(results.single.b64Json, image);
+    });
+
     test('falls back to plain JSON when the server ignores stream', () async {
       final image = base64Encode(<int>[3, 3, 3]);
 
