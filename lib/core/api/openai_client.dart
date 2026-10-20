@@ -423,7 +423,9 @@ class OpenAiClient {
         return _withStatusCode('请求失败，请检查接口返回。', statusCode);
       case DioExceptionType.cancel:
         return '请求已取消。';
-      case DioExceptionType.unknown:
+      default:
+        // 覆盖 DioExceptionType.unknown，以及 dio 后续版本新增的类型
+        // （例如 5.10.0 新增的 transformTimeout），避免 switch 穷尽性失配。
         return _withStatusCode(error.message ?? '请求失败，请稍后重试。', statusCode);
     }
   }

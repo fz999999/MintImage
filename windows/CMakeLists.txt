@@ -55,6 +55,20 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
+# Some Windows plugins (for example flutter_local_notifications_windows) include
+# <atlbase.h>. That header ships with the "C++ ATL" Visual Studio component,
+# which is not always installed. When it is missing, fall back to the small
+# compatible shim in windows/atl_shim so the release build still works.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+  include(CheckIncludeFileCXX)
+  check_include_file_cxx("atlbase.h" MINTIMAGE_HAS_ATL)
+else()
+  set(MINTIMAGE_HAS_ATL 0)
+endif()
+if(NOT MINTIMAGE_HAS_ATL)
+  message(STATUS "atlbase.h not available; using windows/atl_shim")
+  include_directories("${CMAKE_CURRENT_SOURCE_DIR}/atl_shim")
+endif()
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
