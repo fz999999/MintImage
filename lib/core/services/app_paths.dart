@@ -44,4 +44,21 @@ class AppPaths {
     await directory.create(recursive: true);
     return directory;
   }
+
+  /// 旧版本（数据放在 `%APPDATA%`）的数据目录，用于一次性迁移。
+  ///
+  /// 只读用途：新位置为空时才从这里搬数据，迁移完成后旧目录不再使用。
+  static Directory? legacyDataRoot() {
+    if (!Platform.isWindows) {
+      return null;
+    }
+
+    final appData = Platform.environment['APPDATA'];
+    if (appData == null || appData.isEmpty) {
+      return null;
+    }
+
+    final directory = Directory(p.join(appData, 'com.aiqin', 'MintImage'));
+    return directory.existsSync() ? directory : null;
+  }
 }

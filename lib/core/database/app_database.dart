@@ -103,15 +103,31 @@ Future<void> _copyLegacyDatabaseIfNeeded(Directory directory, File file) async {
   }
 
   final legacyFile = File(p.join(directory.path, _legacyDatabaseFileName));
-  if (!await legacyFile.exists()) {
+  if (await legacyFile.exists()) {
+    await _copyDatabaseFiles(legacyFile, file);
     return;
   }
 
-  await legacyFile.copy(file.path);
+  // 便携化升级：新版数据库在 exe 同级 data 目录，旧版在 `%APPDATA%`。
+  // 新位置为空时把旧库整体搬过来，避免用户升级后历史记录消失。
+  final legacyRoot = AppPaths.legacyDataRoot();
+  if (legacyRoot == null) {
+    return;
+  }
+
+  final legacyPortable = File(p.join(legacyRoot.path, _databaseFileName));
+  if (await legacyPortable.exists()) {
+    await _copyDatabaseFiles(legacyPortable, file);
+  }
+}
+
+/// 复制数据库主文件与 WAL 副文件。
+Future<void> _copyDatabaseFiles(File source, File target) async {
+  await source.copy(target.path);
   for (final suffix in ['-wal', '-shm']) {
-    final legacySidecar = File('${legacyFile.path}$suffix');
-    if (await legacySidecar.exists()) {
-      await legacySidecar.copy('${file.path}$suffix');
+    final sidecar = File('${source.path}$suffix');
+    if (await sidecar.exists()) {
+      await sidecar.copy('${target.path}$suffix');
     }
   }
 }
