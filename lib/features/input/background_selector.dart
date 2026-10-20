@@ -38,16 +38,9 @@ class BackgroundSelector extends StatelessWidget {
   bool get _active =>
       background == ImageBackground.transparent && _transparentSupported;
 
-  IconData get _icon {
-    if (!_transparentSupported) {
-      return Icons.grid_on;
-    }
-    return switch (background) {
-      ImageBackground.transparent => Icons.grid_on,
-      ImageBackground.opaque => Icons.crop_square,
-      ImageBackground.auto => Icons.auto_awesome_outlined,
-    };
-  }
+  /// 固定在标签左侧的话题图标，和尺寸/质量/格式/数量四个按钮保持一致：
+  /// 图标只表示「这是背景」，具体状态由后面的文字（自动 / 透明 / 不透明）表达。
+  IconData get _icon => Icons.wallpaper_rounded;
 
   String get _unsupportedReason {
     if (!_modelSupported) {
@@ -89,13 +82,7 @@ class BackgroundSelector extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                _icon,
-                size: 13,
-                color: _transparentSupported
-                    ? AppThemeTokens.primaryStrong
-                    : AppThemeTokens.textSecondary,
-              ),
+              Icon(_icon, size: 13, color: AppThemeTokens.primaryStrong),
               const SizedBox(width: 4),
               SelectorChipLabel(prefix: '背景', value: background.label),
             ],

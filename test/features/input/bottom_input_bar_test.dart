@@ -120,6 +120,8 @@ void main() {
     );
 
     expect(find.text('背景:自动'), findsOneWidget);
+    // 背景按钮和其它四个按钮一样，左侧固定有话题图标。
+    expect(find.byIcon(Icons.wallpaper_rounded), findsOneWidget);
 
     await tester.tap(find.text('背景:自动'));
     await tester.pumpAndSettle();
