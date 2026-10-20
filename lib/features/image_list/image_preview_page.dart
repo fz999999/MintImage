@@ -13,6 +13,7 @@ import '../../core/models/image_record.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../shared/theme.dart';
+import '../../shared/widgets/checkerboard_background.dart';
 
 class ImagePreviewPage extends ConsumerStatefulWidget {
   const ImagePreviewPage({
@@ -453,25 +454,34 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
   }
 
   Widget _buildViewer() {
+    // 透明背景的图放纯黑底上也是黑的，看不出“到底透没透”，
+    // 所以这里用深色棋盘格当底，透明区域会露出来。
     final gallery = PhotoViewGallery.builder(
       itemCount: _records.length,
       pageController: _pageController,
       onPageChanged: _handlePageChanged,
       scrollPhysics: const BouncingScrollPhysics(),
-      backgroundDecoration: const BoxDecoration(color: Colors.black),
+      backgroundDecoration: const BoxDecoration(color: Colors.transparent),
       loadingBuilder: (context, event) =>
           const Center(child: CircularProgressIndicator(color: Colors.white)),
       builder: _buildGalleryItem,
     );
 
+    final viewer = CheckerboardBackground(
+      cellSize: 18,
+      lightColor: const Color(0xFF16181C),
+      darkColor: const Color(0xFF23272D),
+      child: gallery,
+    );
+
     if (!_supportsPointerScrollZoom) {
-      return gallery;
+      return viewer;
     }
 
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerSignal: _handlePointerSignal,
-      child: gallery,
+      child: viewer,
     );
   }
 

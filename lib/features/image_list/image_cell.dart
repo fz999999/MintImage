@@ -11,6 +11,7 @@ import '../../core/providers/generation_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
+import '../../shared/widgets/checkerboard_background.dart';
 import 'image_preview_page.dart';
 
 class ImageCell extends ConsumerWidget {
@@ -234,11 +235,13 @@ class ImageCell extends ConsumerWidget {
 
     if (record.resultImagePath != null &&
         File(record.resultImagePath!).existsSync()) {
-      return Image.file(
-        File(record.resultImagePath!),
-        width: double.infinity,
-        height: double.infinity,
-        fit: BoxFit.cover,
+      return CheckerboardBackground(
+        child: Image.file(
+          File(record.resultImagePath!),
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.cover,
+        ),
       );
     }
 
