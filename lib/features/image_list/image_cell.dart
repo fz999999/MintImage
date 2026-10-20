@@ -10,13 +10,11 @@ import '../../core/models/image_record.dart';
 import '../../core/providers/generation_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/image_clipboard_service.dart';
-import '../../shared/design/app_colors.dart';
-import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/checkerboard_background.dart';
 import 'image_preview_page.dart';
 
-class ImageCell extends ConsumerStatefulWidget {
+class ImageCell extends ConsumerWidget {
   const ImageCell({
     super.key,
     required this.record,
@@ -58,43 +56,7 @@ class ImageCell extends ConsumerStatefulWidget {
   final VoidCallback onAppendCurrentImageToAttachments;
 
   @override
-  ConsumerState<ImageCell> createState() => _ImageCellState();
-}
-
-class _ImageCellState extends ConsumerState<ImageCell> {
-  /// 悬停态：鼠标进入图卡时置 true，右上角操作条浮现、元信息淡出、
-  /// 描边转主色并抬升。桌面端基础能力，现状全库缺失。
-  bool _hovered = false;
-
-  ImageRecord get record => widget.record;
-  double get imageHeight => widget.imageHeight;
-  List<ImageRecord> get previewRecords => widget.previewRecords;
-  int? get previewInitialIndex => widget.previewInitialIndex;
-  bool get selectionMode => widget.selectionMode;
-  bool get selected => widget.selected;
-  int get currentAttachmentCount => widget.currentAttachmentCount;
-  VoidCallback get onReusePrompt => widget.onReusePrompt;
-  VoidCallback get onReuseEdit => widget.onReuseEdit;
-  VoidCallback get onRegenerate => widget.onRegenerate;
-  VoidCallback get onRetry => widget.onRetry;
-  VoidCallback get onCancel => widget.onCancel;
-  VoidCallback get onDelete => widget.onDelete;
-  VoidCallback get onToggleFavorite => widget.onToggleFavorite;
-  Future<void> Function(Future<void> Function() navigate)
-  get onPreviewNavigation => widget.onPreviewNavigation;
-  VoidCallback get onSelectionToggle => widget.onSelectionToggle;
-  VoidCallback get onAppendCurrentImageToAttachments =>
-      widget.onAppendCurrentImageToAttachments;
-
-  void _setHovered(bool value) {
-    if (!mounted || _hovered == value) {
-      return;
-    }
-    setState(() => _hovered = value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final requestStartedAt = ref.watch(
       generationProvider.select((state) => state.requestStartedAts[record.id]),
@@ -104,31 +66,21 @@ class _ImageCellState extends ConsumerState<ImageCell> {
       generationProvider.select((state) => state.partialImages[record.id]),
     );
 
-    return MouseRegion(
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
-      child: Material(
+    return Material(
       color: AppThemeTokens.surface,
       clipBehavior: Clip.antiAlias,
-      borderRadius: BorderRadius.circular(AppRadius.sm),
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: selectionMode ? onSelectionToggle : null,
-        onSecondaryTap:
-            selectionMode ? null : () => _showActions(context),
         onLongPress: selectionMode
             ? onSelectionToggle
             : () => _showActions(context),
         child: DecoratedBox(
           decoration: BoxDecoration(
             border: Border.all(
-              color:
-                  _hovered
-                      ? AppColors.primary(Theme.of(context).brightness)
-                      : AppThemeTokens.border.withValues(alpha: 0.7),
-              width: _hovered ? 1 : 0.5,
+              color: AppThemeTokens.border.withValues(alpha: 0.7),
             ),
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            boxShadow: _hovered ? AppShadow.raised : AppShadow.card,
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,43 +107,20 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                       Positioned(
                         top: 6,
                         right: 6,
-                        child: MouseRegion(
-                          onEnter: (_) => _setHovered(true),
-                          onExit: (_) => _setHovered(false),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AnimatedOpacity(
-                                opacity: _hovered ? 0 : 1,
-                                duration: AppMotion.fast,
-                                child: _ActualImageSizeChip(
-                                  record: record,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              _buildStatusWidget(context),
-                              AnimatedOpacity(
-                                opacity: _hovered ? 1 : 0,
-                                duration: AppMotion.fast,
-                                child: IgnorePointer(
-                                  ignoring: !_hovered,
-                                  child: _QuickActions(
-                                    onShowAll: () => _showActions(context),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _ActualImageSizeChip(record: record),
+                            const SizedBox(width: 4),
+                            _buildStatusWidget(context),
+                          ],
                         ),
                       ),
                       Positioned(
                         left: 6,
                         right: 6,
                         bottom: 6,
-                        child: AnimatedOpacity(
-                          opacity: _hovered ? 0 : 1,
-                          duration: AppMotion.fast,
-                          child: _MetaOverlay(
+                        child: _MetaOverlay(
                           chips: [
                             _OverlayChip(
                               icon: Icons.aspect_ratio_rounded,
@@ -216,7 +145,6 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                                 label: '单图',
                               ),
                           ],
-                          ),
                         ),
                       ),
                       if (selectionMode)
@@ -266,7 +194,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                                   Icon(
                                     Icons.star_rounded,
                                     size: 14,
-                                    color: AppColors.favorite(Theme.of(context).brightness),
+                                    color: Colors.orange.shade700,
                                   ),
                                 ],
                               ],
@@ -287,7 +215,6 @@ class _ImageCellState extends ConsumerState<ImageCell> {
             ],
           ),
         ),
-      ),
       ),
     );
   }
@@ -352,7 +279,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
     return Tooltip(
       message: '查看失败原因',
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.full),
+        borderRadius: BorderRadius.circular(999),
         onTap: () => _showErrorDetails(context),
         child: chip,
       ),
@@ -442,7 +369,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                 ListTile(
                   leading: Icon(
                     Icons.star_border_rounded,
-                    color: record.isFavorite ? AppColors.favorite(Theme.of(context).brightness) : null,
+                    color: record.isFavorite ? Colors.orange.shade700 : null,
                   ),
                   title: const Text('收藏到...'),
                   onTap: () {
@@ -636,7 +563,7 @@ class _MetaOverlay extends StatelessWidget {
             Colors.black.withValues(alpha: 0.58),
           ],
         ),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(5, 14, 5, 5),
@@ -843,7 +770,7 @@ class _OverlayChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.86),
-        borderRadius: BorderRadius.circular(AppRadius.full),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -899,7 +826,7 @@ class _StatusPill extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(AppRadius.full),
+        borderRadius: BorderRadius.circular(999),
         boxShadow: const [
           BoxShadow(
             color: Color(0x22000000),
@@ -951,7 +878,7 @@ class _LoadingThumb extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: AppThemeTokens.surface.withValues(alpha: 0.86),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -1008,77 +935,6 @@ class _FallbackThumb extends StatelessWidget {
     return ColoredBox(
       color: AppThemeTokens.surfaceSoft,
       child: Center(child: Icon(icon, color: AppThemeTokens.primary)),
-    );
-  }
-}
-
-
-/// 图卡右上角悬停浮现的快捷操作条。
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.onShowAll});
-
-  final VoidCallback onShowAll;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(AppSpace.xxs / 2),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        boxShadow: AppShadow.raised,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _QuickActionButton(
-            icon: Icons.copy_rounded,
-            tooltip: '复制图片',
-            onPressed: onShowAll,
-          ),
-          _QuickActionButton(
-            icon: Icons.open_in_full_rounded,
-            tooltip: '放大查看',
-            onPressed: onShowAll,
-          ),
-          _QuickActionButton(
-            icon: Icons.more_horiz_rounded,
-            tooltip: '更多操作（右键也可）',
-            onPressed: onShowAll,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickActionButton extends StatelessWidget {
-  const _QuickActionButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(AppRadius.xs),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpace.xxs),
-            child: Icon(icon, size: AppIconSize.sm),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/app_providers.dart';
 import '../../core/services/request_log_service.dart';
-import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/empty_state.dart';
 
@@ -121,7 +120,7 @@ class _LogOverviewCard extends StatelessWidget {
                 height: 38,
                 decoration: BoxDecoration(
                   color: AppThemeTokens.surfaceSoft,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(Icons.receipt_long_rounded),
               ),
@@ -245,7 +244,7 @@ class _LogLevelChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(AppRadius.full),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,

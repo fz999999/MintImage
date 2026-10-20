@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../core/services/attachment_picker_service.dart';
-import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 
 class AttachmentPreviewStrip extends StatelessWidget {
@@ -23,7 +22,7 @@ class AttachmentPreviewStrip extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: AppThemeTokens.surfaceSoft,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -74,7 +73,7 @@ class _AttachmentThumb extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(14),
             child: Image.file(
               File(attachment.path),
               width: 44,

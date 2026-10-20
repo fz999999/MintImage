@@ -1,4 +1,3 @@
-import '../../../shared/design/tokens.dart';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
@@ -14,7 +13,7 @@ class LoadingImageCell extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        borderRadius: BorderRadius.circular(22),
         gradient: const LinearGradient(
           colors: [AppThemeTokens.surfaceSoft, AppThemeTokens.primarySoft],
         ),

@@ -1,4 +1,3 @@
-import '../../../shared/design/tokens.dart';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
@@ -107,7 +106,7 @@ class _HintChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: AppThemeTokens.surfaceSoft,
-        borderRadius: BorderRadius.circular(AppRadius.full),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,

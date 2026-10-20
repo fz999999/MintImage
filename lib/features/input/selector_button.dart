@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 
 class SelectorButton<T> extends StatelessWidget {
@@ -50,7 +49,7 @@ class SelectorButton<T> extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         decoration: BoxDecoration(
           color: AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: AppThemeTokens.border.withValues(alpha: 0.7),
           ),

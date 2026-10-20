@@ -7,7 +7,6 @@ import '../../core/api/prompt_optimization_api.dart';
 import '../../core/models/settings_model.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/providers/settings_provider.dart';
-import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 import 'model_name_field.dart';
 
@@ -165,7 +164,7 @@ class _PromptOptimizationProfileEditPageState
                       padding: const EdgeInsets.all(11),
                       decoration: BoxDecoration(
                         color: AppThemeTokens.surfaceSoft,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: Text(
                         '最终请求接口：$finalUrl',

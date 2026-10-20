@@ -6,7 +6,6 @@ import '../../core/api/openai_client.dart';
 import '../../core/models/settings_model.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/providers/settings_provider.dart';
-import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 
 class ApiProfileEditPage extends ConsumerStatefulWidget {
@@ -135,7 +134,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppThemeTokens.surfaceSoft,
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
                         '最终生成接口：$finalUrl',

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../shared/design/tokens.dart';
 import '../../shared/theme.dart';
 import 'selector_chip_label.dart';
 
@@ -24,7 +23,7 @@ class QuantitySelector extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         decoration: BoxDecoration(
           color: AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: AppThemeTokens.border.withValues(alpha: 0.7),
           ),
@@ -158,7 +157,7 @@ class _QuantityDialogState extends State<_QuantityDialog> {
                           context,
                         ).colorScheme.primary.withValues(alpha: 0.1)
                       : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: active
                         ? Theme.of(context).colorScheme.primary

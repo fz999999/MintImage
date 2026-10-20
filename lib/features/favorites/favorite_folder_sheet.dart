@@ -7,8 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/favorite_folder.dart';
 import '../../core/models/image_record.dart';
 import '../../core/providers/favorite_folders_provider.dart';
-import '../../shared/design/tokens.dart';
-import '../../shared/design/app_colors.dart';
 import '../../shared/theme.dart';
 
 Future<String?> showFavoriteFolderBrowserSheet(BuildContext context) {
@@ -129,7 +127,7 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
   Widget _buildCreateRow(BuildContext context) {
     if (!_creating) {
       return InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.sm),
+        borderRadius: BorderRadius.circular(12),
         onTap: () {
           setState(() {
             _creating = true;
@@ -146,7 +144,7 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
             color: AppThemeTokens.surfaceSoft,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppThemeTokens.border),
           ),
           child: Row(
@@ -305,7 +303,7 @@ class _FavoriteFolderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.sm),
+      borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       onLongPress: onLongPress,
       child: Container(
@@ -314,9 +312,9 @@ class _FavoriteFolderRow extends StatelessWidget {
           color: selected
               ? Colors.orange.shade50
               : AppThemeTokens.surfaceSoft.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? AppColors.favorite(Theme.of(context).brightness) : AppThemeTokens.border,
+            color: selected ? Colors.orange.shade300 : AppThemeTokens.border,
           ),
         ),
         child: Row(
@@ -337,7 +335,7 @@ class _FavoriteFolderRow extends StatelessWidget {
               Icon(
                 Icons.check_circle_rounded,
                 size: 18,
-                color: AppColors.favorite(Theme.of(context).brightness),
+                color: Colors.orange.shade700,
               ),
             ],
             const SizedBox(width: 10),
@@ -411,7 +409,7 @@ class _FolderPreviewStrip extends StatelessWidget {
       width: _thumbSize,
       height: _thumbSize,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.xs),
+        borderRadius: BorderRadius.circular(7),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1 + depth * 0.17),
@@ -422,7 +420,7 @@ class _FolderPreviewStrip extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.xs),
+        borderRadius: BorderRadius.circular(7),
         child: ColoredBox(
           color: AppThemeTokens.surfaceSoft,
           child: _buildImage(record),
