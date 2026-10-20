@@ -2,17 +2,22 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
 import 'app.dart';
 import 'core/bootstrap/app_bootstrap.dart';
 import 'core/providers/app_providers.dart';
 import 'core/services/background_generation_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/portable_preferences_store.dart';
 import 'core/services/request_log_service.dart';
 import 'features/logs/log_viewer_app.dart';
 
 Future<void> main([List<String> args = const []]) async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 设置数据同样落到 exe 同级的 data 目录，避免受限进程写不了 %APPDATA%。
+  SharedPreferencesStorePlatform.instance = PortablePreferencesStore.instance;
 
   if (args.contains('--log-window')) {
     final requestLogService = await RequestLogService.load();

@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+
+import '../services/app_paths.dart';
 
 part 'app_database.g.dart';
 
@@ -87,11 +88,9 @@ class FavoriteFolderItemsTable extends Table {
 
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
-    // 使用应用程序目录（exe 同级的 data 文件夹）来存储数据库
-    // 这样可以避免 Windows Low Integrity Level 限制，并且使应用便携化
-    final exeDir = Directory.current;
-    final directory = Directory(p.join(exeDir.path, 'data'));
-    await directory.create(recursive: true);
+    // 统一走 AppPaths：Windows 便携模式下是 exe 同级的 data 目录，
+    // 避免低完整性级别进程被拒绝写入 %APPDATA%。
+    final directory = await AppPaths.dataRoot();
     final file = File(p.join(directory.path, _databaseFileName));
     await _copyLegacyDatabaseIfNeeded(directory, file);
     return NativeDatabase.createInBackground(file);

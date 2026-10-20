@@ -53,3 +53,6 @@ app.*.map.json
 # Generated native build output
 /android/build/
 **/.gradle/
+# Windows 发布产物（打包输出，不入库）
+dist/
+*.dsh-ops-update-*.lock

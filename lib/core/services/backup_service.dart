@@ -14,6 +14,7 @@ import '../models/generation_request.dart';
 import '../models/image_record.dart';
 import '../models/settings_model.dart';
 import '../version/app_version.dart';
+import 'app_paths.dart';
 import 'request_log_service.dart';
 
 const _backupFormat = 'mint_image_backup';
@@ -345,14 +346,12 @@ class BackupService {
   }
 
   Future<File> _generatedImageDestination(String archivePath) async {
-    final directory = await getApplicationDocumentsDirectory();
-    return File(
-      p.join(directory.path, 'generated_images', p.basename(archivePath)),
-    );
+    final directory = await AppPaths.subDirectory('generated_images');
+    return File(p.join(directory.path, p.basename(archivePath)));
   }
 
   Future<void> _prepareRestoreFileDirectories() async {
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await AppPaths.dataRoot();
     for (final name in ['generated_images', 'restored_source_attachments']) {
       final target = Directory(p.join(directory.path, name));
       if (await target.exists()) {
@@ -365,14 +364,11 @@ class BackupService {
     String recordId,
     String archivePath,
   ) async {
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await AppPaths.subDirectory(
+      'restored_source_attachments',
+    );
     return File(
-      p.join(
-        directory.path,
-        'restored_source_attachments',
-        _safeFileStem(recordId),
-        p.basename(archivePath),
-      ),
+      p.join(directory.path, _safeFileStem(recordId), p.basename(archivePath)),
     );
   }
 

@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../models/generation_result.dart';
+import 'app_paths.dart';
 
 class StoredImageResult {
   const StoredImageResult({required this.localPath, required this.imageUrl});
@@ -51,12 +51,9 @@ class ImageStorageService {
   }
 
   Future<Directory> _ensureOutputDirectory() async {
-    final directory = await getApplicationDocumentsDirectory();
-    final outputDirectory = Directory(
-      p.join(directory.path, 'generated_images'),
-    );
-    await outputDirectory.create(recursive: true);
-    return outputDirectory;
+    // 统一走 AppPaths：Windows 便携模式下生成的图片放在 exe 同级 data/generated_images，
+    // 避免低完整性级别进程被拒绝写入「我的文档」。
+    return AppPaths.subDirectory('generated_images');
   }
 
   Future<String?> _downloadFromUrl({

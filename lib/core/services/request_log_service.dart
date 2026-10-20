@@ -4,7 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+
+import 'app_paths.dart';
 
 enum RequestLogLevel { info, request, response, error }
 
@@ -58,11 +59,8 @@ class RequestLogService extends ChangeNotifier {
   String get filePath => _file.path;
 
   static Future<RequestLogService> load({bool reset = false}) async {
-    // 使用应用程序目录（exe 同级的 data 文件夹）来存储日志
-    // 与 app_database.dart 保持一致，避免 Windows Low Integrity Level 限制
-    final exeDir = Directory.current;
-    final directory = Directory(p.join(exeDir.path, 'data'));
-    await directory.create(recursive: true);
+    // 统一走 AppPaths（Windows 便携模式为 exe 同级 data 目录）。
+    final directory = await AppPaths.dataRoot();
 
     final service = RequestLogService._(
       File(p.join(directory.path, _fileName)),
