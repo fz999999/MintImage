@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../shared/theme.dart';
+import 'selector_chip_label.dart';
 
 class QuantitySelector extends StatelessWidget {
   const QuantitySelector({
@@ -36,13 +37,7 @@ class QuantitySelector extends StatelessWidget {
               color: AppThemeTokens.primaryStrong,
             ),
             const SizedBox(width: 4),
-            Text(
-              '$count',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppThemeTokens.primaryStrong,
-              ),
-            ),
+            SelectorChipLabel(prefix: '数量', value: '$count'),
           ],
         ),
       ),

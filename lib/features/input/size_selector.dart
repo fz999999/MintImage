@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../shared/theme.dart';
+import 'selector_chip_label.dart';
 import 'size_picker_modal.dart';
 
 class SizeSelector extends StatelessWidget {
@@ -55,12 +56,9 @@ class SizeSelector extends StatelessWidget {
               color: AppThemeTokens.primaryStrong,
             ),
             const SizedBox(width: 4),
-            Text(
-              currentWidth == 0 ? '自动' : '$currentWidth×$currentHeight',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppThemeTokens.primaryStrong,
-              ),
+            SelectorChipLabel(
+              prefix: '尺寸',
+              value: currentWidth == 0 ? '自动' : '$currentWidth×$currentHeight',
             ),
           ],
         ),

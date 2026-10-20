@@ -89,9 +89,10 @@ void main() {
       },
     );
 
-    expect(find.text('1536×1024'), findsOneWidget);
-    expect(find.text('高'), findsOneWidget);
-    expect(find.text('WEBP'), findsOneWidget);
+    expect(find.text('尺寸:1536×1024'), findsOneWidget);
+    expect(find.text('质量:高'), findsOneWidget);
+    expect(find.text('格式:WEBP'), findsOneWidget);
+    expect(find.text('数量:1'), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('prompt-input')), '山谷日出');
     await tester.tap(find.byKey(const Key('submit-generation-button')));
@@ -161,7 +162,7 @@ void main() {
     await _pumpInputBar(tester, settings: _settingsWithTwoProfiles);
 
     expect(find.byTooltip('切换生图 API'), findsOneWidget);
-    expect(find.text('API'), findsOneWidget);
+    expect(find.text('渠道:API'), findsOneWidget);
 
     await tester.tap(find.byTooltip('切换生图 API'));
     await tester.pumpAndSettle();
@@ -215,7 +216,7 @@ void main() {
     await _pumpInputBar(tester, settings: _settingsWithMultipleModels);
 
     expect(find.byTooltip('切换模型'), findsOneWidget);
-    expect(find.text('model-a'), findsOneWidget);
+    expect(find.text('模型:model-a'), findsOneWidget);
 
     await tester.tap(find.byTooltip('切换模型'));
     await tester.pumpAndSettle();

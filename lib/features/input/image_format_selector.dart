@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/generation_request.dart';
 import '../../shared/theme.dart';
+import 'selector_chip_label.dart';
 
 class ImageFormatSelector extends StatelessWidget {
   const ImageFormatSelector({
@@ -36,13 +37,7 @@ class ImageFormatSelector extends StatelessWidget {
               color: AppThemeTokens.primaryStrong,
             ),
             const SizedBox(width: 4),
-            Text(
-              selectedFormat.label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppThemeTokens.primaryStrong,
-              ),
-            ),
+            SelectorChipLabel(prefix: '格式', value: selectedFormat.label),
           ],
         ),
       ),

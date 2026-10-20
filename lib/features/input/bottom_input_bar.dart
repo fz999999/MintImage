@@ -22,6 +22,7 @@ import 'attachment_preview_strip.dart';
 import 'image_format_selector.dart';
 import 'quality_selector.dart';
 import 'quantity_selector.dart';
+import 'selector_chip_label.dart';
 import 'size_selector.dart';
 import '../settings/prompt_optimization_profile_edit_page.dart';
 
@@ -1399,7 +1400,7 @@ class _ApiProfileSwitchButton extends StatelessWidget {
     return Tooltip(
       message: '切换生图 API',
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 90),
+        constraints: const BoxConstraints(maxWidth: 130),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
@@ -1423,14 +1424,9 @@ class _ApiProfileSwitchButton extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Flexible(
-                  child: Text(
-                    activeProfile.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppThemeTokens.primaryStrong,
-                    ),
+                  child: SelectorChipLabel(
+                    prefix: '渠道',
+                    value: activeProfile.name,
                   ),
                 ),
               ],
@@ -1453,7 +1449,7 @@ class _ModelSwitchButton extends StatelessWidget {
     return Tooltip(
       message: '切换模型',
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 110),
+        constraints: const BoxConstraints(maxWidth: 170),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
@@ -1477,15 +1473,7 @@ class _ModelSwitchButton extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Flexible(
-                  child: Text(
-                    model,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppThemeTokens.primaryStrong,
-                    ),
-                  ),
+                  child: SelectorChipLabel(prefix: '模型', value: model),
                 ),
               ],
             ),

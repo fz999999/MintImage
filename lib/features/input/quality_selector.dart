@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/generation_request.dart';
 import '../../shared/theme.dart';
+import 'selector_chip_label.dart';
 
 class QualitySelector extends StatelessWidget {
   const QualitySelector({
@@ -36,13 +37,7 @@ class QualitySelector extends StatelessWidget {
               color: AppThemeTokens.primaryStrong,
             ),
             const SizedBox(width: 4),
-            Text(
-              selectedQuality.label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppThemeTokens.primaryStrong,
-              ),
-            ),
+            SelectorChipLabel(prefix: '质量', value: selectedQuality.label),
           ],
         ),
       ),
