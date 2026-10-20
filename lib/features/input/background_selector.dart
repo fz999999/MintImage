@@ -5,12 +5,17 @@ import '../../core/models/model_capabilities.dart';
 import '../../shared/theme.dart';
 import 'selector_chip_label.dart';
 
-/// 「背景」选项：点开弹出三选（自动 / 透明 / 不透明）。
+/// 「背景」选项：点开弹层三选（自动 / 透明 / 不透明）。
 ///
-/// 用弹层而不是一键开关，是因为「自动」到底算透明还是不透明说不清楚：
-/// - 自动：不发 background 字段，由模型自己决定；
+/// 弹层的样式与「质量」「渠道」保持一致：标题 + ListTile（选中项打勾）。
+/// 用弹层而不是一键开关，是因为「自动」到底算不算透明说不清楚：
+/// - 自动：不发 background 字段，由模型自己决定（默认，通常实底）；
 /// - 透明：背景镂空，需要 PNG / WEBP（JPEG 没有 alpha 通道）；
-/// - 不透明：明确要求实底背景。
+/// - 不透明：明确要求纯实底背景。
+///
+/// 注意：所有图标都必须在这里**内联常量**写死。Flutter release 构建会做图标
+/// tree-shaking，只保留在 `Icon(常量)` 位置出现过的图标；如果图标从变量/getter
+/// 或参数里传进来，运行时就是空白（debug 和测试里看不出来）。
 class BackgroundSelector extends StatelessWidget {
   const BackgroundSelector({
     super.key,
@@ -37,10 +42,6 @@ class BackgroundSelector extends StatelessWidget {
   /// 当前值是否落在「透明」这一档（只有支持时才算生效）。
   bool get _active =>
       background == ImageBackground.transparent && _transparentSupported;
-
-  /// 固定在标签左侧的话题图标，和尺寸/质量/格式/数量四个按钮保持一致：
-  /// 图标只表示「这是背景」，具体状态由后面的文字（自动 / 透明 / 不透明）表达。
-  IconData get _icon => Icons.wallpaper_rounded;
 
   String get _unsupportedReason {
     if (!_modelSupported) {
@@ -82,7 +83,12 @@ class BackgroundSelector extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(_icon, size: 13, color: AppThemeTokens.primaryStrong),
+              // 内联常量图标：和尺寸/质量/格式/数量四个按钮完全一致。
+              const Icon(
+                Icons.wallpaper_rounded,
+                size: 13,
+                color: AppThemeTokens.primaryStrong,
+              ),
               const SizedBox(width: 4),
               SelectorChipLabel(prefix: '背景', value: background.label),
             ],
@@ -93,116 +99,87 @@ class BackgroundSelector extends StatelessWidget {
   }
 
   Future<void> _showSheet(BuildContext context) async {
+    FocusManager.instance.primaryFocus?.unfocus(
+      disposition: UnfocusDisposition.scope,
+    );
+
     final selected = await showModalBottomSheet<ImageBackground>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
-              child: Text(
-                '背景',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppThemeTokens.textPrimary,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '选择背景',
+                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            _BackgroundTile(
-              icon: Icons.auto_awesome_outlined,
-              title: '自动',
-              subtitle: '不指定背景，由模型自己决定（默认，通常是实底）',
-              selected: background == ImageBackground.auto,
-              onTap: () => Navigator.of(sheetContext).pop(ImageBackground.auto),
-            ),
-            _BackgroundTile(
-              icon: Icons.grid_on,
-              title: '透明',
-              subtitle: _transparentSupported
-                  ? '背景镂空，只保留主体（PNG / WEBP）'
-                  : '不可用：$_unsupportedReason',
-              selected: _active,
-              onTap: _transparentSupported
-                  ? () => Navigator.of(
-                      sheetContext,
-                    ).pop(ImageBackground.transparent)
-                  : null,
-            ),
-            _BackgroundTile(
-              icon: Icons.crop_square,
-              title: '不透明',
-              subtitle: '明确要求纯实底背景',
-              selected: background == ImageBackground.opaque,
-              onTap: () =>
-                  Navigator.of(sheetContext).pop(ImageBackground.opaque),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+              ListTile(
+                leading: Icon(
+                  background == ImageBackground.auto
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  color: background == ImageBackground.auto
+                      ? AppThemeTokens.primary
+                      : AppThemeTokens.textSecondary,
+                ),
+                title: const Text('自动'),
+                subtitle: const Text('不指定背景，由模型自己决定（通常是实底）'),
+                onTap: () => Navigator.of(ctx).pop(ImageBackground.auto),
+              ),
+              ListTile(
+                enabled: _transparentSupported,
+                leading: Icon(
+                  _active ? Icons.check_circle_rounded : Icons.circle_outlined,
+                  color: _active
+                      ? AppThemeTokens.primary
+                      : AppThemeTokens.textSecondary,
+                ),
+                title: const Text('透明'),
+                subtitle: Text(
+                  _transparentSupported
+                      ? '背景镂空，只保留主体（需 PNG / WEBP）'
+                      : '不可用：$_unsupportedReason',
+                ),
+                onTap: _transparentSupported
+                    ? () => Navigator.of(ctx).pop(ImageBackground.transparent)
+                    : null,
+              ),
+              ListTile(
+                leading: Icon(
+                  background == ImageBackground.opaque
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  color: background == ImageBackground.opaque
+                      ? AppThemeTokens.primary
+                      : AppThemeTokens.textSecondary,
+                ),
+                title: const Text('不透明'),
+                subtitle: const Text('明确要求纯实底背景'),
+                onTap: () => Navigator.of(ctx).pop(ImageBackground.opaque),
+              ),
+            ],
+          ),
+        );
+      },
     );
+
+    if (context.mounted) {
+      FocusManager.instance.primaryFocus?.unfocus(
+        disposition: UnfocusDisposition.scope,
+      );
+    }
     if (selected != null && selected != background) {
       onSelected(selected);
     }
-  }
-}
-
-class _BackgroundTile extends StatelessWidget {
-  const _BackgroundTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    final color = enabled
-        ? AppThemeTokens.textPrimary
-        : AppThemeTokens.textSecondary;
-    return ListTile(
-      enabled: enabled,
-      onTap: onTap,
-      leading: Icon(
-        icon,
-        size: 20,
-        color: enabled ? AppThemeTokens.primaryStrong : color,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(
-          fontSize: 12,
-          color: AppThemeTokens.textSecondary,
-        ),
-      ),
-      trailing: selected
-          ? const Icon(
-              Icons.check_rounded,
-              size: 20,
-              color: AppThemeTokens.primaryStrong,
-            )
-          : null,
-    );
   }
 }

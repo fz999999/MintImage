@@ -48,6 +48,9 @@ pwsh -File scripts/run-windows.ps1 -Clean
    `lib/features/settings/api_profile_edit_page.dart` 不是 format-clean，**不要整体 `dart format`**。
 6. `windows/runner/main.cpp` 里写中文必须用 `L"\u5927\u5ddd..."` 转义（编译带 `/WX` 且无 `/utf-8`）。
 7. `.gitignore` 已忽略 `dist/`、`build/`、`*.log`：打包产物不进库。
+8. Material 图标必须在 `Icon(...)` 里**内联常量**书写，不能从 getter/变量/参数传入
+   （release 的图标 tree-shaking 会把它丢掉，测试里看不出来）。
+   新加图标后若 release 里仍空白，删掉 `.dart_tool\flutter_build` 再 build。
 
 ## 更多
 

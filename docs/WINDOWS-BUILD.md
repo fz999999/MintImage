@@ -127,9 +127,12 @@ pwsh -File scripts/package-windows.ps1 -Build
 解法：不要依赖热重载。改代码后走「build + 启动」；纯逻辑/UI 断言用 `flutter test`（这个能用，全量约 7 秒）。
 
 ### 坑 9：抓 Flutter 窗口截图只能拿到上半部分
-症状：`PrintWindow` / `CopyFromScreen` 截到的窗口内容只填充上方约 460px，底部输入栏区域是空白。
+症状：`PrintWindow` / `CopyFromScreen` 只截窗口区域时，内容只填充上方约 460px，底部输入栏区域是空白。
 已用改造前的旧包做对照：旧包同样截不到 → 是截图管线的限制，不是界面 bug。
-解法：**不要靠截图验收 UI**，构建并启动后让用户直接看窗口；能用 widget test 断言的（文案、尺寸、交互）就写测试断言。
+**可行的替代**：把窗口置顶（`SetWindowPos(hwnd, HWND_TOPMOST(-1), ...)` + `BringWindowToTop`），
+然后整屏 `CopyFromScreen(0,0,屏幕宽,屏幕高)` 存 PNG —— 整屏截图里底部输入栏是完整的；
+选项行大约在 `y≈850-900`，裁 `Rectangle(20, 850, 760, 50)` 再放大 3 倍即可读清 chip 文案。
+注意 `SetWindowPos` 改窗口高度**不会**触发布局重排（内容按原尺寸绘制后裁切），别指望缩小窗口让底栏露出来。
 
 ### 坑 10：部分大文件不是 format-clean
 `lib/features/input/bottom_input_bar.dart`、`lib/features/settings/settings_page.dart`、
@@ -141,6 +144,19 @@ pwsh -File scripts/package-windows.ps1 -Build
 - `main.cpp` 编译选项是 `/W4 /WX` 且没有 `/utf-8`，写中文字面量会触发 C4819 直接失败 →
   必须用转义 `L"\u5927\u5ddd\u751f\u56fe\u5de5\u5177"`。
 - 修改后建议用 `rc.exe` 单独编译一次 `Runner.rc` 快速验证，不必等整个 build。
+
+### 坑 12：release 里图标显示为空白
+症状：代码里明明写了 `Icon(Icons.wallpaper_rounded)`，widget test 里 `find.byIcon` 也过，
+但 release 里 chip 上什么都没有（13px 的位置还留着，就是空的）。两个原因，都要注意：
+1. **图标必须是内联常量**：`const Icon(Icons.xxx, size: 13, ...)`。
+   写成 `IconData get _icon => Icons.wallpaper_rounded;` 再 `Icon(_icon)` ——
+   release 的图标 tree-shaking 只保留出现在 `Icon(常量)` 位置的图标，
+   通过变量/getter/参数传进来的会被丢掉，而 debug 和 widget test 完全看不出来。
+2. **图标字体子集有增量缓存**：新增图标后只做增量 build，`data\flutter_assets\fonts\MaterialIcons-Regular.otf`
+   可能还是旧的子集（正常约 11.8KB），新图标依旧空白。判据：字体文件大小没变。
+   解法：删掉 `.dart_tool\flutter_build` 再 build，字体子集才会重新生成。
+   （`--no-tree-shake-icons` 能立刻显示，但字体变回 1.6MB，只适合用来定位问题。）
+3. 验证办法：整屏截图裁选项行放大看，或对比字体文件大小有没有变化。
 
 ---
 
