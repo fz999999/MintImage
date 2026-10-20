@@ -87,7 +87,10 @@ class FavoriteFolderItemsTable extends Table {
 
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
-    final directory = await getApplicationSupportDirectory();
+    // 使用应用程序目录（exe 同级的 data 文件夹）来存储数据库
+    // 这样可以避免 Windows Low Integrity Level 限制，并且使应用便携化
+    final exeDir = Directory.current;
+    final directory = Directory(p.join(exeDir.path, 'data'));
     await directory.create(recursive: true);
     final file = File(p.join(directory.path, _databaseFileName));
     await _copyLegacyDatabaseIfNeeded(directory, file);

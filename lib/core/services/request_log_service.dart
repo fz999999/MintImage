@@ -58,7 +58,10 @@ class RequestLogService extends ChangeNotifier {
   String get filePath => _file.path;
 
   static Future<RequestLogService> load({bool reset = false}) async {
-    final directory = await getApplicationSupportDirectory();
+    // 使用应用程序目录（exe 同级的 data 文件夹）来存储日志
+    // 与 app_database.dart 保持一致，避免 Windows Low Integrity Level 限制
+    final exeDir = Directory.current;
+    final directory = Directory(p.join(exeDir.path, 'data'));
     await directory.create(recursive: true);
 
     final service = RequestLogService._(
