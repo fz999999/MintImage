@@ -7,14 +7,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/image_record.dart';
+import '../../core/providers/app_providers.dart';
 import '../../core/providers/generation_provider.dart';
-import '../../core/providers/settings_provider.dart';
 import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/checkerboard_background.dart';
 import 'image_preview_page.dart';
 
-class ImageCell extends ConsumerWidget {
+/// 图墙里的一张图片卡。
+///
+/// P2 升级要点：
+/// - 改成有状态组件，自己记 hover：卡片上移 4px、图片放大 1.05、压暗蒙层、
+///   描边转主色、阴影抬升，统一 `AppMotion.normal`（180ms）。
+/// - 图上只留左上「像素角标」和右上「状态徽章」；比例/质量/格式等元信息
+///   下沉到 76px 高的文字区，渠道名不再显示。
+/// - hover 出 3 个圆钮：预览 / 保存到本地 / 复制，全部接真实动作。
+class ImageCell extends ConsumerStatefulWidget {
   const ImageCell({
     super.key,
     required this.record,
@@ -56,165 +64,305 @@ class ImageCell extends ConsumerWidget {
   final VoidCallback onAppendCurrentImageToAttachments;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ImageCell> createState() => _ImageCellState();
+}
+
+class _ImageCellState extends ConsumerState<ImageCell> {
+  /// hover 圆钮直径（设计稿 40，不属于现有 token 档位，单独常量）。
+  static const double _hoverButtonDiameter = 40;
+
+  bool _hovered = false;
+
+  ImageRecord get _record => widget.record;
+
+  void _setHovered(bool value) {
+    if (_hovered == value) {
+      return;
+    }
+    setState(() => _hovered = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final requestStartedAt = ref.watch(
-      generationProvider.select((state) => state.requestStartedAts[record.id]),
-    );
+    final b = theme.brightness;
     // 流式生成时服务器推来的过程图；没有就是 null（走原来的 loading 占位）。
     final partialImage = ref.watch(
-      generationProvider.select((state) => state.partialImages[record.id]),
+      generationProvider.select(
+        (state) => state.partialImages[widget.record.id],
+      ),
     );
+    // 多选时不做 hover 抬升，避免和拖拽选框抢交互。
+    final hoverActive = _hovered && !widget.selectionMode;
 
-    return Material(
-      color: AppThemeTokens.surface,
-      clipBehavior: Clip.antiAlias,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: selectionMode ? onSelectionToggle : null,
-        onLongPress: selectionMode
-            ? onSelectionToggle
-            : () => _showActions(context),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: AppThemeTokens.border.withValues(alpha: 0.7),
-            ),
-            borderRadius: BorderRadius.circular(8),
+    return MouseRegion(
+      cursor: widget.selectionMode
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: AnimatedContainer(
+        duration: AppMotion.normal,
+        curve: AppMotion.curve,
+        transform: Matrix4.translationValues(0, hoverActive ? -4 : 0, 0),
+        decoration: BoxDecoration(
+          color: AppColors.surface(b),
+          borderRadius: AppRadius.smAll,
+          border: Border.all(
+            color: hoverActive ? AppColors.primary(b) : AppColors.border(b),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: imageHeight,
-                width: double.infinity,
-                child: InkWell(
-                  onTap: selectionMode
-                      ? null
-                      : _canPreview
-                      ? () => _openPreview(context)
-                      : null,
-                  onLongPress: selectionMode
-                      ? null
-                      : () => _showActions(context),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Hero(
-                        tag: 'image-${record.id}',
-                        child: _buildImage(partialImage),
-                      ),
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _ActualImageSizeChip(record: record),
-                            const SizedBox(width: 4),
-                            _buildStatusWidget(context),
-                          ],
-                        ),
-                      ),
-                      Positioned(
-                        left: 6,
-                        right: 6,
-                        bottom: 6,
-                        child: _MetaOverlay(
-                          chips: [
-                            _OverlayChip(
-                              icon: Icons.aspect_ratio_rounded,
-                              label: record.sizeLabel,
-                            ),
-                            _OverlayChip(
-                              icon: Icons.auto_awesome_rounded,
-                              label: record.qualityLabel,
-                            ),
-                            _OverlayChip(
-                              icon: Icons.api_rounded,
-                              label: _compactLabel(_apiProfileName(ref)),
-                            ),
-                            _DurationChip(
-                              record: record,
-                              requestStartedAt: requestStartedAt,
-                              elapsedSeconds: _elapsedSeconds,
-                            ),
-                            if (record.usedSingleImageFallback)
-                              const _OverlayChip(
-                                icon: Icons.filter_1_rounded,
-                                label: '单图',
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (selectionMode)
-                        Positioned.fill(
-                          child: _SelectionOverlay(selected: selected),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
-                  child: Column(
+          boxShadow: hoverActive ? AppShadow.raised(b) : AppShadow.card(b),
+        ),
+        child: ClipRRect(
+          borderRadius: AppRadius.smAll,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.selectionMode ? widget.onSelectionToggle : null,
+              onLongPress: widget.selectionMode
+                  ? widget.onSelectionToggle
+                  : () => _showActions(context),
+              child: Stack(
+                children: [
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        record.prompt,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppThemeTokens.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          height: 1.28,
+                      SizedBox(
+                        height: widget.imageHeight,
+                        width: double.infinity,
+                        child: _buildImageArea(context, b, partialImage),
+                      ),
+                      Expanded(child: _buildFooter(context, b)),
+                    ],
+                  ),
+                  // 描边画在内容之上，否则会被图片盖掉。
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: AppRadius.smAll,
+                          border: Border.all(
+                            color: hoverActive
+                                ? AppColors.primary(b)
+                                : AppColors.border(b),
+                          ),
                         ),
                       ),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    _formatTime(record.createdAt),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: AppThemeTokens.textSecondary,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0,
-                                    ),
-                                  ),
-                                ),
-                                if (record.isFavorite) ...[
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    Icons.star_rounded,
-                                    size: 14,
-                                    color: Colors.orange.shade700,
-                                  ),
-                                ],
-                              ],
-                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 图片区：预览点击、hover 动效、图上角标、状态徽章、hover 圆钮。
+  Widget _buildImageArea(
+    BuildContext context,
+    Brightness b,
+    Uint8List? partialImage,
+  ) {
+    final hoverActive = _hovered && !widget.selectionMode;
+    final requestStartedAt = ref.watch(
+      generationProvider.select(
+        (state) => state.requestStartedAts[widget.record.id],
+      ),
+    );
+
+    return ClipRect(
+      child: InkWell(
+        onTap: widget.selectionMode || !_canPreview
+            ? null
+            : () => _openPreview(context),
+        onLongPress: widget.selectionMode ? null : () => _showActions(context),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AnimatedScale(
+              scale: hoverActive ? 1.05 : 1,
+              duration: AppMotion.normal,
+              curve: AppMotion.curve,
+              child: Hero(
+                tag: 'image-${widget.record.id}',
+                child: _buildImage(partialImage),
+              ),
+            ),
+            // hover 压暗蒙层，让白色圆钮和角标更清楚。
+            // scrim 自带约 70% 的不透明度，0.4 × 0.7 ≈ 0.28 的实际压暗。
+            IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: hoverActive ? 0.4 : 0,
+                duration: AppMotion.normal,
+                curve: AppMotion.curve,
+                child: ColoredBox(color: AppColors.scrim(b)),
+              ),
+            ),
+            Positioned(
+              top: AppSpace.xs,
+              left: AppSpace.xs,
+              child: Wrap(
+                spacing: AppSpace.xxs,
+                runSpacing: AppSpace.xxs,
+                children: [
+                  _ActualImageSizeChip(record: widget.record),
+                  _DurationChip(
+                    record: widget.record,
+                    requestStartedAt: requestStartedAt,
+                    elapsedSeconds: _elapsedSeconds,
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: AppSpace.xs,
+              right: AppSpace.xs,
+              child: _buildStatusWidget(context),
+            ),
+            IgnorePointer(
+              ignoring: !hoverActive,
+              child: AnimatedOpacity(
+                opacity: hoverActive ? 1 : 0,
+                duration: AppMotion.normal,
+                curve: AppMotion.curve,
+                child: Center(
+                  // 卡片很窄时整体等比缩小，三个圆钮不允许溢出。
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _HoverCircleButton(
+                          tooltip: '预览',
+                          onPressed: _canPreview
+                              ? () => _openPreview(context)
+                              : null,
+                          child: Icon(
+                            Icons.visibility_rounded,
+                            size: AppIconSize.md,
+                            color: _canPreview
+                                ? AppColors.textPrimary(b)
+                                : AppColors.textTertiary(b),
                           ),
-                          if (_showsInlineMenuButton) ...[
-                            const SizedBox(width: 8),
-                            _InlineMenuButton(
-                              onPressed: () => _showActions(context),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(width: AppSpace.xs),
+                        _HoverCircleButton(
+                          tooltip: '保存到本地',
+                          onPressed: _canSaveImage
+                              ? () => _saveImage(context)
+                              : null,
+                          child: Icon(
+                            Icons.download_rounded,
+                            size: AppIconSize.md,
+                            color: _canSaveImage
+                                ? AppColors.textPrimary(b)
+                                : AppColors.textTertiary(b),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpace.xs),
+                        _HoverCircleButton(
+                          tooltip: '复制',
+                          onPressed: _showsCopyImageAction && _canCopyImage
+                              ? () => _copyImageToClipboard(context)
+                              : null,
+                          child: Icon(
+                            Icons.copy_all_rounded,
+                            size: AppIconSize.md,
+                            color: _showsCopyImageAction && _canCopyImage
+                                ? AppColors.textPrimary(b)
+                                : AppColors.textTertiary(b),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+            ),
+            if (widget.selectionMode)
+              Positioned.fill(
+                child: _SelectionOverlay(selected: widget.selected),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 文字区（图墙给 76px）：prompt 两行 + 元信息一行 + 时间/星标/⋯ 一行。
+  Widget _buildFooter(BuildContext context, Brightness b) {
+    final theme = Theme.of(context);
+    final record = widget.record;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.sm,
+        vertical: AppSpace.xxs,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            record.prompt,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: AppFontSize.bodySm,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+              color: AppColors.textPrimary(b),
+            ),
+          ),
+          Text(
+            _metaLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: AppFontSize.micro,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+              letterSpacing: 0,
+              color: AppColors.textSecondary(b),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _timeLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0,
+                          height: 1,
+                          color: AppColors.textSecondary(b),
+                        ),
+                      ),
+                    ),
+                    if (record.isFavorite) ...[
+                      const SizedBox(width: AppSpace.xxs),
+                      Icon(
+                        Icons.star_rounded,
+                        size: AppIconSize.sm,
+                        color: AppColors.favorite(b),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (_showsInlineMenuButton)
+                _InlineMenuButton(onPressed: () => _showActions(context)),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -222,22 +370,72 @@ class ImageCell extends ConsumerWidget {
   bool get _showsInlineMenuButton => Platform.isMacOS || Platform.isWindows;
 
   bool get _canPreview {
-    return record.resultImagePath != null ||
-        record.resultImageUrl != null ||
-        record.sourceAttachmentPaths.isNotEmpty;
+    return _record.resultImagePath != null ||
+        _record.resultImageUrl != null ||
+        _record.sourceAttachmentPaths.isNotEmpty;
+  }
+
+  /// 有本地文件或远程地址才谈得上「保存到本地」。
+  bool get _canSaveImage {
+    return _record.resultImagePath != null || _record.resultImageUrl != null;
+  }
+
+  /// 元信息一行：`16:9 • 高 • WEBP`，单图回退时追加 `• 单图`。
+  String get _metaLabel {
+    final parts = <String>[
+      _ratioLabel,
+      _record.qualityLabel,
+      _record.outputFormatLabel,
+    ];
+    if (_record.usedSingleImageFallback) {
+      parts.add('单图');
+    }
+    return parts.join(' • ');
+  }
+
+  /// 按 `record.width/height` 约分；算不出比例就写「自动」。
+  String get _ratioLabel {
+    final width = _record.width;
+    final height = _record.height;
+    if (width <= 0 || height <= 0) {
+      return '自动';
+    }
+
+    final divisor = _greatestCommonDivisor(width, height);
+    final reducedWidth = width ~/ divisor;
+    final reducedHeight = height ~/ divisor;
+    if (reducedWidth <= 32 && reducedHeight <= 32) {
+      return '$reducedWidth:$reducedHeight';
+    }
+
+    final ratio = width / height;
+    return ratio >= 1
+        ? '${ratio.toStringAsFixed(2)}:1'
+        : '1:${(1 / ratio).toStringAsFixed(2)}';
+  }
+
+  int _greatestCommonDivisor(int a, int b) {
+    var x = a.abs();
+    var y = b.abs();
+    while (y != 0) {
+      final remainder = x % y;
+      x = y;
+      y = remainder;
+    }
+    return x == 0 ? 1 : x;
   }
 
   Widget _buildImage(Uint8List? partialImage) {
-    if (record.status == ImageRecordStatus.loading ||
-        record.status == ImageRecordStatus.pending) {
+    if (_record.status == ImageRecordStatus.loading ||
+        _record.status == ImageRecordStatus.pending) {
       return _LoadingThumb(preview: partialImage);
     }
 
-    if (record.resultImagePath != null &&
-        File(record.resultImagePath!).existsSync()) {
+    if (_record.resultImagePath != null &&
+        File(_record.resultImagePath!).existsSync()) {
       return CheckerboardBackground(
         child: Image.file(
-          File(record.resultImagePath!),
+          File(_record.resultImagePath!),
           width: double.infinity,
           height: double.infinity,
           fit: BoxFit.cover,
@@ -245,41 +443,40 @@ class ImageCell extends ConsumerWidget {
       );
     }
 
-    if (record.sourceImagePath != null &&
-        File(record.sourceImagePath!).existsSync()) {
+    if (_record.sourceImagePath != null &&
+        File(_record.sourceImagePath!).existsSync()) {
       return Image.file(
-        File(record.sourceImagePath!),
+        File(_record.sourceImagePath!),
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.cover,
       );
     }
 
-    if (record.resultImageUrl != null) {
+    if (_record.resultImageUrl != null) {
       return CachedNetworkImage(
-        imageUrl: record.resultImageUrl!,
+        imageUrl: _record.resultImageUrl!,
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.cover,
         placeholder: (context, url) => const _LoadingThumb(),
-        errorWidget: (context, url, error) =>
-            const _FallbackThumb(icon: Icons.image_not_supported_rounded),
+        errorWidget: (context, url, error) => const _FallbackThumb(),
       );
     }
 
-    return const _FallbackThumb(icon: Icons.broken_image_rounded);
+    return const _FallbackThumb(broken: true);
   }
 
   Widget _buildStatusWidget(BuildContext context) {
-    final chip = _StatusPill(status: record.status);
-    if (record.status != ImageRecordStatus.error) {
+    final chip = _StatusPill(status: _record.status);
+    if (_record.status != ImageRecordStatus.error) {
       return chip;
     }
 
     return Tooltip(
       message: '查看失败原因',
       child: InkWell(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppRadius.fullAll,
         onTap: () => _showErrorDetails(context),
         child: chip,
       ),
@@ -287,18 +484,20 @@ class ImageCell extends ConsumerWidget {
   }
 
   Future<void> _openPreview(BuildContext context) async {
-    final records = previewRecords.isEmpty ? [record] : previewRecords;
+    final records = widget.previewRecords.isEmpty
+        ? [_record]
+        : widget.previewRecords;
     final resolvedInitialIndex =
-        previewInitialIndex ??
-        records.indexWhere((item) => item.id == record.id);
+        widget.previewInitialIndex ??
+        records.indexWhere((item) => item.id == _record.id);
     final navigator = Navigator.of(context);
 
-    await onPreviewNavigation(
+    await widget.onPreviewNavigation(
       () => navigator.push(
         MaterialPageRoute<void>(
           requestFocus: false,
           builder: (_) => ImagePreviewPage(
-            record: record,
+            record: _record,
             records: records,
             initialIndex: resolvedInitialIndex < 0 ? 0 : resolvedInitialIndex,
           ),
@@ -307,9 +506,56 @@ class ImageCell extends ConsumerWidget {
     );
   }
 
+  /// 保存到本地：复用 `image_preview_page.dart` 的保存实现。
+  Future<void> _saveImage(BuildContext context) async {
+    try {
+      final savedPath = await ref
+          .read(imageSaveServiceProvider)
+          .saveImage(
+            suggestedFileName: 'mint-image-${_record.id}.$_fileExtension',
+            localPath: _record.resultImagePath,
+            imageUrl: _record.resultImageUrl,
+          );
+
+      if (!context.mounted) {
+        return;
+      }
+
+      if (savedPath == null || savedPath.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已取消保存。')));
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('图片已保存到：$savedPath')));
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('保存失败：$error')));
+    }
+  }
+
+  /// 保存时用的扩展名：本地文件优先，其次记录里配置的输出格式。
+  String get _fileExtension {
+    final localPath = _record.resultImagePath;
+    if (localPath != null) {
+      final extension = localPath.split('.').last;
+      if (extension.isNotEmpty && extension != localPath) {
+        return extension;
+      }
+    }
+    return _record.outputFormat;
+  }
+
   Future<void> _showActions(BuildContext context) async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final canEdit = record.status == ImageRecordStatus.done;
+    final canEdit = _record.status == ImageRecordStatus.done;
     final pageContext = context;
 
     await showModalBottomSheet<void>(
@@ -327,7 +573,7 @@ class ImageCell extends ConsumerWidget {
                   title: const Text('复用提示词'),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    onReusePrompt();
+                    widget.onReusePrompt();
                   },
                 ),
                 if (canEdit)
@@ -336,7 +582,7 @@ class ImageCell extends ConsumerWidget {
                     title: const Text('再生成一张'),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
-                      onRegenerate();
+                      widget.onRegenerate();
                     },
                   ),
                 if (canEdit)
@@ -345,16 +591,16 @@ class ImageCell extends ConsumerWidget {
                     title: const Text('以此改图'),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
-                      onReuseEdit();
+                      widget.onReuseEdit();
                     },
                   ),
                 if (_canAppendCurrentImageToAttachments)
                   ListTile(
                     leading: const Icon(Icons.add_photo_alternate_rounded),
-                    title: Text('将此图添加到附件${currentAttachmentCount + 1}'),
+                    title: Text('将此图添加到附件${widget.currentAttachmentCount + 1}'),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
-                      onAppendCurrentImageToAttachments();
+                      widget.onAppendCurrentImageToAttachments();
                     },
                   ),
                 if (_showsCopyImageAction && _canCopyImage)
@@ -369,32 +615,34 @@ class ImageCell extends ConsumerWidget {
                 ListTile(
                   leading: Icon(
                     Icons.star_border_rounded,
-                    color: record.isFavorite ? Colors.orange.shade700 : null,
+                    color: _record.isFavorite
+                        ? AppColors.favorite(Theme.of(sheetContext).brightness)
+                        : null,
                   ),
                   title: const Text('收藏到...'),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    onToggleFavorite();
+                    widget.onToggleFavorite();
                   },
                 ),
-                if (record.status == ImageRecordStatus.loading ||
-                    record.status == ImageRecordStatus.pending)
+                if (_record.status == ImageRecordStatus.loading ||
+                    _record.status == ImageRecordStatus.pending)
                   ListTile(
                     leading: const Icon(Icons.close_rounded),
                     title: const Text('取消当前请求'),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
-                      onCancel();
+                      widget.onCancel();
                     },
                   ),
-                if (record.status == ImageRecordStatus.error ||
-                    record.status == ImageRecordStatus.cancelled)
+                if (_record.status == ImageRecordStatus.error ||
+                    _record.status == ImageRecordStatus.cancelled)
                   ListTile(
                     leading: const Icon(Icons.refresh_rounded),
                     title: const Text('重试本次请求'),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
-                      onRetry();
+                      widget.onRetry();
                     },
                   ),
                 ListTile(
@@ -402,7 +650,7 @@ class ImageCell extends ConsumerWidget {
                   title: const Text('删除这条记录'),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    onDelete();
+                    widget.onDelete();
                   },
                 ),
               ],
@@ -418,29 +666,29 @@ class ImageCell extends ConsumerWidget {
   }
 
   bool get _canCopyImage {
-    return record.resultImagePath != null ||
-        record.sourceImagePath != null ||
-        record.resultB64 != null ||
-        record.resultImageUrl != null;
+    return _record.resultImagePath != null ||
+        _record.sourceImagePath != null ||
+        _record.resultB64 != null ||
+        _record.resultImageUrl != null;
   }
 
   bool get _canAppendCurrentImageToAttachments {
-    final resultImagePath = record.resultImagePath;
+    final resultImagePath = _record.resultImagePath;
     if (resultImagePath != null && File(resultImagePath).existsSync()) {
       return true;
     }
 
-    final sourceImagePath = record.sourceImagePath;
+    final sourceImagePath = _record.sourceImagePath;
     if (sourceImagePath != null && File(sourceImagePath).existsSync()) {
       return true;
     }
 
-    return record.sourceAttachmentPaths.any((path) => File(path).existsSync());
+    return _record.sourceAttachmentPaths.any((path) => File(path).existsSync());
   }
 
   Future<void> _copyImageToClipboard(BuildContext context) async {
     try {
-      await const ImageClipboardService().copyRecordImage(record);
+      await const ImageClipboardService().copyRecordImage(_record);
       if (!context.mounted) {
         return;
       }
@@ -466,7 +714,7 @@ class ImageCell extends ConsumerWidget {
 
   Future<void> _showErrorDetails(BuildContext context) async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final message = record.errorMessage?.trim();
+    final message = _record.errorMessage?.trim();
     final displayMessage = message == null || message.isEmpty
         ? '没有记录到具体失败原因。'
         : message;
@@ -489,33 +737,97 @@ class ImageCell extends ConsumerWidget {
     FocusManager.instance.primaryFocus?.unfocus();
   }
 
-  String _formatTime(DateTime time) {
-    final month = time.month.toString().padLeft(2, '0');
-    final day = time.day.toString().padLeft(2, '0');
+  /// 相对时间优先（10分钟前），超过一周或算不出就退到 `HH:mm`。
+  String get _timeLabel {
+    final now = DateTime.now();
+    final difference = now.difference(_record.createdAt);
+    if (difference.isNegative) {
+      return _clockLabel(_record.createdAt);
+    }
+    if (difference.inSeconds < 60) {
+      return '刚刚';
+    }
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}分钟前';
+    }
+    if (difference.inHours < 24) {
+      return '${difference.inHours}小时前';
+    }
+    if (difference.inDays < 7) {
+      return '${difference.inDays}天前';
+    }
+    return _clockLabel(_record.createdAt);
+  }
+
+  String _clockLabel(DateTime time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
-    return '${time.year}-$month-$day $hour:$minute';
+    return '$hour:$minute';
   }
 
   int _elapsedSeconds(DateTime startedAt) {
     final elapsed = DateTime.now().difference(startedAt).inSeconds;
     return elapsed < 0 ? 0 : elapsed;
   }
+}
 
-  String _apiProfileName(WidgetRef ref) {
-    final profiles = ref.watch(settingsProvider).profiles;
-    for (final p in profiles) {
-      if (p.id == record.apiProfileId) return p.name;
+/// hover 时的圆形动作钮：直径 40，自身再带 hover 放大 1.1。
+class _HoverCircleButton extends StatefulWidget {
+  const _HoverCircleButton({
+    required this.tooltip,
+    required this.child,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final Widget child;
+  final VoidCallback? onPressed;
+
+  @override
+  State<_HoverCircleButton> createState() => _HoverCircleButtonState();
+}
+
+class _HoverCircleButtonState extends State<_HoverCircleButton> {
+  bool _hovered = false;
+
+  void _setHovered(bool value) {
+    if (_hovered == value) {
+      return;
     }
-    return '未知';
+    setState(() => _hovered = value);
   }
 
-  String _compactLabel(String value) {
-    final trimmed = value.trim();
-    if (trimmed.length <= 8) {
-      return trimmed;
-    }
-    return '${trimmed.substring(0, 7)}…';
+  @override
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    final enabled = widget.onPressed != null;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        onEnter: (_) => _setHovered(true),
+        onExit: (_) => _setHovered(false),
+        child: AnimatedScale(
+          scale: _hovered ? 1.1 : 1,
+          duration: AppMotion.normal,
+          curve: AppMotion.curve,
+          child: Material(
+            color: AppColors.surfaceHigh(b),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: widget.onPressed,
+              child: SizedBox(
+                width: _ImageCellState._hoverButtonDiameter,
+                height: _ImageCellState._hoverButtonDiameter,
+                child: Center(child: widget.child),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -526,48 +838,25 @@ class _InlineMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return SizedBox(
-      width: 24,
-      height: 22,
+      width: AppSpace.lg,
+      height: AppIconSize.md,
       child: IconButton(
         tooltip: '更多操作',
         onPressed: onPressed,
-        icon: const Icon(Icons.more_horiz_rounded, size: 17),
+        icon: const Icon(Icons.more_horiz_rounded, size: AppIconSize.sm),
         padding: EdgeInsets.zero,
-        constraints: const BoxConstraints.tightFor(width: 24, height: 22),
+        constraints: const BoxConstraints.tightFor(
+          width: AppSpace.lg,
+          height: AppIconSize.md,
+        ),
         visualDensity: VisualDensity.compact,
         splashRadius: 14,
-        color: AppThemeTokens.textSecondary,
+        color: AppColors.textSecondary(b),
         style: IconButton.styleFrom(
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
-      ),
-    );
-  }
-}
-
-class _MetaOverlay extends StatelessWidget {
-  const _MetaOverlay({required this.chips});
-
-  final List<Widget> chips;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withValues(alpha: 0),
-            Colors.black.withValues(alpha: 0.58),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(5, 14, 5, 5),
-        child: Wrap(spacing: 4, runSpacing: 4, children: chips),
       ),
     );
   }
@@ -580,22 +869,23 @@ class _SelectionOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return IgnorePointer(
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
+        duration: AppMotion.fast,
         decoration: BoxDecoration(
           color: selected
-              ? AppThemeTokens.primary.withValues(alpha: 0.18)
-              : Colors.black.withValues(alpha: 0.06),
+              ? AppColors.primaryContainer(b).withValues(alpha: 0.18)
+              : AppColors.scrim(b).withValues(alpha: 0.06),
           border: Border.all(
-            color: selected ? AppThemeTokens.primary : Colors.transparent,
+            color: selected ? AppColors.primary(b) : Colors.transparent,
             width: 3,
           ),
         ),
         child: Align(
           alignment: Alignment.topLeft,
           child: Padding(
-            padding: const EdgeInsets.all(7),
+            padding: const EdgeInsets.all(AppSpace.xs),
             child: _SelectionDot(selected: selected),
           ),
         ),
@@ -611,27 +901,26 @@ class _SelectionDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
-      width: 22,
-      height: 22,
+      duration: AppMotion.fast,
+      width: AppSpace.lg,
+      height: AppSpace.lg,
       decoration: BoxDecoration(
-        color: selected ? AppThemeTokens.primary : Colors.white,
+        color: selected ? AppColors.primaryContainer(b) : AppColors.surface(b),
         shape: BoxShape.circle,
         border: Border.all(
-          color: selected ? AppThemeTokens.primary : AppThemeTokens.border,
+          color: selected ? AppColors.primary(b) : AppColors.border(b),
           width: 2,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
+        boxShadow: AppShadow.card(b),
       ),
       child: selected
-          ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
+          ? Icon(
+              Icons.check_rounded,
+              size: AppIconSize.sm,
+              color: AppColors.onPrimaryContainer(b),
+            )
           : null,
     );
   }
@@ -659,10 +948,7 @@ class _DurationChip extends StatelessWidget {
         ),
         initialData: 0,
         builder: (context, snapshot) {
-          return _OverlayChip(
-            icon: Icons.timer_outlined,
-            label: '${elapsedSeconds(startedAt)}s',
-          );
+          return _ImageChip(label: '${elapsedSeconds(startedAt)}s');
         },
       );
     }
@@ -672,34 +958,57 @@ class _DurationChip extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return _OverlayChip(
-      icon: Icons.timer_outlined,
-      label: '${(durationMs / 1000).toStringAsFixed(1)}s',
-    );
+    return _ImageChip(label: '${(durationMs / 1000).toStringAsFixed(1)}s');
   }
 }
 
-class _ActualImageSizeChip extends StatelessWidget {
+/// 左上角标：真实像素尺寸。
+///
+/// 解析不到（网络图未下载、文件缺失）时退回 `record.sizeLabel`，角标不留空。
+class _ActualImageSizeChip extends StatefulWidget {
   const _ActualImageSizeChip({required this.record});
 
   final ImageRecord record;
 
   @override
+  State<_ActualImageSizeChip> createState() => _ActualImageSizeChipState();
+}
+
+class _ActualImageSizeChipState extends State<_ActualImageSizeChip> {
+  late Future<String?> _sizeFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _sizeFuture = _resolveSizeLabel();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ActualImageSizeChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final record = widget.record;
+    final oldRecord = oldWidget.record;
+    if (oldRecord.id != record.id ||
+        oldRecord.status != record.status ||
+        oldRecord.resultImagePath != record.resultImagePath ||
+        oldRecord.resultImageUrl != record.resultImageUrl) {
+      _sizeFuture = _resolveSizeLabel();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<String?>(
-      future: _resolveSizeLabel(),
+      future: _sizeFuture,
       builder: (context, snapshot) {
-        return _OverlayChip(
-          icon: Icons.photo_size_select_actual_rounded,
-          label: snapshot.data ?? '--',
-        );
+        return _ImageChip(label: snapshot.data ?? widget.record.sizeLabel);
       },
     );
   }
 
   Future<String?> _resolveSizeLabel() async {
-    if (record.status == ImageRecordStatus.loading ||
-        record.status == ImageRecordStatus.pending) {
+    if (widget.record.status == ImageRecordStatus.loading ||
+        widget.record.status == ImageRecordStatus.pending) {
       return null;
     }
 
@@ -716,17 +1025,17 @@ class _ActualImageSizeChip extends StatelessWidget {
   }
 
   ImageProvider? _imageProvider() {
-    final resultImagePath = record.resultImagePath;
+    final resultImagePath = widget.record.resultImagePath;
     if (resultImagePath != null && File(resultImagePath).existsSync()) {
       return FileImage(File(resultImagePath));
     }
 
-    final sourceImagePath = record.sourceImagePath;
+    final sourceImagePath = widget.record.sourceImagePath;
     if (sourceImagePath != null && File(sourceImagePath).existsSync()) {
       return FileImage(File(sourceImagePath));
     }
 
-    final resultImageUrl = record.resultImageUrl;
+    final resultImageUrl = widget.record.resultImageUrl;
     if (resultImageUrl != null && resultImageUrl.isNotEmpty) {
       return CachedNetworkImageProvider(resultImageUrl);
     }
@@ -757,41 +1066,36 @@ class _ActualImageSizeChip extends StatelessWidget {
   }
 }
 
-class _OverlayChip extends StatelessWidget {
-  const _OverlayChip({required this.icon, required this.label});
+/// 图上角标/徽章：文字只有一档（caption 10）。
+class _ImageChip extends StatelessWidget {
+  const _ImageChip({required this.label});
 
-  final IconData icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return Container(
       constraints: const BoxConstraints(maxWidth: 94),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.86),
-        borderRadius: BorderRadius.circular(999),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.xs,
+        vertical: AppSpace.xxs,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 10, color: AppThemeTokens.primaryStrong),
-          const SizedBox(width: 3),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppThemeTokens.primaryStrong,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0,
-                height: 1,
-              ),
-            ),
-          ),
-        ],
+      decoration: BoxDecoration(
+        color: AppColors.imageChipFill(b),
+        borderRadius: AppRadius.fullAll,
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: AppFontSize.caption,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+          height: 1,
+          color: AppColors.imageChipText(b),
+        ),
       ),
     );
   }
@@ -804,47 +1108,47 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     late final Color backgroundColor;
     late final Color foregroundColor;
 
     switch (status) {
       case ImageRecordStatus.pending:
+        backgroundColor = AppColors.neutralSurface(b);
+        foregroundColor = AppColors.neutralText(b);
       case ImageRecordStatus.loading:
-        backgroundColor = Colors.white.withValues(alpha: 0.92);
-        foregroundColor = AppThemeTokens.primaryStrong;
+        backgroundColor = AppColors.infoSurface(b);
+        foregroundColor = AppColors.infoText(b);
       case ImageRecordStatus.done:
-        backgroundColor = const Color(0xFFE4F6EE).withValues(alpha: 0.94);
-        foregroundColor = const Color(0xFF177245);
+        backgroundColor = AppColors.successSurface(b);
+        foregroundColor = AppColors.successText(b);
       case ImageRecordStatus.error:
-        backgroundColor = AppThemeTokens.dangerSurface.withValues(alpha: 0.96);
-        foregroundColor = AppThemeTokens.dangerText;
+        backgroundColor = AppColors.dangerSurface(b);
+        foregroundColor = AppColors.dangerText(b);
       case ImageRecordStatus.cancelled:
-        backgroundColor = const Color(0xFFFFF0D8).withValues(alpha: 0.96);
-        foregroundColor = const Color(0xFF935E00);
+        backgroundColor = AppColors.warningSurface(b);
+        foregroundColor = AppColors.warningText(b);
     }
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
+        borderRadius: AppRadius.fullAll,
+        boxShadow: AppShadow.card(b),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.xs,
+          vertical: AppSpace.xxs,
+        ),
         child: Text(
           status.label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: foregroundColor,
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
+          style: TextStyle(
+            fontSize: AppFontSize.caption,
+            fontWeight: FontWeight.w700,
             letterSpacing: 0,
             height: 1,
+            color: foregroundColor,
           ),
         ),
       ),
@@ -861,6 +1165,7 @@ class _LoadingThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final previewBytes = preview;
     if (previewBytes != null && previewBytes.isNotEmpty) {
       return Stack(
@@ -873,30 +1178,33 @@ class _LoadingThumb extends StatelessWidget {
             filterQuality: FilterQuality.low,
           ),
           Positioned(
-            left: 8,
-            bottom: 8,
+            left: AppSpace.xs,
+            bottom: AppSpace.xs,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: AppThemeTokens.surface.withValues(alpha: 0.86),
-                borderRadius: BorderRadius.circular(10),
+                color: AppColors.surface(b).withValues(alpha: 0.86),
+                borderRadius: AppRadius.fullAll,
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.xs,
+                  vertical: AppSpace.xxs,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const SizedBox(
-                      width: 10,
-                      height: 10,
+                      width: AppIconSize.xs,
+                      height: AppIconSize.xs,
                       child: CircularProgressIndicator(strokeWidth: 1.6),
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: AppSpace.xxs),
                     Text(
                       '正在生成',
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
-                        color: AppThemeTokens.textSecondary,
+                        color: AppColors.textSecondary(b),
                       ),
                     ),
                   ],
@@ -909,15 +1217,15 @@ class _LoadingThumb extends StatelessWidget {
     }
 
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppThemeTokens.surfaceSoft, AppThemeTokens.primarySoft],
+          colors: [AppColors.surfaceSoft(b), AppColors.primarySoft(b)],
         ),
       ),
       child: const Center(
         child: SizedBox(
-          width: 24,
-          height: 24,
+          width: AppSpace.lg,
+          height: AppSpace.lg,
           child: CircularProgressIndicator(strokeWidth: 2.4),
         ),
       ),
@@ -926,15 +1234,24 @@ class _LoadingThumb extends StatelessWidget {
 }
 
 class _FallbackThumb extends StatelessWidget {
-  const _FallbackThumb({required this.icon});
+  const _FallbackThumb({this.broken = false});
 
-  final IconData icon;
+  /// 文件彻底缺失（true）与网络图加载失败（false）用不同图标。
+  final bool broken;
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return ColoredBox(
-      color: AppThemeTokens.surfaceSoft,
-      child: Center(child: Icon(icon, color: AppThemeTokens.primary)),
+      color: AppColors.surfaceSoft(b),
+      child: Center(
+        child: broken
+            ? Icon(Icons.broken_image_rounded, color: AppColors.textTertiary(b))
+            : Icon(
+                Icons.image_not_supported_rounded,
+                color: AppColors.textTertiary(b),
+              ),
+      ),
     );
   }
 }

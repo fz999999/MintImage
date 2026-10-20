@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -138,6 +139,51 @@ void main() {
 
     expect(find.text('正在生成'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsWidgets);
+  });
+
+  testWidgets('hover lifts the card and the preview button opens preview', (
+    tester,
+  ) async {
+    var navigatedThroughCallback = false;
+    await _pumpImageCell(
+      tester,
+      _record.copyWith(
+        status: ImageRecordStatus.done,
+        sourceImagePaths: const ['missing-preview-image.png'],
+        errorMessage: null,
+        clearErrorMessage: true,
+      ),
+      onPreviewNavigation: (navigate) async {
+        navigatedThroughCallback = true;
+        await navigate();
+      },
+    );
+
+    // hover 上移 4px 作用在卡片内部的 Transform 上，用内容来量位移。
+    final promptText = find.text('一张城市夜景');
+    final beforeHover = tester.getTopLeft(promptText);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await tester.pump();
+    // 鼠标指针从外部移进卡片中心，触发 MouseRegion.onEnter。
+    await mouse.moveTo(tester.getCenter(find.byType(ImageCell)));
+    await tester.pumpAndSettle();
+
+    // hover 时整张卡上移 4px。
+    final afterHover = tester.getTopLeft(promptText);
+    expect(afterHover.dy, closeTo(beforeHover.dy - 4, 0.5));
+
+    // 三个圆钮：预览 / 保存到本地 / 复制。
+    expect(find.byTooltip('预览'), findsOneWidget);
+    expect(find.byTooltip('保存到本地'), findsOneWidget);
+    expect(find.byTooltip('复制'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('预览'));
+    await tester.pumpAndSettle();
+
+    expect(navigatedThroughCallback, isTrue);
+    expect(find.byType(ImagePreviewPage), findsOneWidget);
   });
 }
 
