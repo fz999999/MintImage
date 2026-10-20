@@ -61,6 +61,8 @@ class _GptImageAppState extends ConsumerState<GptImageApp> {
       title: '大川生图工具',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      darkTheme: buildAppDarkTheme(),
+      themeMode: ThemeMode.system,
       home: widget.home ?? const HomePage(),
     );
   }
