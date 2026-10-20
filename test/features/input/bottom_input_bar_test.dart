@@ -122,7 +122,9 @@ void main() {
     expect(find.text('背景:自动'), findsOneWidget);
 
     await tester.tap(find.text('背景:自动'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('透明'));
+    await tester.pumpAndSettle();
     expect(find.text('背景:透明'), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('prompt-input')), '透明背景图标');
@@ -132,6 +134,34 @@ void main() {
     expect(submittedRequest, isNotNull);
     expect(submittedRequest!.background, ImageBackground.transparent);
     expect(submittedRequest!.apiBackground, 'transparent');
+  });
+
+  testWidgets('背景弹层可以明确选择不透明背景', (tester) async {
+    GenerationRequest? submittedRequest;
+    await _pumpInputBar(
+      tester,
+      settings: _settings.copyWith(
+        lastOutputFormat: ImageOutputFormat.png,
+        lastBackground: ImageBackground.auto,
+      ),
+      onSubmit: (request) async {
+        submittedRequest = request;
+      },
+    );
+
+    await tester.tap(find.text('背景:自动'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('不透明'));
+    await tester.pumpAndSettle();
+    expect(find.text('背景:不透明'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('prompt-input')), '实底背景');
+    await tester.tap(find.byKey(const Key('submit-generation-button')));
+    await tester.pump();
+
+    expect(submittedRequest, isNotNull);
+    expect(submittedRequest!.background, ImageBackground.opaque);
+    expect(submittedRequest!.apiBackground, 'opaque');
   });
 
   testWidgets('切到 JPEG 时透明背景自动回退', (tester) async {

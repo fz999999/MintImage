@@ -470,11 +470,6 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                       });
                                       _persistLastGenerationOptions();
                                     },
-                                    onUnsupported: () => _showMessage(
-                                      _outputFormat == ImageOutputFormat.jpeg
-                                          ? 'JPEG 没有透明通道，请把格式改成 PNG 或 WEBP。'
-                                          : '当前模型不支持透明背景。',
-                                    ),
                                   ),
                                   const SizedBox(width: 6),
                                   QuantitySelector(

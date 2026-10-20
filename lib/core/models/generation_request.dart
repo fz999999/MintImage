@@ -71,11 +71,14 @@ enum ImageOutputFormat {
   }
 }
 
-/// 生成背景。`transparent` 只有图像格式为 PNG / WEBP 时才有意义：
-/// JPEG 没有 alpha 通道，带上透明背景会被接口拒绝。
+/// 生成背景。三档含义：
+/// - `auto`：不发 background 字段，由模型自己决定（默认，通常是不透明）；
+/// - `transparent`：背景镂空，只有 PNG / WEBP 才有意义（JPEG 没有 alpha 通道）；
+/// - `opaque`：明确要求不透明背景。
 enum ImageBackground {
   auto('auto', '自动'),
-  transparent('transparent', '透明');
+  transparent('transparent', '透明'),
+  opaque('opaque', '不透明');
 
   const ImageBackground(this.apiValue, this.label);
 
@@ -129,11 +132,20 @@ class GenerationRequest {
 
   String? get apiSize => isAutoSize ? null : '${resolvedWidth}x$resolvedHeight';
 
-  /// 实际发给接口的 background 值；JPEG 或未开启透明背景时为 null（不发送该字段）。
-  String? get apiBackground =>
-      background.isTransparent && outputFormat != ImageOutputFormat.jpeg
-      ? ImageBackground.transparent.apiValue
-      : null;
+  /// 实际发给接口的 background 值。
+  ///
+  /// - `auto` 不发该字段，让模型自己决定；
+  /// - 透明背景在 JPEG 下不发送（没有 alpha 通道，接口会拒）。
+  String? get apiBackground {
+    if (background == ImageBackground.auto) {
+      return null;
+    }
+    if (background == ImageBackground.transparent &&
+        outputFormat == ImageOutputFormat.jpeg) {
+      return null;
+    }
+    return background.apiValue;
+  }
 
   GenerationRequest copyWith({
     String? prompt,

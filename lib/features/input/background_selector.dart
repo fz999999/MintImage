@@ -5,12 +5,12 @@ import '../../core/models/model_capabilities.dart';
 import '../../shared/theme.dart';
 import 'selector_chip_label.dart';
 
-/// 「背景」选项：一键切换自动 / 透明背景。
+/// 「背景」选项：点开弹出三选（自动 / 透明 / 不透明）。
 ///
-/// 可用性同时受两件事限制：
-/// 1. 输出格式必须是 PNG / WEBP（JPEG 没有 alpha 通道，接口会拒）；
-/// 2. 模型得支持 `background` 参数（DALL·E 系列不支持）。
-/// 任一条件不满足时按钮退化为灰色不可用，点击给出提示。
+/// 用弹层而不是一键开关，是因为「自动」到底算透明还是不透明说不清楚：
+/// - 自动：不发 background 字段，由模型自己决定；
+/// - 透明：背景镂空，需要 PNG / WEBP（JPEG 没有 alpha 通道）；
+/// - 不透明：明确要求实底背景。
 class BackgroundSelector extends StatelessWidget {
   const BackgroundSelector({
     super.key,
@@ -18,7 +18,6 @@ class BackgroundSelector extends StatelessWidget {
     required this.outputFormat,
     required this.onSelected,
     this.model = '',
-    this.onUnsupported,
   });
 
   final ImageBackground background;
@@ -28,19 +27,28 @@ class BackgroundSelector extends StatelessWidget {
   /// 当前使用的模型名，用来判断是否支持透明背景。
   final String model;
 
-  /// 当前格式或模型不支持透明背景时点击的提示回调。
-  final VoidCallback? onUnsupported;
-
   bool get _formatSupported => outputFormat != ImageOutputFormat.jpeg;
 
   bool get _modelSupported =>
       ModelCapabilities.supportsTransparentBackground(model);
 
-  bool get _supported => _formatSupported && _modelSupported;
+  bool get _transparentSupported => _formatSupported && _modelSupported;
 
-  bool get _active => _supported && background.isTransparent;
+  /// 当前值是否落在「透明」这一档（只有支持时才算生效）。
+  bool get _active =>
+      background == ImageBackground.transparent && _transparentSupported;
 
-  /// 不支持时的原因说明，用于 Tooltip。
+  IconData get _icon {
+    if (!_transparentSupported) {
+      return Icons.grid_on;
+    }
+    return switch (background) {
+      ImageBackground.transparent => Icons.grid_on,
+      ImageBackground.opaque => Icons.crop_square,
+      ImageBackground.auto => Icons.auto_awesome_outlined,
+    };
+  }
+
   String get _unsupportedReason {
     if (!_modelSupported) {
       return '当前模型不支持透明背景';
@@ -48,25 +56,22 @@ class BackgroundSelector extends StatelessWidget {
     return 'JPEG 没有透明通道，请改用 PNG 或 WEBP';
   }
 
+  String get _tooltip {
+    if (background == ImageBackground.transparent && !_transparentSupported) {
+      return _unsupportedReason;
+    }
+    return '背景：自动由模型决定，透明需要 PNG / WEBP，不透明是纯实底';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final value = _active ? '透明' : '自动';
     final isPreview =
-        _supported && ModelCapabilities.isTransparentBackgroundPreview(model);
+        _transparentSupported &&
+        ModelCapabilities.isTransparentBackgroundPreview(model);
     return Tooltip(
-      message: _supported
-          ? '切换背景（透明仅 PNG / WEBP 支持${isPreview ? '，当前模型为预览支持' : ''}）'
-          : _unsupportedReason,
+      message: isPreview ? '$_tooltip（当前模型为预览支持）' : _tooltip,
       child: GestureDetector(
-        onTap: () {
-          if (!_supported) {
-            onUnsupported?.call();
-            return;
-          }
-          onSelected(
-            _active ? ImageBackground.auto : ImageBackground.transparent,
-          );
-        },
+        onTap: () => _showSheet(context),
         child: Container(
           constraints: const BoxConstraints(minHeight: 28),
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
@@ -85,18 +90,132 @@ class BackgroundSelector extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                _active ? Icons.layers_clear_rounded : Icons.layers_outlined,
+                _icon,
                 size: 13,
-                color: _supported
+                color: _transparentSupported
                     ? AppThemeTokens.primaryStrong
                     : AppThemeTokens.textSecondary,
               ),
               const SizedBox(width: 4),
-              SelectorChipLabel(prefix: '背景', value: value),
+              SelectorChipLabel(prefix: '背景', value: background.label),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _showSheet(BuildContext context) async {
+    final selected = await showModalBottomSheet<ImageBackground>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: Text(
+                '背景',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppThemeTokens.textPrimary,
+                ),
+              ),
+            ),
+            _BackgroundTile(
+              icon: Icons.auto_awesome_outlined,
+              title: '自动',
+              subtitle: '不指定背景，由模型自己决定（默认，通常是实底）',
+              selected: background == ImageBackground.auto,
+              onTap: () => Navigator.of(sheetContext).pop(ImageBackground.auto),
+            ),
+            _BackgroundTile(
+              icon: Icons.grid_on,
+              title: '透明',
+              subtitle: _transparentSupported
+                  ? '背景镂空，只保留主体（PNG / WEBP）'
+                  : '不可用：$_unsupportedReason',
+              selected: _active,
+              onTap: _transparentSupported
+                  ? () => Navigator.of(
+                      sheetContext,
+                    ).pop(ImageBackground.transparent)
+                  : null,
+            ),
+            _BackgroundTile(
+              icon: Icons.crop_square,
+              title: '不透明',
+              subtitle: '明确要求纯实底背景',
+              selected: background == ImageBackground.opaque,
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(ImageBackground.opaque),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (selected != null && selected != background) {
+      onSelected(selected);
+    }
+  }
+}
+
+class _BackgroundTile extends StatelessWidget {
+  const _BackgroundTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final color = enabled
+        ? AppThemeTokens.textPrimary
+        : AppThemeTokens.textSecondary;
+    return ListTile(
+      enabled: enabled,
+      onTap: onTap,
+      leading: Icon(
+        icon,
+        size: 20,
+        color: enabled ? AppThemeTokens.primaryStrong : color,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          fontSize: 12,
+          color: AppThemeTokens.textSecondary,
+        ),
+      ),
+      trailing: selected
+          ? const Icon(
+              Icons.check_rounded,
+              size: 20,
+              color: AppThemeTokens.primaryStrong,
+            )
+          : null,
     );
   }
 }
