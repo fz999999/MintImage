@@ -17,10 +17,12 @@ import '../../shared/widgets/empty_state.dart';
 import '../favorites/favorite_folder_sheet.dart';
 import '../image_list/image_list_widget.dart';
 import '../input/bottom_input_bar.dart';
-import '../settings/settings_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.onOpenSettings});
+
+  /// 打开设置 tab 的入口，由应用外壳注入（设置已从顶栏移到左导航）。
+  final VoidCallback? onOpenSettings;
 
   @override
   ConsumerState<HomePage> createState() => _HomePageState();
@@ -50,6 +52,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final settings = ref.watch(settingsProvider);
     final updateState = ref.watch(updateCheckProvider);
     final favoriteFoldersState = ref.watch(favoriteFoldersProvider);
+    final b = Theme.of(context).brightness;
     final hasApiKey = settings.activeProfile.apiKey.trim().isNotEmpty;
     final activeFavoriteFolderId =
         _activeFavoriteFolderId != null &&
@@ -63,6 +66,14 @@ class _HomePageState extends ConsumerState<HomePage> {
         ? null
         : favoriteFoldersState.recordIdsForFolder(activeFavoriteFolderId);
     final hasActiveFavoriteFolder = activeFavoriteFolderId != null;
+    final collectionLabel = _collectionLabel(
+      hasFavoriteFolder: hasActiveFavoriteFolder,
+      favoriteFolderTitle: activeFavoriteFolder?.title,
+      count: _filteredRecordCount(
+        ref.watch(imageListProvider),
+        activeFavoriteRecordIds,
+      ),
+    );
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -79,9 +90,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 if (updateState.hasUpdate) ...[
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpace.xs),
                   _NewVersionBadge(onTap: () => _handleUpdateTap(updateState)),
                 ],
+                const SizedBox(width: AppSpace.sm),
+                Flexible(child: _CollectionChip(label: collectionLabel)),
               ],
             ),
             Text(
@@ -117,7 +130,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               onPressed: hasActiveFavoriteFolder
                   ? _clearFavoriteFolderFilter
                   : _openFavoriteFolders,
-              color: hasActiveFavoriteFolder ? Colors.orange.shade700 : null,
+              color: hasActiveFavoriteFolder ? AppColors.favorite(b) : null,
               icon: Icon(
                 hasActiveFavoriteFolder
                     ? Icons.star_rounded
@@ -130,16 +143,8 @@ class _HomePageState extends ConsumerState<HomePage> {
             child: IconButton(
               tooltip: _searchExpanded ? '关闭搜索' : '搜索提示词',
               onPressed: _toggleSearchPanel,
-              color: _searchExpanded ? Colors.blue.shade600 : null,
+              color: _searchExpanded ? AppColors.primary(b) : null,
               icon: const Icon(Icons.search_rounded),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              tooltip: '设置',
-              onPressed: _openSettings,
-              icon: const Icon(Icons.settings_rounded),
             ),
           ),
         ],
@@ -147,8 +152,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           preferredSize: Size.fromHeight(_searchExpanded ? 52 : 0),
           child: ClipRect(
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
+              duration: AppMotion.normal,
+              curve: AppMotion.curve,
               height: _searchExpanded ? 52 : 0,
               padding: EdgeInsets.fromLTRB(12, 0, 12, _searchExpanded ? 8 : 0),
               alignment: Alignment.topCenter,
@@ -163,13 +168,19 @@ class _HomePageState extends ConsumerState<HomePage> {
                       decoration: InputDecoration(
                         isDense: true,
                         hintText: '搜索 Prompt',
-                        prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          size: AppIconSize.sm,
+                        ),
                         suffixIcon: _searchQuery.isEmpty
                             ? null
                             : IconButton(
                                 tooltip: '清空搜索',
                                 onPressed: _clearSearchQuery,
-                                icon: const Icon(Icons.close_rounded, size: 18),
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  size: AppIconSize.sm,
+                                ),
                               ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -178,7 +189,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surface,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           borderSide: BorderSide.none,
                         ),
                       ),
@@ -189,37 +200,46 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ),
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [AppThemeTokens.canvas, AppThemeTokens.canvasTint],
+            colors: [AppColors.canvas(b), AppColors.canvasTint(b)],
           ),
         ),
         child: Stack(
           children: [
-            const Positioned(
+            Positioned(
               top: -60,
               right: -40,
               child: _BackgroundOrb(
                 size: 220,
-                colors: [Color(0x444FC3F7), Color(0x114FC3F7)],
+                colors: [
+                  AppColors.primary(b).withValues(alpha: 0.16),
+                  AppColors.primary(b).withValues(alpha: 0),
+                ],
               ),
             ),
-            const Positioned(
+            Positioned(
               top: 120,
               left: -70,
               child: _BackgroundOrb(
                 size: 180,
-                colors: [Color(0x2281D1F0), Color(0x0081D1F0)],
+                colors: [
+                  AppColors.primary(b).withValues(alpha: 0.09),
+                  AppColors.primary(b).withValues(alpha: 0),
+                ],
               ),
             ),
-            const Positioned(
+            Positioned(
               bottom: 90,
               right: -50,
               child: _BackgroundOrb(
                 size: 200,
-                colors: [Color(0x2281D1F0), Color(0x0081D1F0)],
+                colors: [
+                  AppColors.primary(b).withValues(alpha: 0.09),
+                  AppColors.primary(b).withValues(alpha: 0),
+                ],
               ),
             ),
             Positioned.fill(
@@ -273,7 +293,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       description:
                           '先在设置页补充 Base URL、模型名和 Key，然后就可以从底部输入框直接开始生成。',
                       actionLabel: '前往设置',
-                      onAction: _openSettings,
+                      onAction: _handleOpenSettings,
                     ),
             ),
           ],
@@ -503,12 +523,45 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  Future<void> _openSettings() async {
+  /// 空态里的「前往设置」：先收掉页面内焦点，再切到设置 tab。
+  void _handleOpenSettings() {
     _clearHomeInputFocus();
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsPage()));
-    _clearHomeInputFocus();
+    widget.onOpenSettings?.call();
+  }
+
+  /// 「全部作品 (N)」的 N：与图墙同一套筛选（收藏夹 + 提示词搜索）。
+  int _filteredRecordCount(
+    List<ImageRecord> records,
+    Set<String>? favoriteRecordIds,
+  ) {
+    final query = _searchQuery.trim().toLowerCase();
+    var count = 0;
+    for (final record in records) {
+      if (favoriteRecordIds != null &&
+          !favoriteRecordIds.contains(record.id)) {
+        continue;
+      }
+      if (query.isNotEmpty && !record.prompt.toLowerCase().contains(query)) {
+        continue;
+      }
+      count++;
+    }
+    return count;
+  }
+
+  /// 标题区文案：搜索优先，其次收藏夹名，最后「全部作品」。
+  String _collectionLabel({
+    required bool hasFavoriteFolder,
+    required String? favoriteFolderTitle,
+    required int count,
+  }) {
+    if (_searchQuery.trim().isNotEmpty) {
+      return '搜索结果 ($count)';
+    }
+    if (hasFavoriteFolder) {
+      return '${favoriteFolderTitle ?? '收藏'} ($count)';
+    }
+    return '全部作品 ($count)';
   }
 
   Future<void> _handleUpdateTap(UpdateCheckState updateState) async {
@@ -554,6 +607,40 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 }
 
+/// 标题区的作品计数：`全部作品 (N)` / `收藏夹名 (N)` / `搜索结果 (N)`。
+class _CollectionChip extends StatelessWidget {
+  const _CollectionChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.grid_view,
+          size: AppIconSize.sm,
+          color: AppColors.textTertiary(b),
+        ),
+        const SizedBox(width: AppSpace.xxs),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: AppFontSize.label,
+              color: AppColors.textTertiary(b),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _NewVersionBadge extends StatelessWidget {
   const _NewVersionBadge({required this.onTap});
 
@@ -561,21 +648,27 @@ class _NewVersionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(AppRadius.full),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.xs,
+          vertical: AppSpace.xxs,
+        ),
         decoration: BoxDecoration(
-          color: const Color(0xFFE4F6EE),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0xFF93D7B5)),
+          color: AppColors.successSurface(b),
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(
+            color: AppColors.successText(b).withValues(alpha: 0.35),
+          ),
         ),
         child: Text(
           'New',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: const Color(0xFF177245),
-            fontSize: 10,
+            color: AppColors.successText(b),
+            fontSize: AppFontSize.caption,
             fontWeight: FontWeight.w800,
             letterSpacing: 0,
             height: 1,

@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/providers/generation_provider.dart';
-import 'features/home/home_page.dart';
+import 'features/shell/app_shell.dart';
 import 'shared/theme.dart';
 import 'shared/window_lifecycle_channel.dart';
 
@@ -63,7 +63,7 @@ class _GptImageAppState extends ConsumerState<GptImageApp> {
       theme: buildAppTheme(),
       darkTheme: buildAppDarkTheme(),
       themeMode: ThemeMode.system,
-      home: widget.home ?? const HomePage(),
+      home: widget.home ?? const AppShell(),
     );
   }
 
