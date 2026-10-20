@@ -17,12 +17,14 @@ class AttachmentPreviewStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppThemeTokens.surfaceSoft,
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surfaceSoft(b),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -44,14 +46,14 @@ class AttachmentPreviewStrip extends StatelessWidget {
                         onRemove: () => onRemove(index),
                       ),
                       if (index != attachments.length - 1)
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpace.xs),
                     ],
                   ],
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpace.xxs),
         ],
       ),
     );
@@ -66,6 +68,8 @@ class _AttachmentThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+
     return SizedBox(
       width: 44,
       height: 44,
@@ -73,7 +77,7 @@ class _AttachmentThumb extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             child: Image.file(
               File(attachment.path),
               width: 44,
@@ -82,12 +86,12 @@ class _AttachmentThumb extends StatelessWidget {
               errorBuilder: (context, error, stackTrace) => Container(
                 width: 44,
                 height: 44,
-                color: AppThemeTokens.surfaceSoft,
+                color: AppColors.surfaceSoft(b),
                 alignment: Alignment.center,
-                child: const Icon(
+                child: Icon(
                   Icons.image_not_supported_outlined,
-                  size: 18,
-                  color: AppThemeTokens.primary,
+                  size: AppIconSize.sm,
+                  color: AppColors.primary(b),
                 ),
               ),
             ),
@@ -101,7 +105,7 @@ class _AttachmentThumb extends StatelessWidget {
                 width: 18,
                 height: 18,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.72),
+                  color: AppColors.scrim(b),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(

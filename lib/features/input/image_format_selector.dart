@@ -16,28 +16,21 @@ class ImageFormatSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+
     return GestureDetector(
       onTap: () => _showSheet(context),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 28),
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppThemeTokens.border.withValues(alpha: 0.7),
-          ),
-        ),
+      child: SelectorChipShell(
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.image_rounded,
-              size: 13,
-              color: AppThemeTokens.primaryStrong,
+              Icons.image_outlined,
+              size: AppIconSize.sm,
+              color: AppColors.primaryStrong(b),
             ),
-            const SizedBox(width: 4),
-            SelectorChipLabel(prefix: '格式', value: selectedFormat.label),
+            const SizedBox(width: AppSpace.xxs),
+            SelectorChipLabel(value: selectedFormat.label),
           ],
         ),
       ),
@@ -52,6 +45,7 @@ class ImageFormatSelector extends StatelessWidget {
       context: context,
       showDragHandle: true,
       builder: (ctx) {
+        final b = Theme.of(ctx).brightness;
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -60,7 +54,9 @@ class ImageFormatSelector extends StatelessWidget {
               return ListTile(
                 leading: Icon(
                   active ? Icons.check_circle_rounded : Icons.circle_outlined,
-                  color: active ? AppThemeTokens.primary : Colors.grey,
+                  color: active
+                      ? AppColors.primary(b)
+                      : AppColors.textTertiary(b),
                 ),
                 title: Text(format.label),
                 onTap: () {

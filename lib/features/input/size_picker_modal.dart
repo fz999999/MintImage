@@ -221,11 +221,14 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   }
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final size = _computedSize;
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: AppColors.surface(b),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.lg),
+        ),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: SafeArea(
@@ -251,12 +254,13 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   }
 
   Widget _buildHandle() {
+    final b = Theme.of(context).brightness;
     return Center(
       child: Container(
         width: 36,
         height: 4,
         decoration: BoxDecoration(
-          color: Colors.grey.shade300,
+          color: AppColors.borderStrong(b),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -264,6 +268,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   }
 
   Widget _buildHeader((int, int) size) {
+    final b = Theme.of(context).brightness;
     return Row(
       children: [
         Text(
@@ -276,13 +281,13 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: AppThemeTokens.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(10),
+            color: AppColors.primary(b).withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadius.xs),
           ),
           child: Text(
             size.$1 == 0 ? '自动' : '${size.$1}×${size.$2}',
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppThemeTokens.primary,
+              color: AppColors.primary(b),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -292,11 +297,12 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   }
 
   Widget _buildModeTabs() {
+    final b = Theme.of(context).brightness;
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppThemeTokens.surfaceSoft,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.surfaceSoft(b),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         children: [
@@ -315,16 +321,17 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   }
 
   Widget _tabButton(String text, bool active, VoidCallback onTap) {
+    final b = Theme.of(context).brightness;
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
           decoration: BoxDecoration(
-            color: active ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            color: active ? AppColors.surface(b) : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.xs),
             boxShadow: active
-                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4)]
+                ? [BoxShadow(color: AppColors.shadow(b), blurRadius: 4)]
                 : null,
           ),
           alignment: Alignment.center,
@@ -332,7 +339,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
             text,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              color: active ? AppThemeTokens.textPrimary : AppThemeTokens.textSecondary,
+              color: active ? AppColors.textPrimary(b) : AppColors.textSecondary(b),
             ),
           ),
         ),
@@ -340,12 +347,17 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
     );
   }
   Widget _buildAutoContent() {
+    final b = Theme.of(context).brightness;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
-          Icon(Icons.auto_awesome_rounded, size: 40, color: AppThemeTokens.primary.withValues(alpha: 0.6)),
+          Icon(
+            Icons.auto_awesome_rounded,
+            size: 40,
+            color: AppColors.primary(b).withValues(alpha: 0.6),
+          ),
           const SizedBox(height: 12),
           Text(
             '由模型自动决定尺寸',
@@ -357,7 +369,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           Text(
             '不传递尺寸参数，由模型根据内容自行选择',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppThemeTokens.textSecondary,
+              color: AppColors.textSecondary(b),
             ),
           ),
         ],
@@ -417,26 +429,31 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
     );
   }
   Widget _categoryChip(_PresetCategory cat, bool active) {
+    final b = Theme.of(context).brightness;
     return GestureDetector(
       onTap: () => setState(() => _category = cat),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.sm,
+          vertical: 6,
+        ),
         decoration: BoxDecoration(
-          color: active ? AppThemeTokens.primary.withValues(alpha: 0.08) : AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(18),
+          color: active ? AppColors.primary(b).withValues(alpha: 0.08) : AppColors.surfaceSoft(b),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: active ? AppThemeTokens.primary : AppThemeTokens.border.withValues(alpha: 0.5),
+            color: active ? AppColors.primary(b) : AppColors.border(b).withValues(alpha: 0.5),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(cat.icon, size: 14, color: active ? AppThemeTokens.primary : AppThemeTokens.textSecondary),
-            const SizedBox(width: 4),
+            Icon(cat.icon, size: 14, color: active ? AppColors.primary(b) : AppColors.textSecondary(b)),
+            const SizedBox(width: AppSpace.xxs),
             Text(
               cat.label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: active ? AppThemeTokens.primary : AppThemeTokens.textPrimary,
+                fontSize: AppFontSize.micro,
+                color: active ? AppColors.primary(b) : AppColors.textPrimary(b),
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
@@ -447,6 +464,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   }
 
   Widget _presetTile(_SizeItem item) {
+    final b = Theme.of(context).brightness;
     final active = _selectedItem == item && _mode == _Mode.preset;
     final iconData = item.icon;
     final isHorizontal = item.w > item.h;
@@ -459,10 +477,10 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
         decoration: BoxDecoration(
-          color: active ? AppThemeTokens.primary.withValues(alpha: 0.08) : AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(8),
+          color: active ? AppColors.primary(b).withValues(alpha: 0.08) : AppColors.surfaceSoft(b),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
-            color: active ? AppThemeTokens.primary : AppThemeTokens.border.withValues(alpha: 0.5),
+            color: active ? AppColors.primary(b) : AppColors.border(b).withValues(alpha: 0.5),
           ),
         ),
         child: Column(
@@ -470,7 +488,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (iconData != null)
-              Icon(iconData, size: 18, color: active ? AppThemeTokens.primary : AppThemeTokens.textSecondary)
+              Icon(iconData, size: 18, color: active ? AppColors.primary(b) : AppColors.textSecondary(b))
             else
               SizedBox(
                 width: 20,
@@ -482,7 +500,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(2),
                       border: Border.all(
-                        color: active ? AppThemeTokens.primary : AppThemeTokens.textSecondary,
+                        color: active ? AppColors.primary(b) : AppColors.textSecondary(b),
                         width: 1.5,
                       ),
                     ),
@@ -496,16 +514,16 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: active ? AppThemeTokens.primary : AppThemeTokens.textPrimary,
+                color: active ? AppColors.primary(b) : AppColors.textPrimary(b),
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 11,
+                fontSize: AppFontSize.micro,
               ),
             ),
             Text(
               '${item.w}×${item.h}',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppThemeTokens.textSecondary,
-                fontSize: 10,
+                color: AppColors.textSecondary(b),
+                fontSize: AppFontSize.caption,
               ),
             ),
           ],
@@ -514,6 +532,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
     );
   }
   Widget _buildCustomContent() {
+    final b = Theme.of(context).brightness;
     final error = _validationError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,9 +551,13 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                 onChanged: (_) => setState(() {}),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Icon(Icons.close_rounded, size: 16, color: Colors.grey),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm),
+              child: Icon(
+                Icons.close_rounded,
+                size: AppIconSize.sm,
+                color: AppColors.textTertiary(b),
+              ),
             ),
             Expanded(
               child: TextField(
@@ -555,7 +578,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           Text(
             error,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.red.shade700,
+              color: AppColors.dangerText(b),
               fontWeight: FontWeight.w600,
             ),
           )
@@ -563,8 +586,8 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           Text(
             '宽高须为16的倍数 · 单边≤3840 · 总像素≤8,294,400 · 比例≤3:1',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppThemeTokens.textSecondary,
-              fontSize: 11,
+              color: AppColors.textSecondary(b),
+              fontSize: AppFontSize.micro,
             ),
           ),
       ],
@@ -579,7 +602,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
             ),
             child: const Text('取消'),
@@ -594,7 +617,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
             ),
             child: const Text('确定'),

@@ -21,28 +21,21 @@ class QualitySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+
     return GestureDetector(
       onTap: () => _showSheet(context),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 28),
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppThemeTokens.border.withValues(alpha: 0.7),
-          ),
-        ),
+      child: SelectorChipShell(
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.auto_awesome_rounded,
-              size: 13,
-              color: AppThemeTokens.primaryStrong,
+              Icons.high_quality_outlined,
+              size: AppIconSize.sm,
+              color: AppColors.primaryStrong(b),
             ),
-            const SizedBox(width: 4),
-            SelectorChipLabel(prefix: '质量', value: selectedQuality.label),
+            const SizedBox(width: AppSpace.xxs),
+            SelectorChipLabel(value: selectedQuality.label),
           ],
         ),
       ),
@@ -57,6 +50,7 @@ class QualitySelector extends StatelessWidget {
       context: context,
       showDragHandle: true,
       builder: (ctx) {
+        final b = Theme.of(ctx).brightness;
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -72,7 +66,9 @@ class QualitySelector extends StatelessWidget {
                       active
                           ? Icons.check_circle_rounded
                           : Icons.circle_outlined,
-                      color: active ? AppThemeTokens.primary : Colors.grey,
+                      color: active
+                          ? AppColors.primary(b)
+                          : AppColors.textTertiary(b),
                     ),
                     title: Text(q.label),
                     subtitle: q == ImageQuality.xhigh || q == ImageQuality.max

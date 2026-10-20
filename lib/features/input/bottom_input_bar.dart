@@ -21,6 +21,7 @@ import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
 import 'attachment_preview_strip.dart';
 import 'background_selector.dart';
+import 'balance_label.dart';
 import 'image_format_selector.dart';
 import 'quality_selector.dart';
 import 'quantity_selector.dart';
@@ -29,7 +30,15 @@ import 'size_selector.dart';
 import '../settings/prompt_optimization_profile_edit_page.dart';
 
 const double _primaryInputHeight = 40;
-const double _promptOptimizeButtonSize = 28;
+
+/// 输入框两侧按钮统一 40×40（决策 15）。
+const double _barButtonSize = 40;
+
+/// 提示词优化钮尺寸，跟其余按钮保持一致（决策 15：28 → 40）。
+const double _promptOptimizeButtonSize = _barButtonSize;
+
+/// 参考图上限（决策 19）：选文件 / 粘贴 / 从记录追加三个入口统一拦截。
+const int _maxAttachmentCount = 8;
 
 class BottomInputBar extends ConsumerStatefulWidget {
   const BottomInputBar({
@@ -127,6 +136,11 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   }
 
   Future<bool> appendImageFromRecord(ImageRecord record) async {
+    if (_attachments.length >= _maxAttachmentCount) {
+      _showMessage('最多添加 $_maxAttachmentCount 张参考图');
+      return false;
+    }
+
     final path = _attachmentPathForRecord(record);
     if (path == null) {
       _showMessage('这条记录没有可加入附件的本地图片。');
@@ -148,7 +162,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
 
   Future<void> _prefillAttachments(List<String> paths) async {
     final attachments = <PickedAttachment>[];
-    for (final path in paths) {
+    for (final path in paths.take(_maxAttachmentCount)) {
       final attachment = await PickedAttachment.fromExistingPath(path);
       if (attachment != null) {
         attachments.add(attachment);
@@ -247,6 +261,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
         !_optimizingPrompt && (hasApiKey || otherProfiles.isNotEmpty);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final theme = Theme.of(context);
+    final b = theme.brightness;
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 220),
@@ -255,13 +270,16 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       child: SafeArea(
         top: false,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Material(
               color: Colors.transparent,
               child: DecoratedBox(
-                decoration: AppDecorations.glass(radius: 22),
+                decoration: AppDecorations.glass(
+                  brightness: b,
+                  radius: AppRadius.lg,
+                ),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                   child: Column(
@@ -280,8 +298,13 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                       ],
                       const SizedBox(height: 6),
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
+                          _AttachmentInputButton(
+                            enabled: !_submitting && !_optimizingPrompt,
+                            onTap: _pickAttachments,
+                          ),
+                          const SizedBox(width: AppSpace.xs),
                           Expanded(
                             child: AnimatedBuilder(
                               animation: _promptFocusNode,
@@ -289,12 +312,14 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                 final focused = _promptFocusNode.hasFocus;
                                 return DecoratedBox(
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(18),
+                                    color: AppColors.surface(b),
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.sm,
+                                    ),
                                     border: Border.all(
                                       color: focused
-                                          ? AppThemeTokens.primary
-                                          : AppThemeTokens.border,
+                                          ? AppColors.primary(b)
+                                          : AppColors.border(b),
                                       width: focused ? 1.4 : 1,
                                     ),
                                   ),
@@ -305,96 +330,66 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                 constraints: const BoxConstraints(
                                   minHeight: _primaryInputHeight,
                                 ),
-                                child: Stack(
-                                  alignment: Alignment.bottomLeft,
-                                  children: [
-                                    Focus(
-                                      onKeyEvent: _handleKeyEvent,
-                                      child: TextField(
-                                        key: const Key('prompt-input'),
-                                        controller: _promptController,
-                                        focusNode: _promptFocusNode,
-                                        readOnly: _optimizingPrompt,
-                                        minLines: 1,
-                                        maxLines: 4,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: AppThemeTokens.textPrimary,
-                                              fontSize: 13,
-                                              height: 1.25,
-                                            ),
-                                        textAlignVertical:
-                                            TextAlignVertical.center,
-                                        textInputAction:
-                                            TextInputAction.newline,
-                                        keyboardType: TextInputType.multiline,
-                                        decoration: InputDecoration(
-                                          isDense: true,
-                                          filled: false,
-                                          border: InputBorder.none,
-                                          enabledBorder: InputBorder.none,
-                                          focusedBorder: InputBorder.none,
-                                          disabledBorder: InputBorder.none,
-                                          errorBorder: InputBorder.none,
-                                          focusedErrorBorder: InputBorder.none,
-                                          constraints: const BoxConstraints(
-                                            minHeight: _primaryInputHeight,
+                                child: Focus(
+                                  onKeyEvent: _handleKeyEvent,
+                                  child: TextField(
+                                    key: const Key('prompt-input'),
+                                    controller: _promptController,
+                                    focusNode: _promptFocusNode,
+                                    readOnly: _optimizingPrompt,
+                                    minLines: 1,
+                                    maxLines: 4,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textPrimary(b),
+                                      fontSize: AppFontSize.bodySm,
+                                      height: 1.25,
+                                    ),
+                                    textAlignVertical: TextAlignVertical.center,
+                                    textInputAction: TextInputAction.newline,
+                                    keyboardType: TextInputType.multiline,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      filled: false,
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      focusedErrorBorder: InputBorder.none,
+                                      constraints: const BoxConstraints(
+                                        minHeight: _primaryInputHeight,
+                                      ),
+                                      hintText: _attachments.isEmpty
+                                          ? '描述你想生成的画面'
+                                          : '描述你想如何修改这些图片',
+                                      hintStyle: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary(b)
+                                                .withValues(alpha: 0.82),
+                                            fontSize: AppFontSize.bodySm,
+                                            height: 1.25,
                                           ),
-                                          hintText: _attachments.isEmpty
-                                              ? '描述你想生成的画面'
-                                              : '描述你想如何修改这些图片',
-                                          hintStyle: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                                color: AppThemeTokens
-                                                    .textSecondary
-                                                    .withValues(alpha: 0.82),
-                                                fontSize: 13,
-                                                height: 1.25,
-                                              ),
-                                          contentPadding:
-                                              const EdgeInsets.fromLTRB(
-                                                12,
-                                                15,
-                                                70,
-                                                7,
-                                              ),
-                                        ),
-                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.fromLTRB(
+                                            AppSpace.sm,
+                                            15,
+                                            AppSpace.sm,
+                                            7,
+                                          ),
                                     ),
-                                    Positioned(
-                                      right: 5,
-                                      bottom: 0,
-                                      height: _primaryInputHeight,
-                                      child: Center(
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            _AttachmentInputButton(
-                                              enabled:
-                                                  !_submitting &&
-                                                  !_optimizingPrompt,
-                                              onTap: _pickAttachments,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            _PromptOptimizeButton(
-                                              key: const Key(
-                                                'prompt-optimize-button',
-                                              ),
-                                              enabled: true,
-                                              loading: _optimizingPrompt,
-                                              onTap:
-                                                  _handlePromptOptimizationTap,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 7),
+                          const SizedBox(width: AppSpace.xs),
+                          _PromptOptimizeButton(
+                            key: const Key('prompt-optimize-button'),
+                            enabled: true,
+                            loading: _optimizingPrompt,
+                            onTap: _handlePromptOptimizationTap,
+                          ),
+                          const SizedBox(width: AppSpace.xs),
                           _SendButton(
                             key: const Key('submit-generation-button'),
                             enabled: canUseSendButton,
@@ -403,100 +398,92 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          return SizedBox(
-                            width: constraints.maxWidth,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizeSelector(
-                                    currentWidth: _customWidth,
-                                    currentHeight: _customHeight,
-                                    onSizeSelected: (width, height) {
-                                      setState(() {
-                                        _sizePreset = _matchingSizePreset(
-                                          width,
-                                          height,
-                                        );
-                                        _customWidth = width;
-                                        _customHeight = height;
-                                      });
-                                      _persistLastGenerationOptions();
-                                    },
+                      const SizedBox(height: AppSpace.xs),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Wrap(
+                              spacing: AppSpace.xs,
+                              runSpacing: AppSpace.xs,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                SizeSelector(
+                                  currentWidth: _customWidth,
+                                  currentHeight: _customHeight,
+                                  onSizeSelected: (width, height) {
+                                    setState(() {
+                                      _sizePreset = _matchingSizePreset(
+                                        width,
+                                        height,
+                                      );
+                                      _customWidth = width;
+                                      _customHeight = height;
+                                    });
+                                    _persistLastGenerationOptions();
+                                  },
+                                ),
+                                QualitySelector(
+                                  selectedQuality: _quality,
+                                  model: settings.modelForProfile(
+                                    activeProfile,
                                   ),
-                                  const SizedBox(width: 6),
-                                  QualitySelector(
-                                    selectedQuality: _quality,
-                                    model: settings.modelForProfile(
-                                      activeProfile,
-                                    ),
-                                    onSelected: (quality) {
-                                      setState(() {
-                                        _quality = quality;
-                                      });
-                                      _persistLastGenerationOptions();
-                                    },
+                                  onSelected: (quality) {
+                                    setState(() {
+                                      _quality = quality;
+                                    });
+                                    _persistLastGenerationOptions();
+                                  },
+                                ),
+                                ImageFormatSelector(
+                                  selectedFormat: _outputFormat,
+                                  onSelected: (format) {
+                                    setState(() {
+                                      _outputFormat = format;
+                                      // JPEG 没有 alpha 通道，透明背景会被接口拒绝。
+                                      if (format == ImageOutputFormat.jpeg &&
+                                          _background.isTransparent) {
+                                        _background = ImageBackground.auto;
+                                      }
+                                    });
+                                    _persistLastGenerationOptions();
+                                  },
+                                ),
+                                BackgroundSelector(
+                                  background: _background,
+                                  outputFormat: _outputFormat,
+                                  model: settings.modelForProfile(
+                                    activeProfile,
                                   ),
-                                  const SizedBox(width: 6),
-                                  ImageFormatSelector(
-                                    selectedFormat: _outputFormat,
-                                    onSelected: (format) {
-                                      setState(() {
-                                        _outputFormat = format;
-                                        // JPEG 没有 alpha 通道，透明背景会被接口拒绝。
-                                        if (format == ImageOutputFormat.jpeg &&
-                                            _background.isTransparent) {
-                                          _background = ImageBackground.auto;
-                                        }
-                                      });
-                                      _persistLastGenerationOptions();
-                                    },
+                                  onSelected: (background) {
+                                    setState(() {
+                                      _background = background;
+                                    });
+                                    _persistLastGenerationOptions();
+                                  },
+                                ),
+                                QuantitySelector(
+                                  count: _count,
+                                  onSelected: (count) {
+                                    setState(() {
+                                      _count = count;
+                                    });
+                                  },
+                                ),
+                                _ApiProfileSwitchButton(
+                                  activeProfile: activeProfile,
+                                  onTap: _showApiProfileSwitchSheet,
+                                ),
+                                _ModelSwitchButton(
+                                  model: settings.modelForProfile(
+                                    activeProfile,
                                   ),
-                                  const SizedBox(width: 6),
-                                  BackgroundSelector(
-                                    background: _background,
-                                    outputFormat: _outputFormat,
-                                    model: settings.modelForProfile(
-                                      activeProfile,
-                                    ),
-                                    onSelected: (background) {
-                                      setState(() {
-                                        _background = background;
-                                      });
-                                      _persistLastGenerationOptions();
-                                    },
-                                  ),
-                                  const SizedBox(width: 6),
-                                  QuantitySelector(
-                                    count: _count,
-                                    onSelected: (count) {
-                                      setState(() {
-                                        _count = count;
-                                      });
-                                    },
-                                  ),
-                                  const SizedBox(width: 6),
-                                  _ApiProfileSwitchButton(
-                                    activeProfile: activeProfile,
-                                    onTap: _showApiProfileSwitchSheet,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  _ModelSwitchButton(
-                                    model: settings.modelForProfile(
-                                      activeProfile,
-                                    ),
-                                    onTap: _showModelSwitchSheet,
-                                  ),
-                                ],
-                              ),
+                                  onTap: _showModelSwitchSheet,
+                                ),
+                              ],
                             ),
-                          );
-                        },
+                          ),
+                          const BalanceLabel(value: null),
+                        ],
                       ),
                       if (!hasApiKey) ...[
                         const SizedBox(height: 6),
@@ -505,7 +492,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                               ? '当前配置缺少 API Key，发送按钮已禁用。'
                               : '当前配置缺少 API Key，可长按发送切换其他配置。',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.red.shade700,
+                            color: AppColors.dangerText(b),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -627,6 +614,10 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
           _showMessage('已忽略 1 张超过 25MB 的剪贴板图片。');
           return;
         }
+        if (_attachments.length >= _maxAttachmentCount) {
+          _showMessage('最多添加 $_maxAttachmentCount 张参考图');
+          return;
+        }
         _setAttachments([..._attachments, attachment]);
         return;
       }
@@ -679,7 +670,16 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       return;
     }
 
-    _setAttachments([..._attachments, ...valid]);
+    final remaining = _maxAttachmentCount - _attachments.length;
+    if (remaining <= 0) {
+      _showMessage('最多添加 $_maxAttachmentCount 张参考图');
+      return;
+    }
+    if (valid.length > remaining) {
+      _showMessage('最多添加 $_maxAttachmentCount 张参考图');
+    }
+
+    _setAttachments([..._attachments, ...valid.take(remaining)]);
   }
 
   Future<void> _submit({String? apiProfileId}) async {
@@ -768,6 +768,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) {
+        final b = Theme.of(ctx).brightness;
         return SafeArea(
           top: false,
           child: SingleChildScrollView(
@@ -788,7 +789,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         onTap: () => Navigator.of(ctx).pop(profile.id),
                         child: Container(
                           width: double.infinity,
@@ -797,16 +798,15 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                             vertical: 11,
                           ),
                           decoration: BoxDecoration(
-                            color: AppThemeTokens.surfaceSoft,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppThemeTokens.border),
+                            color: AppColors.surfaceSoft(b),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: AppColors.border(b)),
                           ),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.hub_rounded,
-                                size: 18,
-                                color: AppThemeTokens.primaryStrong,
+                                color: AppColors.primaryStrong(b),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -817,7 +817,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                       profile.name,
                                       style: Theme.of(ctx).textTheme.labelLarge
                                           ?.copyWith(
-                                            color: AppThemeTokens.textPrimary,
+                                            color: AppColors.textPrimary(b),
                                             fontWeight: FontWeight.w800,
                                           ),
                                     ),
@@ -828,7 +828,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                       overflow: TextOverflow.ellipsis,
                                       style: Theme.of(ctx).textTheme.bodySmall
                                           ?.copyWith(
-                                            color: AppThemeTokens.textSecondary,
+                                            color: AppColors.textSecondary(b),
                                           ),
                                     ),
                                   ],
@@ -841,8 +841,8 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                     : Icons.arrow_upward_rounded,
                                 size: 18,
                                 color: profile.apiKey.trim().isEmpty
-                                    ? AppThemeTokens.textSecondary
-                                    : AppThemeTokens.primaryStrong,
+                                    ? AppColors.textSecondary(b)
+                                    : AppColors.primaryStrong(b),
                               ),
                             ],
                           ),
@@ -886,6 +886,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) {
+        final b = Theme.of(ctx).brightness;
         return SafeArea(
           child: SingleChildScrollView(
             child: Column(
@@ -910,8 +911,8 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                           ? Icons.check_circle_rounded
                           : Icons.circle_outlined,
                       color: profile.id == settings.activeProfileId
-                          ? AppThemeTokens.primary
-                          : AppThemeTokens.textSecondary,
+                          ? AppColors.primary(b)
+                          : AppColors.textSecondary(b),
                     ),
                     title: Text(profile.name),
                     subtitle: Text(
@@ -966,6 +967,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) {
+        final b = Theme.of(ctx).brightness;
         return SafeArea(
           child: SingleChildScrollView(
             child: Column(
@@ -990,7 +992,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                            color: AppThemeTokens.textSecondary,
+                            color: AppColors.textSecondary(b),
                           ),
                         ),
                       ],
@@ -999,9 +1001,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                 ),
                 for (final model in models)
                   ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.smart_toy_outlined,
-                      color: AppThemeTokens.primaryStrong,
+                      color: AppColors.primaryStrong(b),
                     ),
                     title: Text(
                       model,
@@ -1012,9 +1014,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                         ? const Text('当前使用')
                         : null,
                     trailing: model == currentModel
-                        ? const Icon(
+                        ? Icon(
                             Icons.check_rounded,
-                            color: AppThemeTokens.primary,
+                            color: AppColors.primary(b),
                           )
                         : null,
                     onTap: () => Navigator.of(ctx).pop(model),
@@ -1027,7 +1029,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                       child: Text(
                         '当前 API 只配置了一个模型，可在设置里添加更多。',
                         style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                          color: AppThemeTokens.textSecondary,
+                          color: AppColors.textSecondary(b),
                         ),
                       ),
                     ),
@@ -1126,6 +1128,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) {
+        final b = Theme.of(context).brightness;
         return Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.viewInsetsOf(context).bottom,
@@ -1149,7 +1152,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         onTap: () => Navigator.of(context).pop(direction),
                         child: Container(
                           width: double.infinity,
@@ -1158,16 +1161,15 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                             vertical: 11,
                           ),
                           decoration: BoxDecoration(
-                            color: AppThemeTokens.surfaceSoft,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppThemeTokens.border),
+                            color: AppColors.surfaceSoft(b),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: AppColors.border(b)),
                           ),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.auto_awesome_rounded,
-                                size: 18,
-                                color: AppThemeTokens.primaryStrong,
+                                color: AppColors.primaryStrong(b),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -1180,7 +1182,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                           .textTheme
                                           .labelLarge
                                           ?.copyWith(
-                                            color: AppThemeTokens.textPrimary,
+                                            color: AppColors.textPrimary(b),
                                             fontWeight: FontWeight.w800,
                                           ),
                                     ),
@@ -1191,7 +1193,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                           .textTheme
                                           .bodySmall
                                           ?.copyWith(
-                                            color: AppThemeTokens.textSecondary,
+                                            color: AppColors.textSecondary(b),
                                           ),
                                     ),
                                   ],
@@ -1330,18 +1332,18 @@ class _PromptOptimizeButtonState extends State<_PromptOptimizeButton>
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final active = widget.enabled || widget.loading;
     const gradient = LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [Color(0xFFFFC857), Color(0xFFFF6B6B), Color(0xFF3B82F6)],
-    );
-    final iconWidget = ShaderMask(
+    );    final iconWidget = ShaderMask(
       shaderCallback: (bounds) => gradient.createShader(bounds),
       child: const Icon(
         Icons.auto_awesome_rounded,
         color: Colors.white,
-        size: 20,
+        size: AppIconSize.md,
       ),
     );
     final loadingWidget = SizedBox.square(
@@ -1358,10 +1360,10 @@ class _PromptOptimizeButtonState extends State<_PromptOptimizeButton>
                 value: 0.72,
                 strokeWidth: 2.4,
                 strokeCap: StrokeCap.round,
-                backgroundColor: AppThemeTokens.primarySoft.withValues(
+                backgroundColor: AppColors.primarySoft(b).withValues(
                   alpha: 0.35,
                 ),
-                color: AppThemeTokens.primaryStrong,
+                color: AppColors.primaryStrong(b),
               ),
             ),
           ),
@@ -1370,8 +1372,8 @@ class _PromptOptimizeButtonState extends State<_PromptOptimizeButton>
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: AppThemeTokens.primaryStrong,
-              borderRadius: BorderRadius.circular(1.8),
+              color: AppColors.primaryStrong(b),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
             ),
           ),
         ],
@@ -1381,17 +1383,27 @@ class _PromptOptimizeButtonState extends State<_PromptOptimizeButton>
     return Tooltip(
       message: widget.loading ? '停止优化' : '优化提示词',
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 180),
+        duration: AppMotion.fast,
         opacity: active ? 1 : 0.38,
-        child: SizedBox(
-          width: _promptOptimizeButtonSize,
-          height: _promptOptimizeButtonSize,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: active ? widget.onTap : null,
-              borderRadius: BorderRadius.circular(8),
-              child: Center(child: widget.loading ? loadingWidget : iconWidget),
+        child: SizedBox.square(
+          dimension: _promptOptimizeButtonSize,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft(b),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(
+                color: AppColors.border(b).withValues(alpha: 0.7),
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: active ? widget.onTap : null,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                child: Center(
+                  child: widget.loading ? loadingWidget : iconWidget,
+                ),
+              ),
             ),
           ),
         ),
@@ -1400,6 +1412,7 @@ class _PromptOptimizeButtonState extends State<_PromptOptimizeButton>
   }
 }
 
+/// 输入框左侧的「+ 添加参考图」按钮（决策 15）。
 class _AttachmentInputButton extends StatelessWidget {
   const _AttachmentInputButton({required this.enabled, required this.onTap});
 
@@ -1408,24 +1421,34 @@ class _AttachmentInputButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+
     return Tooltip(
       message: '添加图片',
       child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 180),
+        duration: AppMotion.fast,
         opacity: enabled ? 1 : 0.38,
-        child: SizedBox(
-          width: _promptOptimizeButtonSize,
-          height: _promptOptimizeButtonSize,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: enabled ? onTap : null,
-              borderRadius: BorderRadius.circular(8),
-              child: const Center(
-                child: Icon(
-                  Icons.attach_file_rounded,
-                  color: AppThemeTokens.primaryStrong,
-                  size: 20,
+        child: SizedBox.square(
+          dimension: _barButtonSize,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceSoft(b),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(
+                color: AppColors.border(b).withValues(alpha: 0.7),
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: enabled ? onTap : null,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                child: Center(
+                  child: Icon(
+                    Icons.add,
+                    size: AppIconSize.md,
+                    color: AppColors.primaryStrong(b),
+                  ),
                 ),
               ),
             ),
@@ -1447,38 +1470,25 @@ class _ApiProfileSwitchButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+
     return Tooltip(
       message: '切换生图 API',
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 130),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+        child: GestureDetector(
           onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 28),
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppThemeTokens.border.withValues(alpha: 0.7),
-              ),
-            ),
+          child: SelectorChipShell(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.hub_rounded,
-                  size: 13,
-                  color: AppThemeTokens.primaryStrong,
+                Icon(
+                  Icons.hub_outlined,
+                  size: AppIconSize.sm,
+                  color: AppColors.primaryStrong(b),
                 ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: SelectorChipLabel(
-                    prefix: '渠道',
-                    value: activeProfile.name,
-                  ),
-                ),
+                const SizedBox(width: AppSpace.xxs),
+                Flexible(child: SelectorChipLabel(value: activeProfile.name)),
               ],
             ),
           ),
@@ -1496,35 +1506,25 @@ class _ModelSwitchButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+
     return Tooltip(
       message: '切换模型',
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 170),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+        child: GestureDetector(
           onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 28),
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppThemeTokens.border.withValues(alpha: 0.7),
-              ),
-            ),
+          child: SelectorChipShell(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.smart_toy_outlined,
-                  size: 13,
-                  color: AppThemeTokens.primaryStrong,
+                Icon(
+                  Icons.memory,
+                  size: AppIconSize.sm,
+                  color: AppColors.primaryStrong(b),
                 ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: SelectorChipLabel(prefix: '模型', value: model),
-                ),
+                const SizedBox(width: AppSpace.xxs),
+                Flexible(child: SelectorChipLabel(value: model)),
               ],
             ),
           ),
@@ -1548,33 +1548,30 @@ class _SendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = enabled
-        ? const [AppThemeTokens.primary, AppThemeTokens.primaryStrong]
-        : const [Color(0xFFB9C7D4), Color(0xFFB9C7D4)];
+    final b = Theme.of(context).brightness;
 
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 180),
-      opacity: enabled ? 1 : 0.7,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: colors),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: SizedBox(
-          width: _primaryInputHeight,
-          height: _primaryInputHeight,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: enabled ? onTap : null,
-              onLongPress: enabled ? onLongPress : null,
-              borderRadius: BorderRadius.circular(15),
-              child: const Center(
-                child: Icon(
-                  Icons.arrow_upward_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: enabled
+            ? AppColors.primaryContainer(b)
+            : AppColors.surfaceMuted(b),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: SizedBox.square(
+        dimension: _barButtonSize,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: enabled ? onTap : null,
+            onLongPress: enabled ? onLongPress : null,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            child: Center(
+              child: Icon(
+                Icons.arrow_upward_rounded,
+                size: AppIconSize.md,
+                color: enabled
+                    ? AppColors.onPrimaryContainer(b)
+                    : AppColors.textTertiary(b),
               ),
             ),
           ),

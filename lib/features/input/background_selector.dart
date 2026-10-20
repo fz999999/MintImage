@@ -59,6 +59,7 @@ class BackgroundSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
     final isPreview =
         _transparentSupported &&
         ModelCapabilities.isTransparentBackgroundPreview(model);
@@ -66,31 +67,19 @@ class BackgroundSelector extends StatelessWidget {
       message: isPreview ? '$_tooltip（当前模型为预览支持）' : _tooltip,
       child: GestureDetector(
         onTap: () => _showSheet(context),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 28),
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-          decoration: BoxDecoration(
-            color: _active
-                ? AppThemeTokens.primarySoft.withValues(alpha: 0.55)
-                : AppThemeTokens.surfaceSoft,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _active
-                  ? AppThemeTokens.primary.withValues(alpha: 0.55)
-                  : AppThemeTokens.border.withValues(alpha: 0.7),
-            ),
-          ),
+        child: SelectorChipShell(
+          active: _active,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               // 内联常量图标：和尺寸/质量/格式/数量四个按钮完全一致。
-              const Icon(
+              Icon(
                 Icons.wallpaper_rounded,
-                size: 13,
-                color: AppThemeTokens.primaryStrong,
+                size: AppIconSize.sm,
+                color: AppColors.primaryStrong(b),
               ),
-              const SizedBox(width: 4),
-              SelectorChipLabel(prefix: '背景', value: background.label),
+              const SizedBox(width: AppSpace.xxs),
+              SelectorChipLabel(value: background.label),
             ],
           ),
         ),
@@ -107,6 +96,7 @@ class BackgroundSelector extends StatelessWidget {
       context: context,
       showDragHandle: true,
       builder: (ctx) {
+        final b = Theme.of(ctx).brightness;
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -129,8 +119,8 @@ class BackgroundSelector extends StatelessWidget {
                       ? Icons.check_circle_rounded
                       : Icons.circle_outlined,
                   color: background == ImageBackground.auto
-                      ? AppThemeTokens.primary
-                      : AppThemeTokens.textSecondary,
+                      ? AppColors.primary(b)
+                      : AppColors.textTertiary(b),
                 ),
                 title: const Text('自动'),
                 subtitle: const Text('不指定背景，由模型自己决定（通常是实底）'),
@@ -141,8 +131,8 @@ class BackgroundSelector extends StatelessWidget {
                 leading: Icon(
                   _active ? Icons.check_circle_rounded : Icons.circle_outlined,
                   color: _active
-                      ? AppThemeTokens.primary
-                      : AppThemeTokens.textSecondary,
+                      ? AppColors.primary(b)
+                      : AppColors.textTertiary(b),
                 ),
                 title: const Text('透明'),
                 subtitle: Text(
@@ -160,8 +150,8 @@ class BackgroundSelector extends StatelessWidget {
                       ? Icons.check_circle_rounded
                       : Icons.circle_outlined,
                   color: background == ImageBackground.opaque
-                      ? AppThemeTokens.primary
-                      : AppThemeTokens.textSecondary,
+                      ? AppColors.primary(b)
+                      : AppColors.textTertiary(b),
                 ),
                 title: const Text('不透明'),
                 subtitle: const Text('明确要求纯实底背景'),

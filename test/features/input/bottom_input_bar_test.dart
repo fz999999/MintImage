@@ -14,7 +14,12 @@ import 'package:mint_image/core/models/image_record.dart';
 import 'package:mint_image/core/models/settings_model.dart';
 import 'package:mint_image/core/providers/app_providers.dart';
 import 'package:mint_image/core/providers/settings_provider.dart';
+import 'package:mint_image/features/input/background_selector.dart';
 import 'package:mint_image/features/input/bottom_input_bar.dart';
+import 'package:mint_image/features/input/image_format_selector.dart';
+import 'package:mint_image/features/input/quality_selector.dart';
+import 'package:mint_image/features/input/quantity_selector.dart';
+import 'package:mint_image/features/input/size_selector.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -89,10 +94,10 @@ void main() {
       },
     );
 
-    expect(find.text('尺寸:1536×1024'), findsOneWidget);
-    expect(find.text('质量:高'), findsOneWidget);
-    expect(find.text('格式:WEBP'), findsOneWidget);
-    expect(find.text('数量:1'), findsOneWidget);
+    expect(_chipText('1536×1024', SizeSelector), findsOneWidget);
+    expect(_chipText('高', QualitySelector), findsOneWidget);
+    expect(_chipText('WEBP', ImageFormatSelector), findsOneWidget);
+    expect(_chipText('1', QuantitySelector), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('prompt-input')), '山谷日出');
     await tester.tap(find.byKey(const Key('submit-generation-button')));
@@ -119,15 +124,15 @@ void main() {
       },
     );
 
-    expect(find.text('背景:自动'), findsOneWidget);
+    expect(_chipText('自动', BackgroundSelector), findsOneWidget);
     // 背景按钮和其它四个按钮一样，左侧固定有话题图标。
     expect(find.byIcon(Icons.wallpaper_rounded), findsOneWidget);
 
-    await tester.tap(find.text('背景:自动'));
+    await tester.tap(_chipText('自动', BackgroundSelector));
     await tester.pumpAndSettle();
     await tester.tap(find.text('透明'));
     await tester.pumpAndSettle();
-    expect(find.text('背景:透明'), findsOneWidget);
+    expect(_chipText('透明', BackgroundSelector), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('prompt-input')), '透明背景图标');
     await tester.tap(find.byKey(const Key('submit-generation-button')));
@@ -151,11 +156,11 @@ void main() {
       },
     );
 
-    await tester.tap(find.text('背景:自动'));
+    await tester.tap(_chipText('自动', BackgroundSelector));
     await tester.pumpAndSettle();
     await tester.tap(find.text('不透明'));
     await tester.pumpAndSettle();
-    expect(find.text('背景:不透明'), findsOneWidget);
+    expect(_chipText('不透明', BackgroundSelector), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('prompt-input')), '实底背景');
     await tester.tap(find.byKey(const Key('submit-generation-button')));
@@ -179,14 +184,19 @@ void main() {
       },
     );
 
-    expect(find.text('背景:透明'), findsOneWidget);
+    expect(_chipText('透明', BackgroundSelector), findsOneWidget);
 
-    await tester.tap(find.text('格式:PNG'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(ImageFormatSelector),
+        matching: find.text('PNG'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('JPEG').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('背景:自动'), findsOneWidget);
+    expect(_chipText('自动', BackgroundSelector), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('prompt-input')), 'jpeg 图片');
     await tester.tap(find.byKey(const Key('submit-generation-button')));
@@ -253,7 +263,13 @@ void main() {
     await _pumpInputBar(tester, settings: _settingsWithTwoProfiles);
 
     expect(find.byTooltip('切换生图 API'), findsOneWidget);
-    expect(find.text('渠道:API'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byTooltip('切换生图 API'),
+        matching: find.text('API'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('切换生图 API'));
     await tester.pumpAndSettle();
@@ -307,7 +323,13 @@ void main() {
     await _pumpInputBar(tester, settings: _settingsWithMultipleModels);
 
     expect(find.byTooltip('切换模型'), findsOneWidget);
-    expect(find.text('模型:model-a'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byTooltip('切换模型'),
+        matching: find.text('model-a'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('切换模型'));
     await tester.pumpAndSettle();
@@ -328,6 +350,13 @@ void main() {
     expect(settings.modelForProfile(profile), 'model-b');
   });
 }
+
+/// 参数胶囊现在只显示真实取值（决策 17），同一个词可能同时出现在
+/// 胶囊里和弹层选项里，所以按所属选择器限定查找范围。
+Finder _chipText(String text, Type selectorType) => find.descendant(
+  of: find.byType(selectorType),
+  matching: find.text(text),
+);
 
 Future<void> _pumpInputBar(
   WidgetTester tester, {

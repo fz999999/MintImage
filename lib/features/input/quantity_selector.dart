@@ -16,28 +16,21 @@ class QuantitySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+
     return GestureDetector(
       onTap: () => _showQuantityModal(context),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 28),
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppThemeTokens.border.withValues(alpha: 0.7),
-          ),
-        ),
+      child: SelectorChipShell(
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.layers_rounded,
-              size: 13,
-              color: AppThemeTokens.primaryStrong,
+              Icons.copy_all_outlined,
+              size: AppIconSize.sm,
+              color: AppColors.primaryStrong(b),
             ),
-            const SizedBox(width: 4),
-            SelectorChipLabel(prefix: '数量', value: '$count'),
+            const SizedBox(width: AppSpace.xxs),
+            SelectorChipLabel(value: '$count'),
           ],
         ),
       ),
@@ -116,7 +109,7 @@ class _QuantityDialogState extends State<_QuantityDialog> {
               border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpace.sm),
           _buildQuickPicks(),
         ],
       ),
@@ -134,13 +127,14 @@ class _QuantityDialogState extends State<_QuantityDialog> {
   }
 
   Widget _buildQuickPicks() {
+    final b = Theme.of(context).brightness;
     const picks = [1, 2, 4, 8, 16];
     return Row(
       children: picks.map((n) {
         final active = _value == n;
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(right: n != 16 ? 8 : 0),
+            padding: EdgeInsets.only(right: n != 16 ? AppSpace.xs : 0),
             child: GestureDetector(
               onTap: () {
                 widget.controller.text = '$n';
@@ -150,28 +144,27 @@ class _QuantityDialogState extends State<_QuantityDialog> {
                 setState(() => _value = n);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
                 decoration: BoxDecoration(
                   color: active
-                      ? Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.1)
-                      : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
+                      ? AppColors.primarySoft(b)
+                      : AppColors.surfaceSoft(b),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                   border: Border.all(
                     color: active
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade300,
+                        ? AppColors.primary(b)
+                        : AppColors.border(b),
                   ),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   '$n',
                   style: TextStyle(
+                    fontSize: AppFontSize.label,
                     fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                     color: active
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade700,
+                        ? AppColors.primaryStrong(b)
+                        : AppColors.textSecondary(b),
                   ),
                 ),
               ),

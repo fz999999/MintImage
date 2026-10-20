@@ -18,6 +18,8 @@ class SizeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final b = Theme.of(context).brightness;
+
     return GestureDetector(
       onTap: () async {
         FocusManager.instance.primaryFocus?.unfocus(
@@ -37,27 +39,17 @@ class SizeSelector extends StatelessWidget {
           );
         }
       },
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 28),
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppThemeTokens.border.withValues(alpha: 0.7),
-          ),
-        ),
+      child: SelectorChipShell(
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.aspect_ratio_rounded,
-              size: 13,
-              color: AppThemeTokens.primaryStrong,
+              Icons.aspect_ratio,
+              size: AppIconSize.sm,
+              color: AppColors.primaryStrong(b),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpace.xxs),
             SelectorChipLabel(
-              prefix: '尺寸',
               value: currentWidth == 0 ? '自动' : '$currentWidth×$currentHeight',
             ),
           ],
