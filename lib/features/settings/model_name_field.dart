@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../../shared/widgets/desktop/desktop_menu.dart';
 
 import '../../shared/theme.dart';
 
@@ -63,7 +66,8 @@ class _ModelNameFieldState extends State<ModelNameField> {
       ),
       validator: widget.validator,
       onTap: () {
-        if (widget.modelOptions.isNotEmpty) {
+        if (widget.modelOptions.isNotEmpty &&
+            (kIsWeb || defaultTargetPlatform != TargetPlatform.windows)) {
           _showModelMenu();
         }
       },
@@ -101,7 +105,20 @@ class _ModelNameFieldState extends State<ModelNameField> {
     setState(() {
       _menuOpen = true;
     });
-    final selected = await showMenu<String>(
+    final selected = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
+        ? await showDesktopMenu<String>(
+            context: fieldContext,
+            width: math.min(400.0, math.max(280.0, menuWidth)),
+            title: '选择模型',
+            searchable: widget.modelOptions.length > 8,
+            preferAbove: false,
+            items: [
+              for (final model in widget.modelOptions)
+                DesktopMenuItem<String>(value: model, label: model,
+                    selected: widget.controller.text == model),
+            ],
+          )
+        : await showMenu<String>(
       context: context,
       position: RelativeRect.fromRect(fieldRect, overlayRect),
       items: [

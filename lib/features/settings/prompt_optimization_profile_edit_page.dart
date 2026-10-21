@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -8,6 +9,8 @@ import '../../core/models/settings_model.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../shared/theme.dart';
+import '../../shared/widgets/desktop/desktop_dialog.dart';
+import 'settings_content_width.dart';
 import 'model_name_field.dart';
 
 class PromptOptimizationProfileEditPage extends ConsumerStatefulWidget {
@@ -107,6 +110,10 @@ class _PromptOptimizationProfileEditPageState
                     const SizedBox(height: 16),
                     DropdownButtonFormField<PromptOptimizationProtocol>(
                       initialValue: _protocol,
+                      isExpanded: true,
+                      isDense: true,
+                      itemHeight: 48,
+                      menuMaxHeight: !kIsWeb && defaultTargetPlatform == TargetPlatform.windows ? 280 : null,
                       decoration: const InputDecoration(labelText: '协议类型'),
                       items: [
                         for (final protocol
@@ -223,7 +230,7 @@ class _PromptOptimizationProfileEditPageState
                     : const Icon(Icons.network_check_rounded),
                 label: Text(_testingConnection ? '测试中...' : '测试连通性'),
               ),
-            ],
+            ].map((child) => SettingsContentWidth(child: child)).toList(),
           ),
         ),
       ),
@@ -417,12 +424,15 @@ class _PromptOptimizationProfileEditPageState
         return;
       }
 
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+        await showDesktopInfo(context: context, title: '连通性测试成功', text: result);
+      } else {
       await showDialog<void>(
         context: context,
         builder: (context) {
           return AlertDialog(
             title: const Text('连通性测试成功'),
-            content: Text(result, maxLines: 8, overflow: TextOverflow.ellipsis),
+            content: SingleChildScrollView(child: SelectableText(result)),
             actions: [
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -432,6 +442,7 @@ class _PromptOptimizationProfileEditPageState
           );
         },
       );
+      }
     } on ApiException catch (error) {
       if (!mounted || cancelToken.isCancelled) {
         return;
@@ -459,6 +470,11 @@ class _PromptOptimizationProfileEditPageState
   }
 
   void _showMessage(String message) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows &&
+        (message.contains('失败') || message.startsWith('请输入'))) {
+      showDesktopInfo(context: context, title: '提示', text: message);
+      return;
+    }
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
