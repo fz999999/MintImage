@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,6 +15,7 @@ import '../../core/providers/update_check_provider.dart';
 import '../../core/version/app_version.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/desktop/desktop_dialog.dart';
 import '../favorites/favorite_folder_sheet.dart';
 import '../image_list/image_list_widget.dart';
 import '../input/bottom_input_bar.dart';
@@ -39,6 +41,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _searchExpanded = false;
   String _searchQuery = '';
   int _attachmentCount = 0;
+  final GlobalKey _favoriteButtonKey = GlobalKey();
+  final Set<String> _deletingRecordIds = {};
+  bool _favoriteBrowserOpen = false;
 
   @override
   void dispose() {
@@ -79,28 +84,13 @@ class _HomePageState extends ConsumerState<HomePage> {
       resizeToAvoidBottomInset: true,
       extendBody: true,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '大川生图工具',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                if (updateState.hasUpdate) ...[
-                  const SizedBox(width: AppSpace.xs),
-                  _NewVersionBadge(onTap: () => _handleUpdateTap(updateState)),
-                ],
-                const SizedBox(width: AppSpace.sm),
-                Flexible(child: _CollectionChip(label: collectionLabel)),
-              ],
-            ),
-            Text(
-              hasApiKey ? '生成与改图工作台' : '先完成 API 配置即可开始使用',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            Flexible(child: _CollectionChip(label: collectionLabel)),
+            if (updateState.hasUpdate) ...[
+              const SizedBox(width: AppSpace.xs),
+              _NewVersionBadge(onTap: () => _handleUpdateTap(updateState)),
+            ],
           ],
         ),
         actions: [
@@ -126,6 +116,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           Padding(
             padding: const EdgeInsets.only(right: 2),
             child: IconButton(
+              key: _favoriteButtonKey,
               tooltip: hasActiveFavoriteFolder ? '显示全部' : '选择收藏夹',
               onPressed: hasActiveFavoriteFolder
                   ? _clearFavoriteFolderFilter
@@ -215,7 +206,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: _BackgroundOrb(
                 size: 220,
                 colors: [
-                  AppColors.primary(b).withValues(alpha: 0.16),
+                  AppColors.primary(b).withValues(alpha: 0.035),
                   AppColors.primary(b).withValues(alpha: 0),
                 ],
               ),
@@ -226,7 +217,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: _BackgroundOrb(
                 size: 180,
                 colors: [
-                  AppColors.primary(b).withValues(alpha: 0.09),
+                  AppColors.primary(b).withValues(alpha: 0.025),
                   AppColors.primary(b).withValues(alpha: 0),
                 ],
               ),
@@ -237,7 +228,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               child: _BackgroundOrb(
                 size: 200,
                 colors: [
-                  AppColors.primary(b).withValues(alpha: 0.09),
+                  AppColors.primary(b).withValues(alpha: 0.025),
                   AppColors.primary(b).withValues(alpha: 0),
                 ],
               ),
@@ -259,7 +250,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                             onRegenerateRecord: _regenerateRecord,
                             onRetryRecord: _retryRecord,
                             onCancelRecord: _cancelRecord,
-                            onDeleteRecord: _deleteRecord,
+                            onDeleteRecord: _confirmDeleteRecord,
                             onToggleFavorite: _toggleRecordFavorite,
                             onPreviewNavigation: _handlePreviewNavigation,
                             currentAttachmentCount: _attachmentCount,
@@ -325,6 +316,32 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _cancelRecord(String recordId) {
     ref.read(generationProvider.notifier).cancel(recordId);
+  }
+
+  Future<void> _confirmDeleteRecord(ImageRecord record) async {
+    if (_selectionMode || !_deletingRecordIds.add(record.id)) return;
+    try {
+      if ((defaultTargetPlatform == TargetPlatform.windows)) {
+        final confirmed = await showDesktopConfirm(
+          context: context,
+          title: '删除图像',
+          message: '确认删除这条图像记录？此操作无法撤销。',
+        );
+        if (!confirmed || !mounted || _selectionMode) return;
+      }
+      await _deleteRecord(record);
+    } catch (error) {
+      if (mounted) {
+        if ((defaultTargetPlatform == TargetPlatform.windows)) {
+          await showDesktopInfo(context: context, title: '删除失败', text: '$error');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除失败：$error')));
+        }
+      }
+    } finally {
+      _deletingRecordIds.remove(record.id);
+    }
   }
 
   Future<void> _deleteRecord(ImageRecord record) async {
@@ -427,10 +444,19 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _openFavoriteFolders() async {
+    if (_favoriteBrowserOpen) return;
+    final box = _favoriteButtonKey.currentContext?.findRenderObject();
+    final anchor = box is RenderBox && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size : null;
     _clearHomeInputFocus();
     _exitSelectionMode();
-    final folderId = await showFavoriteFolderBrowserSheet(context);
-    _clearHomeInputFocus();
+    _favoriteBrowserOpen = true;
+    String? folderId;
+    try {
+      folderId = await showFavoriteFolderBrowserSheet(context, anchorRect: anchor);
+    } finally {
+      _favoriteBrowserOpen = false;
+    }
     if (!mounted || folderId == null) {
       return;
     }

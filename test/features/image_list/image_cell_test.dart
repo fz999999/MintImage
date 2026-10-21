@@ -159,7 +159,7 @@ void main() {
       },
     );
 
-    // hover 上移 4px 作用在卡片内部的 Transform 上，用内容来量位移。
+    // hover 上移 1px 作用在卡片内部的 Transform 上，用内容来量位移。
     final promptText = find.text('一张城市夜景');
     final beforeHover = tester.getTopLeft(promptText);
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
@@ -170,9 +170,9 @@ void main() {
     await mouse.moveTo(tester.getCenter(find.byType(ImageCell)));
     await tester.pumpAndSettle();
 
-    // hover 时整张卡上移 4px。
+    // hover 时整张卡轻微上移 1px。
     final afterHover = tester.getTopLeft(promptText);
-    expect(afterHover.dy, closeTo(beforeHover.dy - 4, 0.5));
+    expect(afterHover.dy, closeTo(beforeHover.dy - 1, 0.5));
 
     // 三个圆钮：预览 / 保存到本地 / 复制。
     expect(find.byTooltip('预览'), findsOneWidget);

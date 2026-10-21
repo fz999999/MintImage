@@ -110,6 +110,8 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         actions: [
           if (record.resultImagePath != null || record.resultImageUrl != null)
             Padding(
@@ -117,7 +119,7 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
               child: IconButton(
                 tooltip: '保存到本地',
                 onPressed: () => _saveImage(context, ref),
-                icon: const Icon(Icons.download_rounded),
+                icon: const Icon(Icons.download_rounded, color: Colors.white),
               ),
             ),
         ],

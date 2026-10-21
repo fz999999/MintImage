@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/image_record.dart';
@@ -12,12 +13,15 @@ import '../../core/providers/generation_provider.dart';
 import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/checkerboard_background.dart';
+import '../../shared/widgets/desktop/desktop_dialog.dart';
+import '../../shared/widgets/desktop/desktop_menu.dart';
+import '../favorites/favorite_folder_sheet.dart';
 import 'image_preview_page.dart';
 
 /// 图墙里的一张图片卡。
 ///
 /// P2 升级要点：
-/// - 改成有状态组件，自己记 hover：卡片上移 4px、图片放大 1.05、压暗蒙层、
+/// - 改成有状态组件，自己记 hover：卡片上移 1px、图片放大 1.05、压暗蒙层、
 ///   描边转主色、阴影抬升，统一 `AppMotion.normal`（180ms）。
 /// - 图上只留左上「像素角标」和右上「状态徽章」；比例/质量/格式等元信息
 ///   下沉到 76px 高的文字区，渠道名不再显示。
@@ -72,6 +76,23 @@ class _ImageCellState extends ConsumerState<ImageCell> {
   static const double _hoverButtonDiameter = 40;
 
   bool _hovered = false;
+  bool _menuOpen = false;
+  final GlobalKey _menuButtonKey = GlobalKey();
+  final GlobalKey _cardContentKey = GlobalKey();
+  final FocusNode _cardFocusNode = FocusNode(debugLabel: 'image card');
+
+  @override
+  void dispose() {
+    _cardFocusNode.dispose();
+    super.dispose();
+  }
+
+  Rect? _anchorRect([BuildContext? anchorContext]) {
+    final box = (anchorContext ?? _menuButtonKey.currentContext ?? context)
+        .findRenderObject();
+    return box is RenderBox && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size : null;
+  }
 
   ImageRecord get _record => widget.record;
 
@@ -95,7 +116,19 @@ class _ImageCellState extends ConsumerState<ImageCell> {
     // 多选时不做 hover 抬升，避免和拖拽选框抢交互。
     final hoverActive = _hovered && !widget.selectionMode;
 
-    return MouseRegion(
+    return Focus(
+      focusNode: _cardFocusNode,
+      onKeyEvent: (_, event) {
+        if ((defaultTargetPlatform == TargetPlatform.windows) && !widget.selectionMode &&
+            event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f10 &&
+            HardwareKeyboard.instance.isShiftPressed) {
+          _showActions(context, anchorRect: _anchorRect());
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: MouseRegion(
+      key: _cardContentKey,
       cursor: widget.selectionMode
           ? SystemMouseCursors.basic
           : SystemMouseCursors.click,
@@ -104,7 +137,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
       child: AnimatedContainer(
         duration: AppMotion.normal,
         curve: AppMotion.curve,
-        transform: Matrix4.translationValues(0, hoverActive ? -4 : 0, 0),
+        transform: Matrix4.translationValues(0, hoverActive ? -1 : 0, 0),
         decoration: BoxDecoration(
           color: AppColors.surface(b),
           borderRadius: AppRadius.smAll,
@@ -119,6 +152,10 @@ class _ImageCellState extends ConsumerState<ImageCell> {
             color: Colors.transparent,
             child: InkWell(
               onTap: widget.selectionMode ? widget.onSelectionToggle : null,
+              onSecondaryTapDown: !(defaultTargetPlatform == TargetPlatform.windows) || widget.selectionMode
+                  ? null : (details) => _showActions(context,
+                      anchorRect: Rect.fromLTWH(details.globalPosition.dx,
+                        details.globalPosition.dy, 1, 1)), 
               onLongPress: widget.selectionMode
                   ? widget.onSelectionToggle
                   : () => _showActions(context),
@@ -156,6 +193,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -174,9 +212,9 @@ class _ImageCellState extends ConsumerState<ImageCell> {
 
     return ClipRect(
       child: InkWell(
-        onTap: widget.selectionMode || !_canPreview
-            ? null
-            : () => _openPreview(context),
+        onTap: widget.selectionMode
+            ? widget.onSelectionToggle
+            : !_canPreview ? null : () => _openPreview(context),
         onLongPress: widget.selectionMode ? null : () => _showActions(context),
         child: Stack(
           fit: StackFit.expand,
@@ -236,7 +274,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                       children: [
                         _HoverCircleButton(
                           tooltip: '预览',
-                          onPressed: _canPreview
+                          onPressed: !widget.selectionMode && _canPreview
                               ? () => _openPreview(context)
                               : null,
                           child: Icon(
@@ -250,7 +288,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                         const SizedBox(width: AppSpace.xs),
                         _HoverCircleButton(
                           tooltip: '保存到本地',
-                          onPressed: _canSaveImage
+                          onPressed: !widget.selectionMode && _canSaveImage
                               ? () => _saveImage(context)
                               : null,
                           child: Icon(
@@ -264,7 +302,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                         const SizedBox(width: AppSpace.xs),
                         _HoverCircleButton(
                           tooltip: '复制',
-                          onPressed: _showsCopyImageAction && _canCopyImage
+                          onPressed: !widget.selectionMode && _showsCopyImageAction && _canCopyImage
                               ? () => _copyImageToClipboard(context)
                               : null,
                           child: Icon(
@@ -291,7 +329,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
     );
   }
 
-  /// 文字区（图墙给 76px）：prompt 两行 + 元信息一行 + 时间/星标/⋯ 一行。
+  /// 文字区（图墙给 88px）：prompt 两行 + 元信息一行 + 时间/星标/⋯ 一行。
   Widget _buildFooter(BuildContext context, Brightness b) {
     final theme = Theme.of(context);
     final record = widget.record;
@@ -311,7 +349,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               fontSize: AppFontSize.bodySm,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w500,
               height: 1.2,
               color: AppColors.textPrimary(b),
             ),
@@ -358,8 +396,12 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                   ],
                 ),
               ),
-              if (_showsInlineMenuButton)
-                _InlineMenuButton(onPressed: () => _showActions(context)),
+              if (_showsInlineMenuButton && !widget.selectionMode)
+                KeyedSubtree(
+                  key: _menuButtonKey,
+                  child: _InlineMenuButton(onPressed: () =>
+                    _showActions(context, anchorRect: _anchorRect())),
+                ),
             ],
           ),
         ],
@@ -367,7 +409,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
     );
   }
 
-  bool get _showsInlineMenuButton => Platform.isMacOS || Platform.isWindows;
+  bool get _showsInlineMenuButton => Platform.isMacOS || (defaultTargetPlatform == TargetPlatform.windows);
 
   bool get _canPreview {
     return _record.resultImagePath != null ||
@@ -477,7 +519,8 @@ class _ImageCellState extends ConsumerState<ImageCell> {
       message: '查看失败原因',
       child: InkWell(
         borderRadius: AppRadius.fullAll,
-        onTap: () => _showErrorDetails(context),
+        onTap: widget.selectionMode ? widget.onSelectionToggle
+            : () => _showErrorDetails(context),
         child: chip,
       ),
     );
@@ -553,7 +596,19 @@ class _ImageCellState extends ConsumerState<ImageCell> {
     return _record.outputFormat;
   }
 
-  Future<void> _showActions(BuildContext context) async {
+  Future<void> _showActions(BuildContext context, {Rect? anchorRect}) async {
+    if (widget.selectionMode || _menuOpen) return;
+    if ((defaultTargetPlatform == TargetPlatform.windows)) {
+      _cardFocusNode.requestFocus();
+      FocusManager.instance.applyFocusChangesIfNeeded();
+      _menuOpen = true;
+      try {
+        await _showDesktopActions(anchorRect ?? _anchorRect());
+      } finally {
+        _menuOpen = false;
+      }
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     final canEdit = _record.status == ImageRecordStatus.done;
     final pageContext = context;
@@ -661,8 +716,59 @@ class _ImageCellState extends ConsumerState<ImageCell> {
     );
   }
 
+  Future<void> _showDesktopActions(Rect? anchor) async {
+    final canEdit = _record.status == ImageRecordStatus.done;
+    final action = await showDesktopMenu<String>(
+      context: _cardContentKey.currentContext ?? context,
+      anchorRect: anchor,
+      searchable: true,
+      items: [
+        const DesktopMenuItem(value: 'reuse', label: '复用提示词',
+          leading: Icon(Icons.refresh_rounded)),
+        if (canEdit) ...[
+          const DesktopMenuItem(value: 'regenerate', label: '再生成一张',
+            leading: Icon(Icons.refresh_rounded)),
+          const DesktopMenuItem(value: 'edit', label: '以此改图',
+            leading: Icon(Icons.edit_rounded)),
+        ],
+        if (_canAppendCurrentImageToAttachments)
+          DesktopMenuItem(value: 'attach',
+            label: '将此图添加到附件${widget.currentAttachmentCount + 1}',
+            leading: const Icon(Icons.add_photo_alternate_rounded)),
+        if (_showsCopyImageAction && _canCopyImage)
+          const DesktopMenuItem(value: 'copy', label: '复制图片到剪贴板',
+            leading: Icon(Icons.copy_rounded)),
+        const DesktopMenuItem(value: 'favorite', label: '收藏到...',
+          leading: Icon(Icons.star_border_rounded)),
+        if (_record.isInProgress)
+          const DesktopMenuItem(value: 'cancel', label: '取消当前请求',
+            leading: Icon(Icons.close_rounded)),
+        if (_record.status == ImageRecordStatus.error ||
+            _record.status == ImageRecordStatus.cancelled)
+          const DesktopMenuItem(value: 'retry', label: '重试本次请求',
+            leading: Icon(Icons.refresh_rounded)),
+        const DesktopMenuItem(value: 'delete', label: '删除这条记录',
+          destructive: true, leading: Icon(Icons.delete_rounded)),
+      ],
+    );
+    if (!mounted || widget.selectionMode || action == null) return;
+    switch (action) {
+      case 'reuse': widget.onReusePrompt();
+      case 'regenerate': widget.onRegenerate();
+      case 'edit': widget.onReuseEdit();
+      case 'attach': widget.onAppendCurrentImageToAttachments();
+      case 'copy': await _copyImageToClipboard(context);
+      case 'favorite':
+        await showFavoriteFolderRecordSheet(context,
+          record: _record, anchorRect: anchor);
+      case 'cancel': widget.onCancel();
+      case 'retry': widget.onRetry();
+      case 'delete': widget.onDelete();
+    }
+  }
+
   bool get _showsCopyImageAction {
-    return Platform.isMacOS || Platform.isWindows;
+    return Platform.isMacOS || (defaultTargetPlatform == TargetPlatform.windows);
   }
 
   bool get _canCopyImage {
@@ -714,11 +820,15 @@ class _ImageCellState extends ConsumerState<ImageCell> {
 
   Future<void> _showErrorDetails(BuildContext context) async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final message = _record.errorMessage?.trim();
-    final displayMessage = message == null || message.isEmpty
+    final message = _record.errorMessage;
+    final displayMessage = message == null || message.trim().isEmpty
         ? '没有记录到具体失败原因。'
         : message;
 
+    if ((defaultTargetPlatform == TargetPlatform.windows)) {
+      await showDesktopInfo(context: context, title: '失败原因', text: displayMessage);
+      return;
+    }
     await showDialog<void>(
       context: context,
       builder: (context) {

@@ -292,7 +292,7 @@ class _GridMetrics {
   static const int _maxColumns = 6;
 
   /// 文字区固定高度：prompt 两行 + 元信息一行 + 时间/星标/菜单一行。
-  static const double _footerHeight = 76;
+  static const double _footerHeight = 88;
 
   /// 手机判定：最短边小于 600 视为手机布局（保持 2 列）。
   static const double _phoneBreakpoint = 600;

@@ -2,14 +2,29 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/favorite_folder.dart';
 import '../../core/models/image_record.dart';
 import '../../core/providers/favorite_folders_provider.dart';
 import '../../shared/theme.dart';
+import '../../shared/widgets/desktop/desktop_dialog.dart';
+import '../../shared/widgets/desktop/desktop_menu.dart';
+import '../../shared/widgets/desktop/desktop_popover.dart';
 
-Future<String?> showFavoriteFolderBrowserSheet(BuildContext context) {
+Future<String?> showFavoriteFolderBrowserSheet(
+  BuildContext context, {
+  Rect? anchorRect,
+}) {
+  if ((defaultTargetPlatform == TargetPlatform.windows)) {
+    return showDesktopPopover<String>(
+      context: context,
+      anchorRect: anchorRect,
+      width: 400,
+      builder: (_) => const _FavoriteFolderSheet(),
+    );
+  }
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
@@ -21,7 +36,17 @@ Future<String?> showFavoriteFolderBrowserSheet(BuildContext context) {
 Future<void> showFavoriteFolderRecordSheet(
   BuildContext context, {
   required ImageRecord record,
+  Rect? anchorRect,
 }) async {
+  if ((defaultTargetPlatform == TargetPlatform.windows)) {
+    await showDesktopPopover<void>(
+      context: context,
+      anchorRect: anchorRect,
+      width: 400,
+      builder: (_) => _FavoriteFolderSheet(record: record),
+    );
+    return;
+  }
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -45,6 +70,11 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
   final FocusNode _folderFocusNode = FocusNode();
   bool _creating = false;
   String? _createError;
+  bool _createBusy = false;
+  bool _folderMenuOpen = false;
+  String _query = '';
+  final Set<String> _busyFolderIds = {};
+  final Map<String, String> _folderErrors = {};
 
   bool get _isRecordMode => widget.record != null;
 
@@ -59,7 +89,10 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
   Widget build(BuildContext context) {
     final b = Theme.of(context).brightness;
     final state = ref.watch(favoriteFoldersProvider);
-    final folders = state.folders;
+    final folders = (defaultTargetPlatform == TargetPlatform.windows) && _query.isNotEmpty
+        ? state.folders.where((folder) =>
+            folder.title.toLowerCase().contains(_query.toLowerCase())).toList()
+        : state.folders;
     final selectedFolderIds = widget.record == null
         ? const <String>{}
         : state.folderIdsForRecord(widget.record!.id);
@@ -67,11 +100,13 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
 
     return SafeArea(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: screenHeight * 0.72),
+        constraints: BoxConstraints(maxHeight:
+            defaultTargetPlatform == TargetPlatform.windows
+                ? double.infinity : screenHeight * 0.72),
         child: Padding(
           padding: EdgeInsets.fromLTRB(
             16,
-            0,
+            defaultTargetPlatform == TargetPlatform.windows ? 16 : 0,
             16,
             16 + MediaQuery.viewInsetsOf(context).bottom,
           ),
@@ -97,6 +132,17 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
                 ),
               ],
               const SizedBox(height: 12),
+              if ((defaultTargetPlatform == TargetPlatform.windows) && state.folders.length > 8) ...[
+                TextField(
+                  onChanged: (value) => setState(() => _query = value.trim()),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    hintText: '搜索收藏夹',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               Flexible(
                 child: ListView.separated(
                   shrinkWrap: true,
@@ -104,20 +150,47 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final folder = folders[index];
-                    return _FavoriteFolderRow(
-                      folder: folder,
-                      selected: selectedFolderIds.contains(folder.id),
-                      recordMode: _isRecordMode,
-                      onTap: () => _handleFolderTap(folder.id),
-                      onLongPress: folder.isDefault
-                          ? null
-                          : () => _confirmDeleteFolder(folder),
+                    final busy = _busyFolderIds.contains(folder.id);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _FavoriteFolderRow(
+                          folder: folder,
+                          selected: selectedFolderIds.contains(folder.id),
+                          recordMode: _isRecordMode,
+                          busy: busy,
+                          onTap: busy ? null : () => _handleFolderTap(folder.id),
+                          onLongPress: folder.isDefault || busy
+                              ? null
+                              : () => _confirmDeleteFolder(folder),
+                          onMenu: !(defaultTargetPlatform == TargetPlatform.windows) || busy || folder.isDefault
+                              ? null
+                              : (anchor) => _showFolderMenu(folder, anchor),
+                        ),
+                        if (_folderErrors[folder.id] case final error?)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(error,
+                              style: TextStyle(color: AppColors.dangerText(b))),
+                          ),
+                      ],
                     );
                   },
                 ),
               ),
               const SizedBox(height: 10),
               _buildCreateRow(context),
+              if ((defaultTargetPlatform == TargetPlatform.windows) && _isRecordMode) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _busyFolderIds.isNotEmpty || _createBusy
+                        ? null : () => Navigator.of(context).pop(),
+                    child: const Text('完成'),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -174,6 +247,7 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
           children: [
             Expanded(
               child: TextField(
+                enabled: !_createBusy,
                 controller: _folderController,
                 focusNode: _folderFocusNode,
                 minLines: 1,
@@ -188,18 +262,24 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
               ),
             ),
             const SizedBox(width: 8),
-            _CreateActionButton(
-              tooltip: '创建',
-              icon: Icons.check_rounded,
-              color: AppColors.primaryStrong(b),
-              onPressed: _createFolder,
-            ),
+            if (_createBusy)
+              const SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              IconButton(
+                tooltip: '创建',
+                icon: const Icon(Icons.check_rounded, size: 18),
+                color: AppColors.primaryStrong(b),
+                onPressed: _createFolder,
+              ),
             const SizedBox(width: 4),
-            _CreateActionButton(
-              tooltip: '取消',
-              icon: Icons.close_rounded,
+            IconButton(
+              tooltip: '取消新建',
+              icon: const Icon(Icons.close_rounded, size: 18),
               color: AppColors.textSecondary(b),
-              onPressed: _cancelCreate,
+              onPressed: _createBusy ? null : _cancelCreate,
             ),
           ],
         ),
@@ -219,22 +299,43 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
     );
   }
 
-  void _handleFolderTap(String folderId) {
+  Future<void> _handleFolderTap(String folderId) async {
+    if (_busyFolderIds.contains(folderId)) return;
     final record = widget.record;
     if (record == null) {
       Navigator.of(context).pop(folderId);
       return;
     }
-
-    ref
-        .read(favoriteFoldersProvider.notifier)
-        .toggleRecordInFolder(folderId: folderId, recordId: record.id);
+    setState(() {
+      _busyFolderIds.add(folderId);
+      _folderErrors.remove(folderId);
+    });
+    try {
+      await ref.read(favoriteFoldersProvider.notifier)
+          .toggleRecordInFolder(folderId: folderId, recordId: record.id);
+    } catch (error) {
+      if (mounted) setState(() => _folderErrors[folderId] = '收藏更新失败：$error');
+    } finally {
+      if (mounted) setState(() => _busyFolderIds.remove(folderId));
+    }
   }
 
   Future<void> _createFolder() async {
-    final created = await ref
-        .read(favoriteFoldersProvider.notifier)
-        .createFolder(_folderController.text);
+    if (_createBusy) return;
+    setState(() {
+      _createBusy = true;
+      _createError = null;
+    });
+    bool created;
+    try {
+      created = await ref.read(favoriteFoldersProvider.notifier)
+          .createFolder(_folderController.text);
+    } catch (error) {
+      if (mounted) setState(() => _createError = '创建失败：$error');
+      return;
+    } finally {
+      if (mounted) setState(() => _createBusy = false);
+    }
     if (!mounted) {
       return;
     }
@@ -261,8 +362,38 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
     });
   }
 
+  Future<void> _showFolderMenu(FavoriteFolderSummary folder, Rect anchor) async {
+    if (folder.isDefault || _folderMenuOpen ||
+        _busyFolderIds.contains(folder.id)) {
+      return;
+    }
+    _folderMenuOpen = true;
+    try {
+      final action = await showDesktopMenu<String>(
+        context: context,
+        anchorRect: anchor,
+        items: const [DesktopMenuItem(
+          value: 'delete', label: '删除收藏夹', destructive: true,
+          leading: Icon(Icons.delete_rounded),
+        )],
+      );
+      if (mounted && action == 'delete') await _confirmDeleteFolder(folder);
+    } finally {
+      _folderMenuOpen = false;
+    }
+  }
+
   Future<void> _confirmDeleteFolder(FavoriteFolderSummary folder) async {
-    final confirmed = await showDialog<bool>(
+    if (folder.isDefault || _busyFolderIds.contains(folder.id)) return;
+    setState(() => _busyFolderIds.add(folder.id));
+    try {
+    final confirmed = (defaultTargetPlatform == TargetPlatform.windows)
+        ? await showDesktopConfirm(
+            context: context,
+            title: '删除收藏夹',
+            message: '确认删除“${folder.title}”？其中的生成结果不会被删除。',
+          )
+        : await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -286,6 +417,11 @@ class _FavoriteFolderSheetState extends ConsumerState<_FavoriteFolderSheet> {
     }
 
     await ref.read(favoriteFoldersProvider.notifier).deleteFolder(folder.id);
+    } catch (error) {
+      if (mounted) setState(() => _folderErrors[folder.id] = '删除失败：$error');
+    } finally {
+      if (mounted) setState(() => _busyFolderIds.remove(folder.id));
+    }
   }
 }
 
@@ -296,12 +432,16 @@ class _FavoriteFolderRow extends StatelessWidget {
     required this.recordMode,
     required this.onTap,
     required this.onLongPress,
+    required this.busy,
+    this.onMenu,
   });
 
+  final bool busy;
+  final void Function(Rect anchor)? onMenu;
   final FavoriteFolderSummary folder;
   final bool selected;
   final bool recordMode;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
   @override
@@ -311,6 +451,8 @@ class _FavoriteFolderRow extends StatelessWidget {
       borderRadius: AppRadius.smAll,
       onTap: onTap,
       onLongPress: onLongPress,
+      onSecondaryTapDown: onMenu == null ? null : (details) => onMenu!(
+        Rect.fromLTWH(details.globalPosition.dx, details.globalPosition.dy, 1, 1)),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
@@ -345,6 +487,20 @@ class _FavoriteFolderRow extends StatelessWidget {
             ],
             const SizedBox(width: 10),
             _FolderPreviewStrip(records: folder.previewRecords),
+            if (busy)
+              const SizedBox.square(dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            if (onMenu != null)
+              Builder(builder: (buttonContext) => IconButton(
+                tooltip: '收藏夹操作',
+                onPressed: () {
+                  final box = buttonContext.findRenderObject() as RenderBox?;
+                  if (box != null && box.hasSize) {
+                    onMenu!(box.localToGlobal(Offset.zero) & box.size);
+                  }
+                },
+                icon: const Icon(Icons.more_horiz_rounded, size: 18),
+              )), 
           ],
         ),
       ),
@@ -469,33 +625,3 @@ class _FolderPreviewStrip extends StatelessWidget {
   }
 }
 
-class _CreateActionButton extends StatelessWidget {
-  const _CreateActionButton({
-    required this.tooltip,
-    required this.icon,
-    required this.color,
-    required this.onPressed,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: 34,
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18),
-        color: color,
-        padding: EdgeInsets.zero,
-        style: IconButton.styleFrom(
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-      ),
-    );
-  }
-}
