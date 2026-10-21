@@ -71,7 +71,9 @@ if ($running) {
 
 Write-Host "`n=== flutter build windows --release ===" -ForegroundColor Cyan
 $sw = [Diagnostics.Stopwatch]::StartNew()
-& $flutter --no-version-check build windows --release
+# Windows Release 保留完整 Material 图标字体，防止增量构建的裁剪字体遗漏新增图标。
+# 该问题不会被 widget test / analyze 捕获，必须校验最终字体产物。
+& $flutter --no-version-check build windows --release --no-tree-shake-icons
 $exit = $LASTEXITCODE
 $sw.Stop()
 
