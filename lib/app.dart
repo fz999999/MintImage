@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/providers/generation_provider.dart';
 import 'features/shell/app_shell.dart';
 import 'shared/theme.dart';
+import 'shared/widgets/desktop/desktop_dialog.dart';
 import 'shared/window_lifecycle_channel.dart';
 
 export 'shared/window_lifecycle_channel.dart' show windowLifecycleChannel;
@@ -113,6 +114,40 @@ class _GptImageAppState extends ConsumerState<GptImageApp> {
       context: navigatorContext,
       barrierDismissible: false,
       builder: (context) {
+        final windows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+        final content = const Text('当前仍有图片正在生成，退出会中断这些任务。');
+        final cancel = TextButton(
+          autofocus: windows,
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('继续生成'),
+        );
+        final confirm = FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          style: windows ? FilledButton.styleFrom(
+            backgroundColor: AppColors.dangerSurface(Theme.of(context).brightness),
+            foregroundColor: AppColors.dangerText(Theme.of(context).brightness),
+          ) : null,
+          child: const Text('退出'),
+        );
+        if (windows) {
+          return Focus(
+            canRequestFocus: false,
+            onKeyEvent: (node, event) {
+              if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
+                Navigator.of(context).pop(false);
+                return KeyEventResult.handled;
+              }
+              if (event.logicalKey == LogicalKeyboardKey.enter ||
+                  event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+                  event.logicalKey == LogicalKeyboardKey.space) {
+                return KeyEventResult.skipRemainingHandlers;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: DesktopDialog(title: '确认退出？', content: content,
+                actions: [confirm, cancel]),
+          );
+        }
         return AlertDialog(
           title: const Text('确认退出？'),
           content: const Text('当前仍有图片正在生成，退出会中断这些任务。'),

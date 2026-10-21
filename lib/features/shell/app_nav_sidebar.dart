@@ -4,7 +4,7 @@ import '../../shared/theme.dart';
 
 /// 左侧导航栏：品牌区 + 三个 tab 入口。
 ///
-/// 宽度固定 [width]（决策 43），右侧一条 1px 描边与内容区分离。
+/// 紧凑宽度 [width]，右侧一条 1px 描边与内容区分离。
 /// 所有颜色按 `Theme.of(context).brightness` 取值，亮/暗共用一套代码。
 class AppNavSidebar extends StatelessWidget {
   const AppNavSidebar({
@@ -14,7 +14,7 @@ class AppNavSidebar extends StatelessWidget {
   });
 
   /// 侧栏宽度。
-  static const double width = 256;
+  static const double width = 176;
 
   /// 当前选中的 tab 索引（0 主界面 / 1 日志 / 2 设置）。
   final int selectedIndex;
@@ -35,7 +35,7 @@ class AppNavSidebar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpace.sm,
-          AppSpace.lg,
+          AppSpace.md,
           AppSpace.sm,
           AppSpace.md,
         ),
@@ -43,7 +43,7 @@ class AppNavSidebar extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const _BrandBlock(),
-            const SizedBox(height: AppSpace.lg),
+            const SizedBox(height: AppSpace.md),
             _NavItem(
               index: 0,
               label: '主界面',
@@ -125,7 +125,7 @@ class _BrandBlock extends StatelessWidget {
   }
 }
 
-/// 单个导航项：当前项实底高亮，其余项 hover 时浮出底色。
+/// 单个导航项：浅青选中底、中性 hover 底与独立键盘焦点描边。
 class _NavItem extends StatefulWidget {
   const _NavItem({
     required this.index,
@@ -145,83 +145,88 @@ class _NavItem extends StatefulWidget {
 
 class _NavItemState extends State<_NavItem> {
   bool _hovered = false;
-
-  void _handleHover(bool hovered) {
-    if (_hovered == hovered) {
-      return;
-    }
-    setState(() {
-      _hovered = hovered;
-    });
-  }
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
     final b = Theme.of(context).brightness;
     final selected = widget.selected;
     final foreground = selected
-        ? AppColors.onPrimaryContainer(b)
-        : _hovered
+        ? AppColors.primaryStrong(b)
+        : _hovered || _focused
         ? AppColors.textPrimary(b)
         : AppColors.textSecondary(b);
     final background = selected
-        ? AppColors.primaryContainer(b)
+        ? _hovered
+              ? AppStateLayer.hovered(AppColors.primarySoft(b), b)
+              : AppColors.primarySoft(b)
         : _hovered
         ? AppColors.surfaceMuted(b)
         : Colors.transparent;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => _handleHover(true),
-      onExit: (_) => _handleHover(false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: AppMotion.fast,
-          curve: AppMotion.curve,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.sm,
-            vertical: AppSpace.xs,
-          ),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-          ),
-          child: Row(
-            children: [
-              // 图标必须内联常量：release 的图标 tree-shaking 只认字面量。
-              switch (widget.index) {
-                0 => Icon(
-                  Icons.palette_outlined,
-                  size: AppIconSize.md,
-                  color: foreground,
-                ),
-                1 => Icon(
-                  Icons.terminal,
-                  size: AppIconSize.md,
-                  color: foreground,
-                ),
-                _ => Icon(
-                  Icons.settings_outlined,
-                  size: AppIconSize.md,
-                  color: foreground,
-                ),
-              },
-              const SizedBox(width: AppSpace.sm),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: AppFontSize.label,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          onHover: (value) => setState(() => _hovered = value),
+          onFocusChange: (value) => setState(() => _focused = value),
+          mouseCursor: SystemMouseCursors.click,
+          borderRadius: AppRadius.smAll,
+          focusColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          child: AnimatedContainer(
+            duration: AppMotion.fast,
+            curve: AppMotion.curve,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpace.sm,
+              vertical: AppSpace.xs,
+            ),
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: AppRadius.smAll,
+              border: Border.all(
+                color: _focused ? AppColors.primary(b) : Colors.transparent,
+                width: 2,
+              ),
+            ),
+            child: Row(
+              children: [
+                // 图标必须内联常量：release 的图标 tree-shaking 只认字面量。
+                switch (widget.index) {
+                  0 => Icon(
+                    Icons.palette_outlined,
+                    size: AppIconSize.md,
                     color: foreground,
                   ),
+                  1 => Icon(
+                    Icons.terminal,
+                    size: AppIconSize.md,
+                    color: foreground,
+                  ),
+                  _ => Icon(
+                    Icons.settings_outlined,
+                    size: AppIconSize.md,
+                    color: foreground,
+                  ),
+                },
+                const SizedBox(width: AppSpace.sm),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: AppFontSize.label,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                      color: foreground,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

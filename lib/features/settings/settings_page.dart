@@ -1,10 +1,11 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import '../../core/services/app_paths.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/settings_model.dart';
@@ -16,8 +17,22 @@ import '../../core/services/backup_service.dart';
 import '../../core/services/webdav_backup_service.dart';
 import '../../core/version/app_version.dart';
 import '../../shared/theme.dart';
+import '../../shared/widgets/desktop/desktop_dialog.dart';
+import 'api_configuration_row.dart';
 import 'api_profile_edit_page.dart';
+import 'image_api_section.dart';
 import 'prompt_optimization_profile_edit_page.dart';
+import 'settings_content_width.dart';
+
+bool get _isWindows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
+Widget _settingsDialog({required String title, required Widget content,
+  List<Widget> actions = const [], double width = 440}) {
+  if (_isWindows) {
+    return DesktopDialog(title: title, content: content, actions: actions, width: width);
+  }
+  return AlertDialog(title: Text(title), content: content, actions: actions);
+}
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -33,7 +48,6 @@ class SettingsPage extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final b = Theme.of(context).brightness;
     // 「至少保留 1 个配置」的保护：只剩 1 个时禁用删除按钮。
-    final canDeleteImageProfile = settings.profiles.length > 1;
     final canDeleteOptimizationProfile =
         settings.promptOptimizationProfiles.length > 1;
 
@@ -49,92 +63,41 @@ class SettingsPage extends ConsumerWidget {
         ),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpace.sm,
-            AppSpace.sm,
-            AppSpace.sm,
+            AppSpace.md,
+            AppSpace.md,
+            AppSpace.md,
             AppSpace.xl,
           ),
           children: [
-            const _AppInfoCard(),
-            const SizedBox(height: AppSpace.sm),
-            _RequestTimeoutCard(
-              timeoutSeconds: settings.requestTimeoutSeconds,
-              minSeconds: _minTimeoutSeconds,
-              maxSeconds: _maxTimeoutSeconds,
-              onSave: (seconds) => ref
-                  .read(settingsProvider.notifier)
-                  .setRequestTimeoutSeconds(seconds),
+            ImageApiSection(
+              onAdd: () => _openImageEditor(context),
+              onEdit: (profile) => _openImageEditor(context, profile: profile),
+              onDelete: (profile) async {
+                final confirmed = await _confirmDeleteConfig(
+                  context,
+                  kind: '生图 API',
+                  name: profile.name,
+                );
+                if (confirmed != true) {
+                  return;
+                }
+                await ref
+                    .read(settingsProvider.notifier)
+                    .deleteProfile(profile.id);
+              },
             ),
-            const SizedBox(height: AppSpace.sm),
-            _DataBackupCard(
-              webDavConfig: settings.webDavBackupConfig,
-              onExportToFile: () => _exportBackupToFile(context, ref, settings),
-              onRestoreFromFile: () =>
-                  _restoreBackupFromFile(context, ref, settings),
-              onEditWebDav: () => _editWebDavConfig(context, ref, settings),
-              onSyncToWebDav: () => _syncBackupToWebDav(context, ref, settings),
-              onRestoreFromWebDav: () =>
-                  _restoreBackupFromWebDav(context, ref, settings),
-            ),
-            const SizedBox(height: AppSpace.md),
-            _SectionTitle(
-              icon: Icon(
-                Icons.auto_awesome_motion_rounded,
-                size: AppIconSize.sm,
-                color: AppColors.primaryStrong(b),
-              ),
-              title: '生图API',
-            ),
-            const SizedBox(height: AppSpace.xs),
-            for (final profile in settings.profiles)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpace.xs),
-                child: _ImageProfileCard(
-                  profile: profile,
-                  isActive: profile.id == settings.activeProfileId,
-                  canDelete: canDeleteImageProfile,
-                  onTap: () async {
-                    await ref
-                        .read(settingsProvider.notifier)
-                        .setActiveProfile(profile.id);
-                  },
-                  onEdit: () => _openImageEditor(context, profile: profile),
-                  onDelete: () async {
-                    final confirmed = await _confirmDeleteConfig(
-                      context,
-                      kind: '生图 API',
-                      name: profile.name,
-                    );
-                    if (confirmed != true) {
-                      return;
-                    }
-                    await ref
-                        .read(settingsProvider.notifier)
-                        .deleteProfile(profile.id);
-                  },
-                ),
-              ),
-            _AddConfigButton(
-              icon: const Icon(Icons.add_rounded, size: AppIconSize.sm),
-              label: '添加生图 API',
-              onTap: () => _openImageEditor(context),
-            ),
-            const SizedBox(height: AppSpace.md),
-            const Divider(),
-            const SizedBox(height: AppSpace.sm),
+            const SizedBox(height: AppSpace.lg),
             _SectionTitle(
               icon: Icon(
                 Icons.auto_fix_high_rounded,
                 size: AppIconSize.sm,
                 color: AppColors.primaryStrong(b),
               ),
-              title: '提示词优化API',
+              title: '提示词优化 API',
             ),
             const SizedBox(height: AppSpace.xs),
-            if (settings.promptOptimizationProfiles.isEmpty) ...[
-              _EmptyConfigHint(text: '还没有提示词优化 API。添加后，首页输入框右侧会启用提示词优化。'),
-              const SizedBox(height: AppSpace.xs),
-            ],
+            if (settings.promptOptimizationProfiles.isEmpty)
+              _EmptyConfigHint(onAdd: () => _openPromptOptimizationEditor(context)), 
             for (final profile in settings.promptOptimizationProfiles)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpace.xs),
@@ -167,22 +130,60 @@ class SettingsPage extends ConsumerWidget {
                   },
                 ),
               ),
-            _AddConfigButton(
+            if (settings.promptOptimizationProfiles.isNotEmpty)
+              _AddConfigButton(
               icon: const Icon(Icons.add_rounded, size: AppIconSize.sm),
               label: '添加提示词优化 API',
               onTap: () => _openPromptOptimizationEditor(context),
             ),
-            const SizedBox(height: AppSpace.md),
-            FilledButton.tonalIcon(
+            const SizedBox(height: AppSpace.lg),
+            _SectionTitle(
+              icon: const Icon(Icons.tune_rounded, size: AppIconSize.sm),
+              title: '生成设置',
+            ),
+            const SizedBox(height: AppSpace.sm),
+            _RequestTimeoutCard(
+              timeoutSeconds: settings.requestTimeoutSeconds,
+              minSeconds: _minTimeoutSeconds,
+              maxSeconds: _maxTimeoutSeconds,
+              onSave: (seconds) => ref
+                  .read(settingsProvider.notifier)
+                  .setRequestTimeoutSeconds(seconds),
+            ),
+            const SizedBox(height: AppSpace.lg),
+            _SectionTitle(
+              icon: const Icon(Icons.storage_rounded, size: AppIconSize.sm),
+              title: '备份与数据管理',
+            ),
+            const SizedBox(height: AppSpace.sm),
+            _DataBackupCard(
+              webDavConfig: settings.webDavBackupConfig,
+              onExportToFile: () => _exportBackupToFile(context, ref, settings),
+              onRestoreFromFile: () =>
+                  _restoreBackupFromFile(context, ref, settings),
+              onEditWebDav: () => _editWebDavConfig(context, ref, settings),
+              onSyncToWebDav: () => _syncBackupToWebDav(context, ref, settings),
+              onRestoreFromWebDav: () =>
+                  _restoreBackupFromWebDav(context, ref, settings),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            _SettingsActionRow(
+              title: '清除历史记录',
+              description: '删除所有生成记录，保留 API 配置。',
+              action: OutlinedButton.icon(
               onPressed: () async {
-                final confirmed = await showDialog<bool>(
+                final confirmed = _isWindows
+                    ? await showDesktopConfirm(context: context, title: '清除历史记录',
+                        message: '这会删除所有生成记录，但不会清除 API 配置。', confirmLabel: '确认清除')
+                    : await showDialog<bool>(
                   context: context,
                   builder: (context) {
-                    return AlertDialog(
-                      title: const Text('清除历史记录'),
+                    return _settingsDialog(
+                      title: '清除历史记录',
                       content: const Text('这会删除所有生成记录，但不会清除 API 配置。'),
                       actions: [
                         TextButton(
+                          autofocus: _isWindows,
                           onPressed: () => Navigator.of(context).pop(false),
                           child: const Text('取消'),
                         ),
@@ -209,12 +210,15 @@ class SettingsPage extends ConsumerWidget {
               },
               icon: const Icon(Icons.delete_sweep_rounded),
               label: const Text('清除历史记录'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.dangerSurface(b),
+              style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.dangerText(b),
+                minimumSize: const Size(0, 44),
               ),
-            ),
-          ],
+            )),
+            const SizedBox(height: AppSpace.lg),
+            const _AppInfoCard(),
+          ].map((child) => SettingsContentWidth(
+            maxWidth: 1120, child: child)).toList(),
         ),
       ),
     );
@@ -248,15 +252,20 @@ class SettingsPage extends ConsumerWidget {
     required String kind,
     required String name,
   }) {
+    if (_isWindows) {
+      return showDesktopConfirm(context: context, title: '删除配置',
+          message: '删除$kind「$name」？此操作不可撤销。');
+    }
     return showDialog<bool>(
       context: context,
       builder: (context) {
         final b = Theme.of(context).brightness;
-        return AlertDialog(
-          title: const Text('删除配置'),
+        return _settingsDialog(
+          title: '删除配置',
           content: Text('删除$kind「$name」？此操作不可撤销。'),
           actions: [
             TextButton(
+              autofocus: _isWindows,
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('取消'),
             ),
@@ -312,7 +321,11 @@ class SettingsPage extends ConsumerWidget {
       await _showBackupWarnings(context, backup.warnings);
     } catch (error) {
       if (context.mounted) {
-        _showSnack(context, _errorMessage(error));
+        if (_isWindows) {
+          await showDesktopInfo(context: context, title: '操作失败', text: _errorMessage(error));
+        } else {
+          _showSnack(context, _errorMessage(error));
+        }
       }
     }
   }
@@ -357,7 +370,11 @@ class SettingsPage extends ConsumerWidget {
       await _applyRestoreResult(context, ref, result);
     } catch (error) {
       if (context.mounted) {
-        _showSnack(context, _errorMessage(error));
+        if (_isWindows) {
+          await showDesktopInfo(context: context, title: '操作失败', text: _errorMessage(error));
+        } else {
+          _showSnack(context, _errorMessage(error));
+        }
       }
     }
   }
@@ -381,19 +398,20 @@ class SettingsPage extends ConsumerWidget {
       text: current?.remoteDirectory ?? 'MintImage/backups',
     );
 
+    String? errorText;
+    var statusIsSuccess = false;
+    var testing = false;
+    var passwordVisible = false;
     final config = await showDialog<WebDavBackupConfig>(
       context: context,
       builder: (context) {
-        String? errorText;
-        var statusIsSuccess = false;
-        var testing = false;
-        var passwordVisible = false;
 
         return StatefulBuilder(
           builder: (context, setState) {
             final b = Theme.of(context).brightness;
-            return AlertDialog(
-              title: const Text('WebDAV 设置'),
+            return _settingsDialog(
+              title: 'WebDAV 设置',
+              width: 560,
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -509,10 +527,6 @@ class SettingsPage extends ConsumerWidget {
                         },
                   child: Text(testing ? '测试中...' : '测试连接'),
                 ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('取消'),
-                ),
                 FilledButton(
                   onPressed: testing
                       ? null
@@ -542,6 +556,10 @@ class SettingsPage extends ConsumerWidget {
                           );
                         },
                   child: const Text('保存'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('取消'),
                 ),
               ],
             );
@@ -603,7 +621,11 @@ class SettingsPage extends ConsumerWidget {
       await _showBackupWarnings(context, warnings);
     } catch (error) {
       if (context.mounted) {
-        _showSnack(context, _errorMessage(error));
+        if (_isWindows) {
+          await showDesktopInfo(context: context, title: '操作失败', text: _errorMessage(error));
+        } else {
+          _showSnack(context, _errorMessage(error));
+        }
       }
     }
   }
@@ -630,7 +652,7 @@ class SettingsPage extends ConsumerWidget {
         context,
         message: '正在从 WebDAV 恢复...',
         task: () async {
-          final tempDirectory = await getTemporaryDirectory();
+          final tempDirectory = await AppPaths.temporaryDirectory('backup_restore');
           final backupFile = await ref
               .read(webDavBackupServiceProvider)
               .downloadLatestBackup(config, tempDirectory);
@@ -645,7 +667,11 @@ class SettingsPage extends ConsumerWidget {
       await _applyRestoreResult(context, ref, result);
     } catch (error) {
       if (context.mounted) {
-        _showSnack(context, _errorMessage(error));
+        if (_isWindows) {
+          await showDesktopInfo(context: context, title: '操作失败', text: _errorMessage(error));
+        } else {
+          _showSnack(context, _errorMessage(error));
+        }
       }
     }
   }
@@ -661,7 +687,7 @@ class SettingsPage extends ConsumerWidget {
       throw const BackupException('无法读取备份文件。');
     }
 
-    final tempDirectory = await getTemporaryDirectory();
+    final tempDirectory = await AppPaths.temporaryDirectory('backup_restore');
     final file = File(p.join(tempDirectory.path, picked.name));
     await file.writeAsBytes(bytes, flush: true);
     return file;
@@ -687,16 +713,22 @@ class SettingsPage extends ConsumerWidget {
     BuildContext context, {
     required String title,
   }) {
+    if (_isWindows) {
+      return showDesktopConfirm(context: context, title: title,
+          message: '备份会包含 API Key、WebDAV 密码等敏感配置。当前版本不会加密备份文件，请确认只保存到可信位置。',
+          confirmLabel: '继续', destructive: false);
+    }
     return showDialog<bool>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text(title),
+        return _settingsDialog(
+          title: title,
           content: const Text(
             '备份会包含 API Key、WebDAV 密码等敏感配置。当前版本不会加密备份文件，请确认只保存到可信位置。',
           ),
           actions: [
             TextButton(
+              autofocus: _isWindows,
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('取消'),
             ),
@@ -714,14 +746,20 @@ class SettingsPage extends ConsumerWidget {
     BuildContext context, {
     required String source,
   }) {
+    if (_isWindows) {
+      return showDesktopConfirm(context: context, title: '从$source恢复',
+          message: '恢复会替换当前设置、历史记录、收藏夹和应用内图片文件。恢复前会自动生成一份安全快照。',
+          confirmLabel: '确认恢复');
+    }
     return showDialog<bool>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('从$source恢复'),
+        return _settingsDialog(
+          title: '从$source恢复',
           content: const Text('恢复会替换当前设置、历史记录、收藏夹和应用内图片文件。恢复前会自动生成一份安全快照。'),
           actions: [
             TextButton(
+              autofocus: _isWindows,
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('取消'),
             ),
@@ -740,13 +778,15 @@ class SettingsPage extends ConsumerWidget {
     required String message,
     required Future<T> Function() task,
   }) async {
-    showDialog<void>(
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final route = DialogRoute<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) {
         return PopScope(
           canPop: false,
-          child: AlertDialog(
+          child: _settingsDialog(
+            title: '请稍候',
             content: Row(
               children: [
                 const SizedBox(
@@ -762,12 +802,14 @@ class SettingsPage extends ConsumerWidget {
         );
       },
     );
+    navigator.push<void>(route);
 
     try {
       return await task();
     } finally {
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
+      // Close only our progress route; a native exit confirmation may be above it.
+      if (navigator.mounted && route.isActive) {
+        navigator.removeRoute(route);
       }
     }
   }
@@ -780,6 +822,11 @@ class SettingsPage extends ConsumerWidget {
       return;
     }
 
+    if (_isWindows) {
+      await showDesktopInfo(context: context,
+          title: '备份提示（${warnings.length}）', text: warnings.join('\n'));
+      return;
+    }
     await showDialog<void>(
       context: context,
       builder: (context) {
@@ -788,7 +835,7 @@ class SettingsPage extends ConsumerWidget {
           content: SizedBox(
             width: 420,
             child: SingleChildScrollView(
-              child: Text(warnings.take(20).join('\n')),
+              child: Text(warnings.join('\n')),
             ),
           ),
           actions: [
@@ -841,172 +888,6 @@ class _CardIcon extends StatelessWidget {
   }
 }
 
-/// 卡片右上角的小圆角图标按钮（32×32，hover 底色 `surfaceMuted`）。
-///
-/// 图标由调用方以 `const Icon(Icons.xxx)` 内联传入，避免 release 图标被裁掉。
-class _HoverIconButton extends StatefulWidget {
-  const _HoverIconButton({
-    required this.tooltip,
-    required this.onPressed,
-    required this.child,
-  });
-
-  final String tooltip;
-  final VoidCallback? onPressed;
-  final Widget child;
-
-  @override
-  State<_HoverIconButton> createState() => _HoverIconButtonState();
-}
-
-class _HoverIconButtonState extends State<_HoverIconButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final b = Theme.of(context).brightness;
-    final enabled = widget.onPressed != null;
-
-    return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
-        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: AppRadius.xsAll,
-          child: InkWell(
-            onTap: widget.onPressed,
-            borderRadius: AppRadius.xsAll,
-            hoverColor: Colors.transparent,
-            child: AnimatedContainer(
-              duration: AppMotion.fast,
-              curve: AppMotion.curve,
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _hovered && enabled
-                    ? AppColors.surfaceMuted(b)
-                    : Colors.transparent,
-                borderRadius: AppRadius.xsAll,
-              ),
-              child: widget.child,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 配置卡右上角的编辑 / 删除按钮组。
-class _ConfigActions extends StatelessWidget {
-  const _ConfigActions({
-    required this.canDelete,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final bool canDelete;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final b = Theme.of(context).brightness;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _HoverIconButton(
-          tooltip: '编辑',
-          onPressed: onEdit,
-          child: Icon(
-            Icons.edit_outlined,
-            size: AppIconSize.sm,
-            color: AppColors.primaryStrong(b),
-          ),
-        ),
-        const SizedBox(width: AppSpace.xxs),
-        _HoverIconButton(
-          tooltip: canDelete ? '删除' : '至少保留 1 个配置',
-          onPressed: canDelete ? onDelete : null,
-          child: Icon(
-            Icons.delete_outline,
-            size: AppIconSize.sm,
-            color: canDelete
-                ? AppColors.dangerText(b)
-                : AppColors.textTertiary(b),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 「使用中」徽章。
-class _ActiveBadge extends StatelessWidget {
-  const _ActiveBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    final b = Theme.of(context).brightness;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpace.xs + 2,
-        vertical: AppSpace.xxs + 1,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surface(b),
-        borderRadius: AppRadius.fullAll,
-        border: Border.all(color: AppColors.border(b)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.check_circle_rounded,
-            size: AppIconSize.xs + 2,
-            color: AppColors.primary(b),
-          ),
-          const SizedBox(width: AppSpace.xxs + 2),
-          Text('使用中', style: Theme.of(context).textTheme.labelSmall),
-        ],
-      ),
-    );
-  }
-}
-
-/// 协议 / 模式的小胶囊。
-class _MetaPill extends StatelessWidget {
-  const _MetaPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final b = Theme.of(context).brightness;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpace.xs - 1,
-        vertical: 3,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted(b),
-        borderRadius: AppRadius.fullAll,
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: AppColors.primaryStrong(b),
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
 class _AppInfoCard extends StatelessWidget {
   const _AppInfoCard();
 
@@ -1022,8 +903,8 @@ class _AppInfoCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 32,
+                height: 32,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: AppColors.surfaceSoft(b),
@@ -1035,7 +916,10 @@ class _AppInfoCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '关于 大川生图工具',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.textSecondary(b),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -1058,7 +942,7 @@ class _AppInfoCard extends StatelessWidget {
               color: AppColors.primaryStrong(b),
             ),
             label: '开源地址',
-            value: AppVersion.repositoryUrl,
+            value: 'GitHub · ${AppVersion.repository}',
             onTap: () => _openRepository(context),
           ),
         ],
@@ -1114,45 +998,16 @@ class _DataBackupCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const _CardIcon(
-                child: Icon(Icons.cloud_sync_rounded, size: AppIconSize.md),
-              ),
-              const SizedBox(width: AppSpace.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '数据备份与恢复',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'WebDAV：$status',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary(b),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpace.sm),
-          // 本地备份：导出 / 从文件恢复。
           _BackupGroup(
-            title: '本地',
+            title: '本地备份',
+            description: '导出为 .mintbackup 文件，或选择已有备份恢复数据。',
             actions: [
               _BackupActionButton(
                 icon: const Icon(
                   Icons.upload_file_rounded,
                   size: AppIconSize.sm,
                 ),
-                label: '导出本地备份（.mintbackup）',
+                label: '导出本地备份',
                 onPressed: onExportToFile,
               ),
               _BackupActionButton(
@@ -1165,10 +1020,11 @@ class _DataBackupCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpace.sm),
-          // 云端备份：WebDAV 设置 / 同步 / 恢复。
+          const Padding(padding: EdgeInsets.symmetric(vertical: AppSpace.sm),
+            child: Divider(height: 1)),
           _BackupGroup(
-            title: '云端（WebDAV）',
+            title: '云端备份 · WebDAV',
+            description: configured ? '已配置 · $status' : '尚未配置。连接 WebDAV 后，可上传备份或从云端恢复。',
             actions: [
               _BackupActionButton(
                 icon: const Icon(
@@ -1184,7 +1040,7 @@ class _DataBackupCard extends StatelessWidget {
                   size: AppIconSize.sm,
                 ),
                 label: '同步到 WebDAV',
-                onPressed: onSyncToWebDav,
+                onPressed: configured ? onSyncToWebDav : null,
               ),
               _BackupActionButton(
                 icon: const Icon(
@@ -1192,7 +1048,7 @@ class _DataBackupCard extends StatelessWidget {
                   size: AppIconSize.sm,
                 ),
                 label: '从 WebDAV 恢复',
-                onPressed: onRestoreFromWebDav,
+                onPressed: configured ? onRestoreFromWebDav : null,
               ),
             ],
           ),
@@ -1204,8 +1060,9 @@ class _DataBackupCard extends StatelessWidget {
 
 /// 备份动作分组：组标题 + 一行可换行的按钮。
 class _BackupGroup extends StatelessWidget {
-  const _BackupGroup({required this.title, required this.actions});
+  const _BackupGroup({required this.title, required this.description, required this.actions});
 
+  final String description;
   final String title;
   final List<Widget> actions;
 
@@ -1217,13 +1074,12 @@ class _BackupGroup extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            fontSize: AppFontSize.label,
-            color: AppColors.textTertiary(b),
-            fontWeight: FontWeight.w800,
-          ),
+          style: Theme.of(context).textTheme.titleSmall,
         ),
-        const SizedBox(height: AppSpace.xs),
+        const SizedBox(height: AppSpace.xxs),
+        Text(description, style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: AppColors.textSecondary(b))),
+        const SizedBox(height: AppSpace.sm),
         Wrap(
           spacing: AppSpace.xs,
           runSpacing: AppSpace.xs,
@@ -1243,15 +1099,19 @@ class _BackupActionButton extends StatelessWidget {
 
   final Widget icon;
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.tonalIcon(
+    final b = Theme.of(context).brightness;
+    return OutlinedButton.icon(
       onPressed: onPressed,
       icon: icon,
       label: Text(label),
-      style: FilledButton.styleFrom(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 44),
+        foregroundColor: AppColors.textPrimary(b),
+        side: BorderSide(color: AppColors.border(b)),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpace.sm,
           vertical: AppSpace.xs,
@@ -1300,7 +1160,7 @@ class _InfoRow extends StatelessWidget {
               color: onTap == null
                   ? AppColors.textPrimary(b)
                   : AppColors.primaryStrong(b),
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -1323,7 +1183,7 @@ class _InfoRow extends StatelessWidget {
       borderRadius: AppRadius.smAll,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
         child: content,
       ),
     );
@@ -1347,7 +1207,7 @@ class _SectionTitle extends StatelessWidget {
           title,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
             color: AppColors.textPrimary(b),
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
@@ -1392,7 +1252,7 @@ class _AddConfigButton extends StatelessWidget {
               label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 color: AppColors.primaryStrong(b),
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -1403,125 +1263,54 @@ class _AddConfigButton extends StatelessWidget {
 }
 
 class _EmptyConfigHint extends StatelessWidget {
-  const _EmptyConfigHint({required this.text});
+  const _EmptyConfigHint({required this.onAdd});
 
-  final String text;
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
-    final b = Theme.of(context).brightness;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpace.sm,
-        vertical: AppSpace.xs + 2,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceSoft(b),
-        borderRadius: AppRadius.mdAll,
-        border: Border.all(color: AppColors.border(b)),
-      ),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: AppColors.textSecondary(b),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+    return _SettingsActionRow(
+      title: '尚未配置提示词优化',
+      description: '添加 API 后，可在首页输入框右侧优化提示词。',
+      action: FilledButton.icon(
+        style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+        onPressed: onAdd,
+        icon: const Icon(Icons.add_rounded, size: AppIconSize.sm),
+        label: const Text('添加提示词优化 API')),
     );
   }
 }
 
-class _ImageProfileCard extends StatelessWidget {
-  const _ImageProfileCard({
-    required this.profile,
-    required this.isActive,
-    required this.canDelete,
-    required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
-  });
+/// 保持说明与操作的层次；空间不足时将操作移至下一行。
+class _SettingsActionRow extends StatelessWidget {
+  const _SettingsActionRow({required this.title, required this.description,
+    required this.action});
 
-  final ApiProfile profile;
-  final bool isActive;
-  final bool canDelete;
-  final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final String title;
+  final String description;
+  final Widget action;
 
   @override
   Widget build(BuildContext context) {
     final b = Theme.of(context).brightness;
-    final tint = isActive ? AppColors.surfaceSoft(b) : AppColors.surface(b);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.mdAll,
-        child: Container(
-          decoration: AppDecorations.card(
-            brightness: b,
-            radius: AppRadius.md,
-            color: tint,
-          ),
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.sm,
-            AppSpace.xs,
-            AppSpace.xs,
-            AppSpace.xs,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      profile.name,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary(b),
-                      ),
-                    ),
-                  ),
-                  if (isActive) const _ActiveBadge(),
-                  const SizedBox(width: AppSpace.xs),
-                  _ConfigActions(
-                    canDelete: canDelete,
-                    onEdit: onEdit,
-                    onDelete: onDelete,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpace.xxs),
-              Row(
-                children: [
-                  _MetaPill(label: profile.apiMode.shortLabel),
-                  const SizedBox(width: AppSpace.xs - 1),
-                  Expanded(
-                    child: Text(
-                      profile.normalizedBaseUrl,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textPrimary(b),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                profile.models.length > 1
-                    ? '模型：${profile.model} 等 ${profile.models.length} 个模型'
-                    : '模型：${profile.model}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
+    final summary = Column(crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: AppSpace.xxs),
+        Text(description, style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: AppColors.textSecondary(b))),
+      ]);
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: AppDecorations.card(brightness: b, radius: AppRadius.lg),
+      child: LayoutBuilder(builder: (context, constraints) {
+        if (constraints.maxWidth / MediaQuery.textScalerOf(context).scale(1) < 640) {
+          return Column(crossAxisAlignment: CrossAxisAlignment.start,
+            children: [summary, const SizedBox(height: AppSpace.sm), action]);
+        }
+        return Row(children: [Expanded(child: summary),
+          const SizedBox(width: AppSpace.lg), action]);
+      }),
     );
   }
 }
@@ -1546,77 +1335,21 @@ class _PromptOptimizationProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final b = Theme.of(context).brightness;
-    final tint = isActive ? AppColors.surfaceSoft(b) : AppColors.surface(b);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.mdAll,
-        child: Container(
-          decoration: AppDecorations.card(
-            brightness: b,
-            radius: AppRadius.md,
-            color: tint,
-          ),
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.sm,
-            AppSpace.xs,
-            AppSpace.xs,
-            AppSpace.xs,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      profile.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary(b),
-                      ),
-                    ),
-                  ),
-                  if (isActive) const _ActiveBadge(),
-                  const SizedBox(width: AppSpace.xs),
-                  _ConfigActions(
-                    canDelete: canDelete,
-                    onEdit: onEdit,
-                    onDelete: onDelete,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpace.xxs),
-              Row(
-                children: [
-                  _MetaPill(label: profile.protocol.label),
-                  const SizedBox(width: AppSpace.xs - 1),
-                  Expanded(
-                    child: Text(
-                      profile.normalizedBaseUrl,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary(b),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '模型：${profile.model}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: AppDecorations.card(brightness: b, radius: AppRadius.md),
+      child: ApiConfigurationRow(
+        name: profile.name,
+        protocol: profile.protocol.label,
+        url: profile.normalizedBaseUrl,
+        models: [profile.model],
+        currentModel: profile.model,
+        isActive: isActive,
+        canDelete: canDelete,
+        onEnable: onTap,
+        onEdit: onEdit,
+        onDelete: onDelete,
+        balance: null,
       ),
     );
   }
@@ -1676,7 +1409,8 @@ class _RequestTimeoutCardState extends State<_RequestTimeoutCard> {
         horizontal: AppSpace.md,
         vertical: AppSpace.sm,
       ),
-      child: Row(
+      child: LayoutBuilder(builder: (context, constraints) {
+        final summary = Row(
         children: [
           const _CardIcon(child: Icon(Icons.timer_outlined, size: AppIconSize.md)),
           const SizedBox(width: AppSpace.sm),
@@ -1693,8 +1427,6 @@ class _RequestTimeoutCardState extends State<_RequestTimeoutCard> {
                 const SizedBox(height: 2),
                 Text(
                   '默认 600 秒，可填 ${widget.minSeconds}–${widget.maxSeconds} 秒',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary(b),
                   ),
@@ -1702,7 +1434,8 @@ class _RequestTimeoutCardState extends State<_RequestTimeoutCard> {
               ],
             ),
           ),
-          const SizedBox(width: AppSpace.sm),
+        ]);
+        final controls = Row(mainAxisSize: MainAxisSize.min, children: [
           SizedBox(
             width: 120,
             child: TextField(
@@ -1714,16 +1447,25 @@ class _RequestTimeoutCardState extends State<_RequestTimeoutCard> {
               onSubmitted: (_) => _handleSave(),
               style: Theme.of(context).textTheme.bodyMedium,
               decoration: const InputDecoration(
-                isDense: true,
-                suffixText: 's',
+                isDense: false,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                suffixText: '秒',
                 hintText: '600',
               ),
             ),
           ),
           const SizedBox(width: AppSpace.xs),
-          FilledButton(onPressed: _handleSave, child: const Text('保存')),
-        ],
-      ),
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(72, 44)),
+            onPressed: _handleSave, child: const Text('保存')),
+        ]);
+        if (constraints.maxWidth / MediaQuery.textScalerOf(context).scale(1) < 600) {
+          return Column(crossAxisAlignment: CrossAxisAlignment.start,
+            children: [summary, const SizedBox(height: AppSpace.md), controls]);
+        }
+        return Row(children: [Expanded(child: summary),
+          const SizedBox(width: AppSpace.lg), controls]);
+      }),
     );
   }
 
