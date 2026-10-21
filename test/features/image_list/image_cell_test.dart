@@ -141,9 +141,29 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsWidgets);
   });
 
-  testWidgets('hover lifts the card and the preview button opens preview', (
-    tester,
-  ) async {
+  testWidgets('hover lifts the card by 1px', (tester) async {
+    await _pumpImageCell(
+      tester,
+      _record.copyWith(
+        status: ImageRecordStatus.done,
+        sourceImagePaths: const ['missing-preview-image.png'],
+        errorMessage: null,
+        clearErrorMessage: true,
+      ),
+    );
+
+    // hover 上移 1px 作用在卡片内部的 Transform 上，用内容来量位移。
+    final promptText = find.text('一张城市夜景');
+    final beforeHover = tester.getTopLeft(promptText);
+    await _hoverOverCell(tester);
+
+    // hover 时整张卡轻微上移 1px。
+    final afterHover = tester.getTopLeft(promptText);
+    expect(afterHover.dy, closeTo(beforeHover.dy - 1, 0.5));
+  });
+
+  testWidgets('card actions stay hidden until the pointer dwells, then sit in '
+      'the footer', (tester) async {
     var navigatedThroughCallback = false;
     await _pumpImageCell(
       tester,
@@ -159,25 +179,25 @@ void main() {
       },
     );
 
-    // hover 上移 1px 作用在卡片内部的 Transform 上，用内容来量位移。
-    final promptText = find.text('一张城市夜景');
-    final beforeHover = tester.getTopLeft(promptText);
-    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await mouse.addPointer(location: Offset.zero);
-    addTearDown(mouse.removePointer);
-    await tester.pump();
-    // 鼠标指针从外部移进卡片中心，触发 MouseRegion.onEnter。
-    await mouse.moveTo(tester.getCenter(find.byType(ImageCell)));
+    await _hoverOverCell(tester, settle: false);
+
+    // 刚进入卡片时不出现动作钮，此时点「预览」不应命中，避免误触。
+    expect(_actionOpacity(tester, '预览'), 0);
+    await tester.tap(find.byTooltip('预览'), warnIfMissed: false);
     await tester.pumpAndSettle();
+    expect(navigatedThroughCallback, isFalse);
 
-    // hover 时整张卡轻微上移 1px。
-    final afterHover = tester.getTopLeft(promptText);
-    expect(afterHover.dy, closeTo(beforeHover.dy - 1, 0.5));
+    // 停留满 240ms 之后三个动作才淡入。
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(_actionOpacity(tester, '预览'), 1);
+    expect(_actionOpacity(tester, '保存到本地'), 1);
+    expect(_actionOpacity(tester, '复制'), 1);
 
-    // 三个圆钮：预览 / 保存到本地 / 复制。
-    expect(find.byTooltip('预览'), findsOneWidget);
-    expect(find.byTooltip('保存到本地'), findsOneWidget);
-    expect(find.byTooltip('复制'), findsOneWidget);
+    // 动作钮在文字区（图片高 180），不再压住图片中央。
+    final cardRect = tester.getRect(find.byType(ImageCell));
+    final previewRect = tester.getRect(find.byTooltip('预览'));
+    expect(previewRect.top, greaterThan(cardRect.top + 180));
 
     await tester.tap(find.byTooltip('预览'));
     await tester.pumpAndSettle();
@@ -185,7 +205,47 @@ void main() {
     expect(navigatedThroughCallback, isTrue);
     expect(find.byType(ImagePreviewPage), findsOneWidget);
   });
+
+  testWidgets('card actions hide again when the pointer leaves', (
+    tester,
+  ) async {
+    await _pumpImageCell(
+      tester,
+      _record.copyWith(
+        status: ImageRecordStatus.done,
+        sourceImagePaths: const ['missing-preview-image.png'],
+        errorMessage: null,
+        clearErrorMessage: true,
+      ),
+    );
+
+    await _hoverOverCell(tester);
+    expect(_actionOpacity(tester, '预览'), 1);
+
+    final mouse = _activeMouse;
+    await mouse!.moveTo(Offset.zero);
+    await tester.pump();
+    expect(_actionOpacity(tester, '预览'), 0);
+  });
 }
+
+/// 让鼠标指针从卡片外部移进卡片中心，触发 MouseRegion.onEnter。
+/// [settle] 为 false 时只推进一帧，用于观察延迟出现前的状态。
+Future<void> _hoverOverCell(WidgetTester tester, {bool settle = true}) async {
+  final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+  await mouse.addPointer(location: Offset.zero);
+  addTearDown(mouse.removePointer);
+  _activeMouse = mouse;
+  await tester.pump();
+  await mouse.moveTo(tester.getCenter(find.byType(ImageCell)));
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
+}
+
+TestGesture? _activeMouse;
 
 class _SeededGenerationController extends GenerationController {
   // 基类构造参数是私有的 `_ref`，无法用 super 参数转发。
@@ -250,6 +310,19 @@ Future<void> _pumpImageCell(
     ),
   );
   await tester.pump();
+}
+
+/// 取动作钮外层 AnimatedOpacity 的目标透明度（0=没出现，1=已出现）。
+double _actionOpacity(WidgetTester tester, String tooltip) {
+  final opacity = tester.widget<AnimatedOpacity>(
+    find
+        .ancestor(
+          of: find.byTooltip(tooltip),
+          matching: find.byType(AnimatedOpacity),
+        )
+        .first,
+  );
+  return opacity.opacity;
 }
 
 final _settings = SettingsModel(

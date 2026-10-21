@@ -25,7 +25,8 @@ import 'image_preview_page.dart';
 ///   描边转主色、阴影抬升，统一 `AppMotion.normal`（180ms）。
 /// - 图上只留左上「像素角标」和右上「状态徽章」；比例/质量/格式等元信息
 ///   下沉到 76px 高的文字区，渠道名不再显示。
-/// - hover 出 3 个圆钮：预览 / 保存到本地 / 复制，全部接真实动作。
+/// - 三个动作（预览 / 保存到本地 / 复制）不再压在图片中央，改到文字区
+///   右下角常驻占位、hover 停留后才淡入，避免指针一扫过就出现按钮导致误触。
 class ImageCell extends ConsumerStatefulWidget {
   const ImageCell({
     super.key,
@@ -72,17 +73,25 @@ class ImageCell extends ConsumerStatefulWidget {
 }
 
 class _ImageCellState extends ConsumerState<ImageCell> {
-  /// hover 圆钮直径（设计稿 40，不属于现有 token 档位，单独常量）。
-  static const double _hoverButtonDiameter = 40;
+  /// 指针停留多久才让文字区的动作钮淡入。
+  ///
+  /// 指针只是从图墙上扫过时不会闪出一排按钮，必须先停在这张卡上。
+  static const Duration _actionsRevealDelay = Duration(milliseconds: 240);
+
+  /// 文字区动作钮的命中尺寸（图标 16，留 24 的点击热区）。
+  static const double _footerActionHitSize = 24;
 
   bool _hovered = false;
+  bool _actionsRevealed = false;
   bool _menuOpen = false;
+  Timer? _actionsRevealTimer;
   final GlobalKey _menuButtonKey = GlobalKey();
   final GlobalKey _cardContentKey = GlobalKey();
   final FocusNode _cardFocusNode = FocusNode(debugLabel: 'image card');
 
   @override
   void dispose() {
+    _actionsRevealTimer?.cancel();
     _cardFocusNode.dispose();
     super.dispose();
   }
@@ -96,11 +105,26 @@ class _ImageCellState extends ConsumerState<ImageCell> {
 
   ImageRecord get _record => widget.record;
 
+  /// 进卡立刻给抬升反馈，但动作钮要等指针停留一会儿才出现。
   void _setHovered(bool value) {
     if (_hovered == value) {
       return;
     }
-    setState(() => _hovered = value);
+    _actionsRevealTimer?.cancel();
+    if (!value) {
+      setState(() {
+        _hovered = false;
+        _actionsRevealed = false;
+      });
+      return;
+    }
+    setState(() => _hovered = true);
+    _actionsRevealTimer = Timer(_actionsRevealDelay, () {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _actionsRevealed = true);
+    });
   }
 
   @override
@@ -118,6 +142,18 @@ class _ImageCellState extends ConsumerState<ImageCell> {
 
     return Focus(
       focusNode: _cardFocusNode,
+      // 键盘 Tab 到卡片上也把动作钮亮出来，不留死角。
+      onFocusChange: (focused) {
+        if (focused) {
+          if (!_actionsRevealed) {
+            setState(() => _actionsRevealed = true);
+          }
+          return;
+        }
+        if (!_hovered && _actionsRevealed) {
+          setState(() => _actionsRevealed = false);
+        }
+      },
       onKeyEvent: (_, event) {
         if ((defaultTargetPlatform == TargetPlatform.windows) && !widget.selectionMode &&
             event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f10 &&
@@ -197,7 +233,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
     );
   }
 
-  /// 图片区：预览点击、hover 动效、图上角标、状态徽章、hover 圆钮。
+  /// 图片区：预览点击、hover 缩放、图上角标、状态徽章。
   Widget _buildImageArea(
     BuildContext context,
     Brightness b,
@@ -228,16 +264,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                 child: _buildImage(partialImage),
               ),
             ),
-            // hover 压暗蒙层，让白色圆钮和角标更清楚。
-            // scrim 自带约 70% 的不透明度，0.4 × 0.7 ≈ 0.28 的实际压暗。
-            IgnorePointer(
-              child: AnimatedOpacity(
-                opacity: hoverActive ? 0.4 : 0,
-                duration: AppMotion.normal,
-                curve: AppMotion.curve,
-                child: ColoredBox(color: AppColors.scrim(b)),
-              ),
-            ),
+            // 图片区不再叠 hover 蒙层：动作钮已搬到文字区，压暗只会让画面发灰。
             Positioned(
               top: AppSpace.xs,
               left: AppSpace.xs,
@@ -258,66 +285,6 @@ class _ImageCellState extends ConsumerState<ImageCell> {
               top: AppSpace.xs,
               right: AppSpace.xs,
               child: _buildStatusWidget(context),
-            ),
-            IgnorePointer(
-              ignoring: !hoverActive,
-              child: AnimatedOpacity(
-                opacity: hoverActive ? 1 : 0,
-                duration: AppMotion.normal,
-                curve: AppMotion.curve,
-                child: Center(
-                  // 卡片很窄时整体等比缩小，三个圆钮不允许溢出。
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _HoverCircleButton(
-                          tooltip: '预览',
-                          onPressed: !widget.selectionMode && _canPreview
-                              ? () => _openPreview(context)
-                              : null,
-                          child: Icon(
-                            Icons.visibility_rounded,
-                            size: AppIconSize.md,
-                            color: _canPreview
-                                ? AppColors.textPrimary(b)
-                                : AppColors.textTertiary(b),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpace.xs),
-                        _HoverCircleButton(
-                          tooltip: '保存到本地',
-                          onPressed: !widget.selectionMode && _canSaveImage
-                              ? () => _saveImage(context)
-                              : null,
-                          child: Icon(
-                            Icons.download_rounded,
-                            size: AppIconSize.md,
-                            color: _canSaveImage
-                                ? AppColors.textPrimary(b)
-                                : AppColors.textTertiary(b),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpace.xs),
-                        _HoverCircleButton(
-                          tooltip: '复制',
-                          onPressed: !widget.selectionMode && _showsCopyImageAction && _canCopyImage
-                              ? () => _copyImageToClipboard(context)
-                              : null,
-                          child: Icon(
-                            Icons.copy_all_rounded,
-                            size: AppIconSize.md,
-                            color: _showsCopyImageAction && _canCopyImage
-                                ? AppColors.textPrimary(b)
-                                : AppColors.textTertiary(b),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
             ),
             if (widget.selectionMode)
               Positioned.fill(
@@ -396,6 +363,11 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                   ],
                 ),
               ),
+              // 移动端没有 hover，这组按钮永远不亮，等于不存在（走长按菜单）。
+              if (!widget.selectionMode) ...[
+                _buildFooterActions(context, b),
+                const SizedBox(width: AppSpace.xxs),
+              ],
               if (_showsInlineMenuButton && !widget.selectionMode)
                 KeyedSubtree(
                   key: _menuButtonKey,
@@ -410,6 +382,70 @@ class _ImageCellState extends ConsumerState<ImageCell> {
   }
 
   bool get _showsInlineMenuButton => Platform.isMacOS || (defaultTargetPlatform == TargetPlatform.windows);
+
+  /// 文字区右下角的三个动作：预览 / 保存到本地 / 复制。
+  ///
+  /// 位置从「图片中央」挪到这里，并且要指针停留 [_actionsRevealDelay] 之后
+  /// 才淡入，避免鼠标扫过图墙时误触。始终占位，出现时不推动其它元素。
+  Widget _buildFooterActions(BuildContext context, Brightness b) {
+    final revealed = _actionsRevealed && !widget.selectionMode;
+    final canPreview = _canPreview;
+    final canSave = _canSaveImage;
+    final canCopy = _showsCopyImageAction && _canCopyImage;
+
+    return ExcludeFocus(
+      excluding: !revealed,
+      child: IgnorePointer(
+      ignoring: !revealed,
+      child: AnimatedOpacity(
+        opacity: revealed ? 1 : 0,
+        duration: AppMotion.fast,
+        curve: AppMotion.curve,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _FooterActionButton(
+              tooltip: '预览',
+              enabled: canPreview,
+              onPressed: () => _openPreview(context),
+              child: Icon(
+                Icons.visibility_rounded,
+                size: AppIconSize.sm,
+                color: canPreview
+                    ? AppColors.textSecondary(b)
+                    : AppColors.textTertiary(b),
+              ),
+            ),
+            _FooterActionButton(
+              tooltip: '保存到本地',
+              enabled: canSave,
+              onPressed: () => _saveImage(context),
+              child: Icon(
+                Icons.download_rounded,
+                size: AppIconSize.sm,
+                color: canSave
+                    ? AppColors.textSecondary(b)
+                    : AppColors.textTertiary(b),
+              ),
+            ),
+            _FooterActionButton(
+              tooltip: '复制',
+              enabled: canCopy,
+              onPressed: () => _copyImageToClipboard(context),
+              child: Icon(
+                Icons.copy_all_rounded,
+                size: AppIconSize.sm,
+                color: canCopy
+                    ? AppColors.textSecondary(b)
+                    : AppColors.textTertiary(b),
+              ),
+            ),
+          ],
+        ),
+      ),
+      ),
+    );
+  }
 
   bool get _canPreview {
     return _record.resultImagePath != null ||
@@ -881,23 +917,25 @@ class _ImageCellState extends ConsumerState<ImageCell> {
   }
 }
 
-/// hover 时的圆形动作钮：直径 40，自身再带 hover 放大 1.1。
-class _HoverCircleButton extends StatefulWidget {
-  const _HoverCircleButton({
+/// 文字区右下角的小动作钮：24×24 热区、无实底，只在 hover 时整体淡入。
+class _FooterActionButton extends StatefulWidget {
+  const _FooterActionButton({
     required this.tooltip,
     required this.child,
+    required this.enabled,
     required this.onPressed,
   });
 
   final String tooltip;
   final Widget child;
-  final VoidCallback? onPressed;
+  final bool enabled;
+  final VoidCallback onPressed;
 
   @override
-  State<_HoverCircleButton> createState() => _HoverCircleButtonState();
+  State<_FooterActionButton> createState() => _FooterActionButtonState();
 }
 
-class _HoverCircleButtonState extends State<_HoverCircleButton> {
+class _FooterActionButtonState extends State<_FooterActionButton> {
   bool _hovered = false;
 
   void _setHovered(bool value) {
@@ -910,29 +948,28 @@ class _HoverCircleButtonState extends State<_HoverCircleButton> {
   @override
   Widget build(BuildContext context) {
     final b = Theme.of(context).brightness;
-    final enabled = widget.onPressed != null;
 
     return Tooltip(
       message: widget.tooltip,
+      waitDuration: const Duration(milliseconds: 400),
       child: MouseRegion(
-        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        cursor: widget.enabled
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
         onEnter: (_) => _setHovered(true),
         onExit: (_) => _setHovered(false),
-        child: AnimatedScale(
-          scale: _hovered ? 1.1 : 1,
-          duration: AppMotion.normal,
-          curve: AppMotion.curve,
-          child: Material(
-            color: AppColors.surfaceHigh(b),
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: widget.onPressed,
-              child: SizedBox(
-                width: _ImageCellState._hoverButtonDiameter,
-                height: _ImageCellState._hoverButtonDiameter,
-                child: Center(child: widget.child),
-              ),
+        child: Material(
+          color: _hovered && widget.enabled
+              ? AppColors.surfaceMuted(b)
+              : Colors.transparent,
+          borderRadius: AppRadius.smAll,
+          child: InkWell(
+            borderRadius: AppRadius.smAll,
+            onTap: widget.enabled ? widget.onPressed : null,
+            child: SizedBox(
+              width: _ImageCellState._footerActionHitSize,
+              height: _ImageCellState._footerActionHitSize,
+              child: Center(child: widget.child),
             ),
           ),
         ),
