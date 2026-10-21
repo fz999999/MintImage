@@ -4,9 +4,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../api/openai_client.dart';
+import 'app_paths.dart';
 
 class ImageSaveService {
   const ImageSaveService();
@@ -69,7 +69,7 @@ class ImageSaveService {
     }
 
     final bytes = await consolidateHttpClientResponseBytes(response);
-    final tempDirectory = await getTemporaryDirectory();
+    final tempDirectory = await AppPaths.temporaryDirectory('image_downloads');
     final file = File(p.join(tempDirectory.path, suggestedFileName));
     await file.writeAsBytes(bytes, flush: true);
     return file;

@@ -45,6 +45,17 @@ class AppPaths {
     return directory;
   }
 
+  /// 应用临时文件。Windows 使用 exe 同级 data，避开不可写的系统 Temp。
+  static Future<Directory> temporaryDirectory(String name) async {
+    if (_portable) {
+      return subDirectory(p.join('temp', name));
+    }
+    final root = await getTemporaryDirectory();
+    final directory = Directory(p.join(root.path, name));
+    await directory.create(recursive: true);
+    return directory;
+  }
+
   /// 旧版本（数据放在 `%APPDATA%`）的数据目录，用于一次性迁移。
   ///
   /// 只读用途：新位置为空时才从这里搬数据，迁移完成后旧目录不再使用。

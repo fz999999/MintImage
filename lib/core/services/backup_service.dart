@@ -4,8 +4,6 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-
 import '../database/app_database.dart';
 import '../database/favorite_folder_dao.dart';
 import '../database/image_record_dao.dart';
@@ -188,11 +186,7 @@ class BackupService {
 
     final bytes = ZipEncoder().encode(archive);
 
-    final tempDirectory = await getTemporaryDirectory();
-    final backupDirectory = Directory(
-      p.join(tempDirectory.path, 'mint_image_backups'),
-    );
-    await backupDirectory.create(recursive: true);
+    final backupDirectory = await AppPaths.subDirectory('backups');
     final fileName =
         'mint_image_backup_${_timestampForFileName(DateTime.now())}'
         '.mintbackup';

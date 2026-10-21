@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
+import 'app_paths.dart';
 
 import '../models/image_record.dart';
 
@@ -77,7 +77,7 @@ class ImageClipboardService {
     }
 
     final encodedBytes = await _loadEncodedBytes(record);
-    final tempDirectory = await getTemporaryDirectory();
+    final tempDirectory = await AppPaths.temporaryDirectory('clipboard');
     final safeId = record.id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
     final extension = _clipboardFileExtension(record);
     final file = File(
