@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/generation_request.dart';
 import '../../core/models/image_record.dart';
+import '../../core/models/settings_model.dart';
 import '../../core/providers/favorite_folders_provider.dart';
 import '../../core/providers/generation_provider.dart';
 import '../../core/providers/image_list_provider.dart';
@@ -16,6 +17,7 @@ import '../../core/version/app_version.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/desktop/desktop_dialog.dart';
+import '../../shared/widgets/desktop/desktop_menu.dart';
 import '../favorites/favorite_folder_sheet.dart';
 import '../image_list/image_list_widget.dart';
 import '../input/bottom_input_bar.dart';
@@ -127,6 +129,15 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ? Icons.star_rounded
                     : Icons.star_border_rounded,
               ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 2),
+            child: _GalleryDensityButton(
+              density: settings.galleryDensity,
+              onSelected: (density) => ref
+                  .read(settingsProvider.notifier)
+                  .setGalleryDensity(density),
             ),
           ),
           Padding(
@@ -701,6 +712,125 @@ class _NewVersionBadge extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 顶栏的图墙密度开关：紧凑 / 标准 / 大图。
+///
+/// 只改展示，不改生成参数；选择会写进设置并记住。
+class _GalleryDensityButton extends StatefulWidget {
+  const _GalleryDensityButton({
+    required this.density,
+    required this.onSelected,
+  });
+
+  final GalleryDensity density;
+  final ValueChanged<GalleryDensity> onSelected;
+
+  @override
+  State<_GalleryDensityButton> createState() => _GalleryDensityButtonState();
+}
+
+class _GalleryDensityButtonState extends State<_GalleryDensityButton> {
+  final GlobalKey _anchorKey = GlobalKey();
+
+  /// 图标必须写成 `const Icon(内联常量)`：
+  /// release 的图标 tree-shaking 只认这种写法，经变量传入会在包里变空白。
+  Widget _buildIcon() {
+    if (widget.density == GalleryDensity.compact) {
+      return const Icon(Icons.view_comfy_rounded);
+    }
+    if (widget.density == GalleryDensity.large) {
+      return const Icon(Icons.view_agenda_rounded);
+    }
+    return const Icon(Icons.grid_view_rounded);
+  }
+
+  Rect? get _anchorRect {
+    final box = _anchorKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) {
+      return null;
+    }
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  Future<void> _showPicker() async {
+    final platform = defaultTargetPlatform;
+    final useMenu =
+        platform == TargetPlatform.windows ||
+        platform == TargetPlatform.macOS ||
+        platform == TargetPlatform.linux;
+
+    if (useMenu) {
+      final rect = _anchorRect;
+      if (rect == null) {
+        return;
+      }
+      final selected = await showDesktopMenu<GalleryDensity>(
+        context: context,
+        title: '图片大小',
+        anchorRect: rect,
+        items: GalleryDensity.values
+            .map(
+              (density) => DesktopMenuItem(
+                value: density,
+                label: density.label,
+                subtitle: density.description,
+                selected: density == widget.density,
+              ),
+            )
+            .toList(),
+      );
+      if (selected != null) {
+        widget.onSelected(selected);
+      }
+      return;
+    }
+
+    FocusManager.instance.primaryFocus?.unfocus(
+      disposition: UnfocusDisposition.scope,
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final b = Theme.of(ctx).brightness;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: GalleryDensity.values.map((density) {
+              final active = density == widget.density;
+              return ListTile(
+                leading: Icon(
+                  active
+                      ? Icons.check_circle_rounded
+                      : Icons.circle_outlined,
+                  color: active
+                      ? AppColors.primary(b)
+                      : AppColors.textTertiary(b),
+                ),
+                title: Text(density.label),
+                subtitle: Text(density.description),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  widget.onSelected(density);
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      key: _anchorKey,
+      tooltip: '图片大小',
+      onPressed: _showPicker,
+      icon: _buildIcon(),
     );
   }
 }

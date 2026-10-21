@@ -244,14 +244,6 @@ class SettingsController extends StateNotifier<SettingsModel> {
     await _persist();
   }
 
-  Future<void> setPreviewInfoCollapsed(bool collapsed) async {
-    if (state.previewInfoCollapsed == collapsed) {
-      return;
-    }
-    state = state.copyWith(previewInfoCollapsed: collapsed);
-    await _persist();
-  }
-
   Future<void> setWebDavBackupConfig(WebDavBackupConfig config) async {
     state = state.copyWith(webDavBackupConfig: config);
     await _persist();
@@ -259,6 +251,14 @@ class SettingsController extends StateNotifier<SettingsModel> {
 
   Future<void> clearWebDavBackupConfig() async {
     state = state.copyWith(clearWebDavBackupConfig: true);
+    await _persist();
+  }
+
+  Future<void> setGalleryDensity(GalleryDensity density) async {
+    if (state.galleryDensity == density) {
+      return;
+    }
+    state = state.copyWith(galleryDensity: density);
     await _persist();
   }
 

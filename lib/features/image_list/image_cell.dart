@@ -28,10 +28,17 @@ import 'image_preview_page.dart';
 /// - 三个动作（预览 / 保存到本地 / 复制）不再压在图片中央，改到文字区
 ///   右下角常驻占位、hover 停留后才淡入，避免指针一扫过就出现按钮导致误触。
 class ImageCell extends ConsumerStatefulWidget {
+  /// 文字区固定高度。
+  ///
+  /// 瀑布流给子项的纵向约束是**无界的**，这里不能用 `Expanded` 去撑——
+  /// 只能在内部就把高度定量好，图墙排版表也按这个值算卡片高度。
+  static const double footerHeight = 88;
+
   const ImageCell({
     super.key,
     required this.record,
     required this.imageHeight,
+    this.imageFit = BoxFit.cover,
     this.previewRecords = const [],
     this.previewInitialIndex,
     required this.onReusePrompt,
@@ -51,6 +58,12 @@ class ImageCell extends ConsumerStatefulWidget {
 
   final ImageRecord record;
   final double imageHeight;
+
+  /// 图片在图区里怎么摆。
+  ///
+  /// 瀑布流按真实宽高比给卡片定了高，比例对得上时 `cover` 不裁任何像素；
+  /// 只有被最小/最大高度夹住的极端比例才传 `contain`，宁可留边也不裁。
+  final BoxFit imageFit;
   final List<ImageRecord> previewRecords;
   final int? previewInitialIndex;
   final VoidCallback onReusePrompt;
@@ -205,7 +218,10 @@ class _ImageCellState extends ConsumerState<ImageCell> {
                         width: double.infinity,
                         child: _buildImageArea(context, b, partialImage),
                       ),
-                      Expanded(child: _buildFooter(context, b)),
+                      SizedBox(
+                        height: ImageCell.footerHeight,
+                        child: _buildFooter(context, b),
+                      ),
                     ],
                   ),
                   // 描边画在内容之上，否则会被图片盖掉。
@@ -516,7 +532,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
           File(_record.resultImagePath!),
           width: double.infinity,
           height: double.infinity,
-          fit: BoxFit.cover,
+          fit: widget.imageFit,
         ),
       );
     }
@@ -527,7 +543,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
         File(_record.sourceImagePath!),
         width: double.infinity,
         height: double.infinity,
-        fit: BoxFit.cover,
+        fit: widget.imageFit,
       );
     }
 
@@ -536,7 +552,7 @@ class _ImageCellState extends ConsumerState<ImageCell> {
         imageUrl: _record.resultImageUrl!,
         width: double.infinity,
         height: double.infinity,
-        fit: BoxFit.cover,
+        fit: widget.imageFit,
         placeholder: (context, url) => const _LoadingThumb(),
         errorWidget: (context, url, error) => const _FallbackThumb(),
       );

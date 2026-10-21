@@ -230,4 +230,42 @@ void main() {
       'a',
     );
   });
+
+  test('gallery density defaults to standard and survives a round-trip', () {
+    expect(SettingsModel.initial().galleryDensity, GalleryDensity.standard);
+
+    final encoded = SettingsModel.initial()
+        .copyWith(galleryDensity: GalleryDensity.large)
+        .encode();
+    expect(
+      SettingsModel.decode(encoded).galleryDensity,
+      GalleryDensity.large,
+    );
+  });
+
+  test('unknown or missing gallery density falls back to standard', () {
+    expect(GalleryDensity.fromStorageValue(null), GalleryDensity.standard);
+    expect(GalleryDensity.fromStorageValue(''), GalleryDensity.standard);
+    expect(GalleryDensity.fromStorageValue('huge'), GalleryDensity.standard);
+    expect(
+      GalleryDensity.fromStorageValue('compact'),
+      GalleryDensity.compact,
+    );
+  });
+
+  test('density tiers narrow the column cap as cards grow', () {
+    // 列数上限越大，卡片越窄：紧凑 > 标准 > 大图。
+    expect(
+      GalleryDensity.compact.maxColumns,
+      greaterThan(GalleryDensity.standard.maxColumns),
+    );
+    expect(
+      GalleryDensity.standard.maxColumns,
+      greaterThan(GalleryDensity.large.maxColumns),
+    );
+    expect(
+      GalleryDensity.large.minCardWidth,
+      greaterThan(GalleryDensity.compact.minCardWidth),
+    );
+  });
 }

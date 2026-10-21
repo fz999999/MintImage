@@ -361,6 +361,46 @@ class WebDavBackupConfig {
   }
 }
 
+/// 图墙密度：决定卡片最窄宽度（进而决定列数）与图区最大高度。
+///
+/// 桌面端窗口宽度波动很大，只靠「自适应当前宽度」无法同时满足「想一次看很多张」
+/// 和「想看清一张」两种诉求，所以暴露成一个显式开关，并记住上次选择。
+enum GalleryDensity {
+  compact('compact', '紧凑', '一屏看更多，卡片更小', 170, 260, 6),
+  standard('standard', '标准', '默认密度', 220, 360, 4),
+  large('large', '大图', '单张更清楚，列数更少', 300, 520, 3);
+
+  const GalleryDensity(
+    this.storageKey,
+    this.label,
+    this.description,
+    this.minCardWidth,
+    this.maxImageHeight,
+    this.maxColumns,
+  );
+
+  final String storageKey;
+  final String label;
+  final String description;
+
+  /// 卡片最小宽度：低于这个值就减一列。
+  final double minCardWidth;
+
+  /// 图区最大高度：竖图不至于把一屏撑成一张。
+  final double maxImageHeight;
+
+  /// 列数上限：窗口再宽也不超过这个数，否则卡片会被拉得很扁。
+  final int maxColumns;
+
+  static GalleryDensity fromStorageValue(Object? rawValue) {
+    final value = rawValue is String ? rawValue : '';
+    return GalleryDensity.values.firstWhere(
+      (density) => density.storageKey == value,
+      orElse: () => GalleryDensity.standard,
+    );
+  }
+}
+
 class SettingsModel {
   static const int defaultRequestTimeoutSeconds = 600;
 
@@ -378,7 +418,7 @@ class SettingsModel {
     this.lastQuality = ImageQuality.auto,
     this.lastOutputFormat = ImageOutputFormat.png,
     this.lastBackground = ImageBackground.auto,
-    this.previewInfoCollapsed = false,
+    this.galleryDensity = GalleryDensity.standard,
     this.webDavBackupConfig,
   });
 
@@ -398,6 +438,7 @@ class SettingsModel {
       lastQuality: ImageQuality.auto,
       lastOutputFormat: ImageOutputFormat.png,
       lastBackground: ImageBackground.auto,
+      galleryDensity: GalleryDensity.standard,
       webDavBackupConfig: null,
     );
   }
@@ -466,7 +507,7 @@ class SettingsModel {
       lastQuality: _normalizeImageQuality(json['lastQuality']),
       lastOutputFormat: _normalizeImageOutputFormat(json['lastOutputFormat']),
       lastBackground: _normalizeImageBackground(json['lastBackground']),
-      previewInfoCollapsed: _normalizeBool(json['previewInfoCollapsed']),
+      galleryDensity: GalleryDensity.fromStorageValue(json['galleryDensity']),
       webDavBackupConfig: _normalizeWebDavBackupConfig(
         json['webDavBackupConfig'],
       ),
@@ -490,7 +531,9 @@ class SettingsModel {
 
   /// 上次使用的背景选项（自动 / 透明）。
   final ImageBackground lastBackground;
-  final bool previewInfoCollapsed;
+
+  /// 图墙密度（紧凑 / 标准 / 大图），只影响展示，不影响生成参数。
+  final GalleryDensity galleryDensity;
   final WebDavBackupConfig? webDavBackupConfig;
 
   ApiProfile get activeProfile {
@@ -561,7 +604,7 @@ class SettingsModel {
     ImageQuality? lastQuality,
     ImageOutputFormat? lastOutputFormat,
     ImageBackground? lastBackground,
-    bool? previewInfoCollapsed,
+    GalleryDensity? galleryDensity,
     WebDavBackupConfig? webDavBackupConfig,
     bool clearWebDavBackupConfig = false,
   }) {
@@ -587,7 +630,7 @@ class SettingsModel {
       lastQuality: lastQuality ?? this.lastQuality,
       lastOutputFormat: lastOutputFormat ?? this.lastOutputFormat,
       lastBackground: lastBackground ?? this.lastBackground,
-      previewInfoCollapsed: previewInfoCollapsed ?? this.previewInfoCollapsed,
+      galleryDensity: galleryDensity ?? this.galleryDensity,
       webDavBackupConfig: clearWebDavBackupConfig
           ? null
           : webDavBackupConfig ?? this.webDavBackupConfig,
@@ -611,7 +654,7 @@ class SettingsModel {
       'lastQuality': lastQuality.apiValue,
       'lastOutputFormat': lastOutputFormat.apiValue,
       'lastBackground': lastBackground.apiValue,
-      'previewInfoCollapsed': previewInfoCollapsed,
+      'galleryDensity': galleryDensity.storageKey,
       'webDavBackupConfig': webDavBackupConfig?.toJson(),
     };
   }
@@ -701,15 +744,6 @@ class SettingsModel {
       (background) => background.apiValue == value,
       orElse: () => ImageBackground.auto,
     );
-  }
-
-  static bool _normalizeBool(Object? rawValue, {bool fallback = false}) {
-    return switch (rawValue) {
-      bool value => value,
-      String value => value == 'true',
-      num value => value != 0,
-      _ => fallback,
-    };
   }
 
   static Map<String, String> _normalizeActiveModelByProfileId(

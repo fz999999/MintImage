@@ -1,9 +1,12 @@
 name: Build and Release
 
+# 只维护 Windows 端（见 AGENTS.md）：本仓库的发布包只构建 Windows x64。
+#
+# **不自动构建**：推 tag 不会触发 CI。发版流程是本地构建 + 打包 + 上传
+# （scripts/package-windows.ps1 出 zip，再用 release 上传），
+# 需要 CI 重建时在这里手动 Run workflow。
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -21,14 +24,14 @@ jobs:
       - name: Prepare build version
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          $version = $tag -replace '^v',''
-          "APP_VERSION=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # 手动触发时没有 ref_name 是 tag 的前提，版本号从 pubspec.yaml 取。
+          $version = (Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value.Split('+')[0]
+          "APP_VERSION=v$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BUILD_NAME=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "BUILD_NUMBER=${{ github.run_number }}" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - run: flutter pub get
-      - run: flutter build windows --release --build-name $env:BUILD_NAME --build-number $env:BUILD_NUMBER --dart-define "APP_VERSION=$env:APP_VERSION"
+      - run: flutter build windows --release --no-tree-shake-icons --build-name $env:BUILD_NAME --build-number $env:BUILD_NUMBER --dart-define "APP_VERSION=$env:APP_VERSION"
 
       - name: Archive Windows build
         run: |
@@ -39,115 +42,3 @@ jobs:
         with:
           name: windows-x64
           path: MintImage-windows-x64.zip
-
-  build-android:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - name: Prepare build version
-        run: |
-          echo "APP_VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
-          echo "BUILD_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          echo "BUILD_NUMBER=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-
-      - name: Restore Android signing
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/mint_image_release.jks
-          cat > android/key.properties <<EOF
-          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          storeFile=mint_image_release.jks
-          EOF
-
-      - run: flutter pub get
-      - run: flutter build apk --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER" --dart-define "APP_VERSION=$APP_VERSION"
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: android-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - name: Prepare build version
-        run: |
-          echo "APP_VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
-          echo "BUILD_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          echo "BUILD_NUMBER=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-
-      - run: flutter pub get
-      - run: flutter build macos --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER" --dart-define "APP_VERSION=$APP_VERSION"
-
-      - name: Archive macOS build
-        run: |
-          cd build/macos/Build/Products/Release
-          zip -r ../../../../../MintImage-macos-arm64.zip *.app
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: macos-arm64
-          path: MintImage-macos-arm64.zip
-
-  # iOS packaging is temporarily disabled.
-  # build-ios:
-  #   runs-on: macos-latest
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #
-  #     - uses: subosito/flutter-action@v2
-  #       with:
-  #         channel: stable
-  #
-  #     - name: Prepare build version
-  #       run: |
-  #         echo "APP_VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
-  #         echo "BUILD_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-  #         echo "BUILD_NUMBER=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-  #
-  #     - run: flutter pub get
-  #     - run: flutter build ios --release --no-codesign --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER" --dart-define "APP_VERSION=$APP_VERSION"
-  #
-  #     - name: Archive iOS build
-  #       run: |
-  #         cd build/ios/iphoneos
-  #         zip -r ../../../MintImage-ios-nosign.zip Runner.app
-  #
-  #     - uses: actions/upload-artifact@v6
-  #       with:
-  #         name: ios-ipa
-  #         path: MintImage-ios-nosign.zip
-
-  release:
-    needs: [build-windows, build-android, build-macos]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v7
-        with:
-          merge-multiple: true
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-          files: |
-            MintImage-windows-x64.zip
-            app-release.apk
-            MintImage-macos-arm64.zip

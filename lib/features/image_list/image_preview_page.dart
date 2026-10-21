@@ -11,7 +11,6 @@ import 'package:photo_view/photo_view_gallery.dart';
 
 import '../../core/models/image_record.dart';
 import '../../core/providers/app_providers.dart';
-import '../../core/providers/settings_provider.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/checkerboard_background.dart';
 
@@ -48,7 +47,10 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
   int _currentIndex = 0;
   double? _baselineScale;
   double _currentScale = 1.0;
-  bool _infoCollapsed = false;
+  // 信息面板默认收起：进预览页第一眼只该看到图本身，尺寸/文件大小/格式/
+  // 画质/模型/提示词都是需要时才看的细节。收起状态只活在当前页面里，
+  // 不写设置、不跨会话记忆，避免出现「上次展开过就永远展开」。
+  bool _infoCollapsed = true;
 
   ImageRecord get _currentRecord => _records[_currentIndex];
   PhotoViewController get _photoViewController =>
@@ -70,7 +72,6 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
     _pageController = PageController(initialPage: _currentIndex);
     _actualSizeLabelFuture = _resolveActualSizeLabel();
     _fileSizeLabelFuture = _resolveFileSizeLabel();
-    _infoCollapsed = ref.read(settingsProvider).previewInfoCollapsed;
     _listenToCurrentController();
   }
 
@@ -317,27 +318,28 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
   }
 
   void _toggleInfoCollapsed() {
-    final next = !_infoCollapsed;
-    setState(() => _infoCollapsed = next);
-    ref.read(settingsProvider.notifier).setPreviewInfoCollapsed(next);
+    setState(() => _infoCollapsed = !_infoCollapsed);
   }
 
   Widget _buildCollapsedInfoButton() {
-    return Material(
-      key: const ValueKey('preview-info-collapsed'),
-      color: Colors.black.withValues(alpha: 0.72),
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: _toggleInfoCollapsed,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+    return Tooltip(
+      message: '图片信息',
+      child: Material(
+        key: const ValueKey('preview-info-collapsed'),
+        color: Colors.black.withValues(alpha: 0.72),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _toggleInfoCollapsed,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: const Icon(Icons.info_outline_rounded, color: Colors.white),
           ),
-          child: const Icon(Icons.info_outline_rounded, color: Colors.white),
         ),
       ),
     );
