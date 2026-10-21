@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
 
+import 'balance_query.dart';
 import 'generation_request.dart';
 
 const _uuid = Uuid();
@@ -82,6 +83,7 @@ class ApiProfile {
     String? model,
     this.apiMode = ImageGenerationApiMode.images,
     this.useStreaming = false,
+    this.balanceQuery = const BalanceQueryConfig(),
   }) : models = _normalizeModels(
          models,
          fallbackModel: model,
@@ -126,6 +128,7 @@ class ApiProfile {
       model: json['model'] as String? ?? apiMode.defaultModel,
       apiMode: apiMode,
       useStreaming: json['useStreaming'] as bool? ?? false,
+      balanceQuery: BalanceQueryConfig.fromJson(json['balanceQuery']),
     );
   }
 
@@ -138,6 +141,9 @@ class ApiProfile {
   final List<String> models;
   final ImageGenerationApiMode apiMode;
   final bool useStreaming;
+
+  /// 该中转站的余额查询设置（主页右下角的余额就靠它取数）。
+  final BalanceQueryConfig balanceQuery;
 
   /// 兼容旧入口：等价于 [models] 的第一个模型。
   String get model => models.first;
@@ -163,6 +169,7 @@ class ApiProfile {
     String? model,
     ImageGenerationApiMode? apiMode,
     bool? useStreaming,
+    BalanceQueryConfig? balanceQuery,
   }) {
     return ApiProfile(
       id: id ?? this.id,
@@ -172,6 +179,7 @@ class ApiProfile {
       models: models ?? (model != null ? <String>[model] : this.models),
       apiMode: apiMode ?? this.apiMode,
       useStreaming: useStreaming ?? this.useStreaming,
+      balanceQuery: balanceQuery ?? this.balanceQuery,
     );
   }
 
@@ -186,6 +194,7 @@ class ApiProfile {
       'model': model,
       'apiMode': apiMode.storageValue,
       'useStreaming': useStreaming,
+      'balanceQuery': balanceQuery.toJson(),
     };
   }
 }

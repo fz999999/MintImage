@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../models/balance_query.dart';
 import '../models/generation_request.dart';
 import '../models/settings_model.dart';
 import 'app_providers.dart';
@@ -51,6 +52,7 @@ class SettingsController extends StateNotifier<SettingsModel> {
     List<String>? models,
     ImageGenerationApiMode apiMode = ImageGenerationApiMode.images,
     bool useStreaming = false,
+    BalanceQueryConfig balanceQuery = const BalanceQueryConfig(),
   }) async {
     final nextIndex = state.profiles.length + 1;
     final profile = ApiProfile(
@@ -61,6 +63,7 @@ class SettingsController extends StateNotifier<SettingsModel> {
       models: models ?? <String>[model ?? apiMode.defaultModel],
       apiMode: apiMode,
       useStreaming: useStreaming,
+      balanceQuery: balanceQuery,
     );
     state = state.copyWith(
       profiles: [...state.profiles, profile],
