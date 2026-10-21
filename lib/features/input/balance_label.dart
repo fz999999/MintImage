@@ -2,16 +2,34 @@ import 'package:flutter/material.dart';
 
 import '../../shared/theme.dart';
 
-/// 余额显示槽（决策 18）。
+/// 余额显示槽。
 ///
-/// 本期**没有数据源**（仓库无 balance / billing 代码，`ImageRecord` 也无费用字段），
-/// 调用处统一传 `null`，此时整块不渲染（连占位空白都不留），绝不摆假数字。
-/// 以后接上数据源时，只改传值那一处即可。
+/// 本身只负责“怎么显示”，数据由 [ChannelBalanceLabel] 之类的取数组件传进来：
+/// - [value] 有值：`余额: $10.68`；
+/// - [loading]：`余额: 查询中…`；
+/// - [failed]：`余额: 获取失败`（提示里放具体原因，点一下重试）；
+/// - 三者都没有：整块不渲染，不摆假数字。
 class BalanceLabel extends StatelessWidget {
-  const BalanceLabel({super.key, this.value, this.onTap});
+  const BalanceLabel({
+    super.key,
+    this.value,
+    this.loading = false,
+    this.failed = false,
+    this.tooltip,
+    this.onTap,
+  });
 
-  /// 已格式化好的余额文本，如 `1,420 元`；`null` 表示暂无数据。
+  /// 已格式化好的余额文本，如 `$10.68`；`null` 表示暂无数据。
   final String? value;
+
+  /// 正在查询。
+  final bool loading;
+
+  /// 上一次查询失败。
+  final bool failed;
+
+  /// 悬停提示（来源、说明或错误原因）。
+  final String? tooltip;
 
   /// 点击回调；`null` 时不可点。
   final VoidCallback? onTap;
@@ -19,11 +37,21 @@ class BalanceLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final value = this.value;
-    if (value == null) {
+    if (value == null && !loading && !failed) {
       return const SizedBox.shrink();
     }
 
     final b = Theme.of(context).brightness;
+    final accent = failed
+        ? AppColors.dangerText(b)
+        : AppColors.primary(b);
+    final placeholder = loading
+        ? '查询中…'
+        : failed
+        ? '获取失败'
+        : '';
+    final display = value ?? placeholder;
+
     final textStyle = TextStyle(
       fontSize: AppFontSize.caption,
       height: 1.3,
@@ -36,7 +64,7 @@ class BalanceLabel extends StatelessWidget {
         Icon(
           Icons.account_balance_wallet_outlined,
           size: AppIconSize.xs,
-          color: AppColors.textSecondary(b),
+          color: failed ? AppColors.dangerText(b) : AppColors.textSecondary(b),
         ),
         const SizedBox(width: AppSpace.xxs),
         Text.rich(
@@ -44,10 +72,12 @@ class BalanceLabel extends StatelessWidget {
             children: [
               TextSpan(text: '余额: ', style: textStyle),
               TextSpan(
-                text: value,
+                text: display,
                 style: textStyle.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary(b),
+                  fontWeight: value == null ? FontWeight.w500 : FontWeight.w700,
+                  color: value == null
+                      ? AppColors.textTertiary(b)
+                      : accent,
                 ),
               ),
             ],
@@ -59,20 +89,30 @@ class BalanceLabel extends StatelessWidget {
       ],
     );
 
-    if (onTap == null) {
-      return content;
+    Widget result = content;
+    if (onTap != null) {
+      result = InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.xs),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.xxs,
+            vertical: 2,
+          ),
+          child: result,
+        ),
+      );
     }
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.xs),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.xxs,
-          vertical: 2,
-        ),
-        child: content,
-      ),
-    );
+    final tooltip = this.tooltip;
+    if (tooltip != null && tooltip.isNotEmpty) {
+      result = Tooltip(
+        message: tooltip,
+        waitDuration: const Duration(milliseconds: 400),
+        child: result,
+      );
+    }
+
+    return result;
   }
 }
