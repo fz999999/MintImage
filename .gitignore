@@ -56,3 +56,6 @@ app.*.map.json
 # Windows 发布产物（打包输出，不入库）
 dist/
 *.dsh-ops-update-*.lock
+
+# 本地设计稿压缩包（解包内容见 stitch_windows_ui/ 与 .design-api/）
+*.zip
