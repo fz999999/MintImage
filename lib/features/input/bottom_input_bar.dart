@@ -19,9 +19,10 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/attachment_picker_service.dart';
 import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
+import '../../shared/widgets/desktop/desktop_menu.dart';
 import 'attachment_preview_strip.dart';
 import 'background_selector.dart';
-import 'balance_label.dart';
+import 'channel_balance.dart';
 import 'image_format_selector.dart';
 import 'quality_selector.dart';
 import 'quantity_selector.dart';
@@ -57,6 +58,44 @@ class BottomInputBar extends ConsumerStatefulWidget {
 class BottomInputBarState extends ConsumerState<BottomInputBar> {
   final TextEditingController _promptController = TextEditingController();
   final FocusNode _promptFocusNode = FocusNode();
+  final GlobalKey _apiSwitchKey = GlobalKey();
+  final GlobalKey _modelSwitchKey = GlobalKey();
+  final GlobalKey _optimizeButtonKey = GlobalKey();
+  final GlobalKey _sendButtonKey = GlobalKey();
+  final GlobalKey _sendMenuKey = GlobalKey();
+
+  bool get _usesDesktopPopups => !kIsWeb && Platform.isWindows;
+
+  Rect? _anchorRect(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  Future<T?> _showAnchoredMenu<T>({
+    required GlobalKey anchorKey,
+    required List<DesktopMenuItem<T>> items,
+    required String title,
+    bool searchable = false,
+    double width = 280,
+  }) {
+    final anchorContext = anchorKey.currentContext;
+    final rect = _anchorRect(anchorKey);
+    if (anchorContext == null || rect == null) return Future<T?>.value();
+    final trigger = Focus.maybeOf(anchorContext);
+    if (trigger != null && trigger is! FocusScopeNode && trigger.canRequestFocus) {
+      trigger.requestFocus();
+      FocusManager.instance.applyFocusChangesIfNeeded();
+    }
+    return showDesktopMenu<T>(
+      context: anchorContext,
+      anchorRect: rect,
+      items: items,
+      title: title,
+      searchable: searchable,
+      width: width,
+    );
+  }
 
   SizePreset _sizePreset = SizePreset.auto;
   ImageQuality _quality = ImageQuality.auto;
@@ -372,9 +411,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                       contentPadding:
                                           const EdgeInsets.fromLTRB(
                                             AppSpace.sm,
-                                            15,
+                                            11,
                                             AppSpace.sm,
-                                            7,
+                                            10,
                                           ),
                                     ),
                                   ),
@@ -385,6 +424,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                           const SizedBox(width: AppSpace.xs),
                           _PromptOptimizeButton(
                             key: const Key('prompt-optimize-button'),
+                            anchorKey: _optimizeButtonKey,
                             enabled: true,
                             loading: _optimizingPrompt,
                             onTap: _handlePromptOptimizationTap,
@@ -392,10 +432,33 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                           const SizedBox(width: AppSpace.xs),
                           _SendButton(
                             key: const Key('submit-generation-button'),
+                            anchorKey: _sendButtonKey,
                             enabled: canUseSendButton,
                             onTap: _submit,
                             onLongPress: _showApiProfileSendSheet,
                           ),
+                          if (_usesDesktopPopups) ...[
+                            const SizedBox(width: 2),
+                            IconButton(
+                              tooltip: '切换 API 并发送',
+                              onPressed: canUseSendButton && !_submitting
+                                  ? () => _showApiProfileSendSheet(
+                                      anchorKey: _sendMenuKey,
+                                    )
+                                  : null,
+                              constraints: const BoxConstraints(
+                                minWidth: 28,
+                                minHeight: _barButtonSize,
+                              ),
+                              padding: EdgeInsets.zero,
+                              icon: SizedBox(
+                                key: _sendMenuKey,
+                                width: 28,
+                                height: _barButtonSize,
+                                child: const Icon(Icons.arrow_drop_down_rounded),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: AppSpace.xs),
@@ -470,10 +533,12 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                   },
                                 ),
                                 _ApiProfileSwitchButton(
+                                  anchorKey: _apiSwitchKey,
                                   activeProfile: activeProfile,
                                   onTap: _showApiProfileSwitchSheet,
                                 ),
                                 _ModelSwitchButton(
+                                  anchorKey: _modelSwitchKey,
                                   model: settings.modelForProfile(
                                     activeProfile,
                                   ),
@@ -482,7 +547,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                               ],
                             ),
                           ),
-                          const BalanceLabel(value: null),
+                          const ChannelBalanceLabel(),
                         ],
                       ),
                       if (!hasApiKey) ...[
@@ -490,7 +555,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                         Text(
                           otherProfiles.isEmpty
                               ? '当前配置缺少 API Key，发送按钮已禁用。'
-                              : '当前配置缺少 API Key，可长按发送切换其他配置。',
+                              : _usesDesktopPopups
+                                  ? '当前配置缺少 API Key，可点击发送旁箭头或长按发送切换其他配置。'
+                                  : '当前配置缺少 API Key，可长按发送切换其他配置。',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: AppColors.dangerText(b),
                             fontWeight: FontWeight.w700,
@@ -748,7 +815,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     }
   }
 
-  Future<void> _showApiProfileSendSheet() async {
+  Future<void> _showApiProfileSendSheet({GlobalKey? anchorKey}) async {
     if (_submitting || _optimizingPrompt) {
       return;
     }
@@ -763,7 +830,26 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     }
 
     unfocusPrompt();
-    final selectedProfileId = await showModalBottomSheet<String>(
+    final selectedProfileId = _usesDesktopPopups
+        ? await _showAnchoredMenu<String>(
+            anchorKey: anchorKey ?? _sendButtonKey,
+            title: '切换 API 并发送',
+            width: 360,
+            searchable: profiles.length > 8,
+            items: [
+              for (final profile in profiles)
+                DesktopMenuItem<String>(
+                  value: profile.id,
+                  label: profile.name,
+                  subtitle: profile.apiKey.trim().isEmpty
+                      ? '缺少 API Key，无法发送'
+                      : profile.normalizedBaseUrl,
+                  enabled: profile.apiKey.trim().isNotEmpty,
+                  leading: const Icon(Icons.hub_rounded, size: 18),
+                ),
+            ],
+          )
+        : await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -881,7 +967,26 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
 
     final settings = ref.read(settingsProvider);
     unfocusPrompt();
-    final selectedProfileId = await showModalBottomSheet<String>(
+    final selectedProfileId = _usesDesktopPopups
+        ? await _showAnchoredMenu<String>(
+            anchorKey: _apiSwitchKey,
+            title: '切换生图 API',
+            width: 360,
+            searchable: settings.profiles.length > 8,
+            items: [
+              for (final profile in settings.profiles)
+                DesktopMenuItem<String>(
+                  value: profile.id,
+                  label: profile.name,
+                  subtitle: profile.apiKey.trim().isEmpty
+                      ? '${profile.normalizedBaseUrl} · 缺少 API Key'
+                      : profile.normalizedBaseUrl,
+                  selected: profile.id == settings.activeProfileId,
+                  leading: const Icon(Icons.hub_outlined, size: 18),
+                ),
+            ],
+          )
+        : await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -947,6 +1052,24 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     unfocusPrompt();
   }
 
+  ({String badge, String description})? _modelIntroduction(String model) {
+    return switch (model.trim().toLowerCase()) {
+      'gpt-image-2.5-flare' => (
+        badge: '速度优先',
+        description: '出图更快，适合批量草稿、方案探索和日常配图。',
+      ),
+      'gpt-image-2.5-sunburst' => (
+        badge: '画质优先',
+        description: '注重画面质量，适合精修成品和需要放大查看的图片。',
+      ),
+      'gpt-image-2.5' => (
+        badge: '均衡之选',
+        description: '兼顾出图速度与画质，适合大多数日常创作。',
+      ),
+      _ => null,
+    };
+  }
+
   Future<void> _showModelSwitchSheet() async {
     if (_optimizingPrompt) {
       return;
@@ -962,7 +1085,25 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     final currentModel = settings.modelForProfile(activeProfile);
 
     unfocusPrompt();
-    final selectedModel = await showModalBottomSheet<String>(
+    final selectedModel = _usesDesktopPopups
+        ? await _showAnchoredMenu<String>(
+            anchorKey: _modelSwitchKey,
+            title: '切换模型 · ${activeProfile.name}',
+            width: 420,
+            searchable: models.length > 8,
+            items: [
+              for (final model in models)
+                DesktopMenuItem<String>(
+                  value: model,
+                  label: model,
+                  selected: model == currentModel,
+                  badge: _modelIntroduction(model)?.badge,
+                  subtitle: _modelIntroduction(model)?.description,
+                  leading: const Icon(Icons.smart_toy_outlined, size: 18),
+                ),
+            ],
+          )
+        : await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -1123,7 +1264,23 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   Future<PromptOptimizationDirection?>
   _showPromptOptimizationDirectionSheet() async {
     unfocusPrompt();
-    final direction = await showModalBottomSheet<PromptOptimizationDirection>(
+    final direction = _usesDesktopPopups
+        ? await _showAnchoredMenu<PromptOptimizationDirection>(
+            anchorKey: _optimizeButtonKey,
+            title: '优化方向',
+            width: 360,
+            // DesktopMenu 使用公共 Popover 的 420 最大高度与独立滚动。
+            items: [
+              for (final option in PromptOptimizationDirection.values)
+                DesktopMenuItem<PromptOptimizationDirection>(
+                  value: option,
+                  label: option.label,
+                  subtitle: option.description,
+                  leading: const Icon(Icons.auto_awesome_rounded, size: 18),
+                ),
+            ],
+          )
+        : await showModalBottomSheet<PromptOptimizationDirection>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1284,11 +1441,13 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
 class _PromptOptimizeButton extends StatefulWidget {
   const _PromptOptimizeButton({
     super.key,
+    required this.anchorKey,
     required this.enabled,
     required this.loading,
     required this.onTap,
   });
 
+  final GlobalKey anchorKey;
   final bool enabled;
   final bool loading;
   final VoidCallback onTap;
@@ -1401,6 +1560,7 @@ class _PromptOptimizeButtonState extends State<_PromptOptimizeButton>
                 onTap: active ? widget.onTap : null,
                 borderRadius: BorderRadius.circular(AppRadius.sm),
                 child: Center(
+                  key: widget.anchorKey,
                   child: widget.loading ? loadingWidget : iconWidget,
                 ),
               ),
@@ -1459,12 +1619,88 @@ class _AttachmentInputButton extends StatelessWidget {
   }
 }
 
+/// 输入栏私有 chip 自行管理键盘入口，不改变公共 selector 的接口。
+class _InputSelectorTrigger extends StatefulWidget {
+  const _InputSelectorTrigger({
+    required this.anchorKey,
+    required this.onTap,
+    required this.child,
+  });
+
+  final GlobalKey anchorKey;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<_InputSelectorTrigger> createState() => _InputSelectorTriggerState();
+}
+
+class _InputSelectorTriggerState extends State<_InputSelectorTrigger> {
+  final FocusNode _focusNode = FocusNode();
+  bool _showFocus = false;
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _activate() {
+    _focusNode.requestFocus();
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIsWeb || !Platform.isWindows) {
+      return GestureDetector(onTap: widget.onTap, child: widget.child);
+    }
+    return FocusableActionDetector(
+      focusNode: _focusNode,
+      onShowFocusHighlight: (value) => setState(() => _showFocus = value),
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.enter, includeRepeats: false): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space, includeRepeats: false): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.arrowDown, includeRepeats: false): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.arrowUp, includeRepeats: false): ActivateIntent(),
+      },
+      actions: <Type, Action<Intent>>{
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            _activate();
+            return null;
+          },
+        ),
+      },
+      child: Semantics(
+        button: true,
+        onTap: _activate,
+        child: GestureDetector(
+          onTap: _activate,
+          child: DecoratedBox(
+            key: widget.anchorKey,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: _showFocus
+                  ? Border.all(color: AppColors.primary(Theme.of(context).brightness))
+                  : null,
+            ),
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ApiProfileSwitchButton extends StatelessWidget {
   const _ApiProfileSwitchButton({
+    required this.anchorKey,
     required this.activeProfile,
     required this.onTap,
   });
 
+  final GlobalKey anchorKey;
   final ApiProfile activeProfile;
   final VoidCallback onTap;
 
@@ -1475,8 +1711,9 @@ class _ApiProfileSwitchButton extends StatelessWidget {
     return Tooltip(
       message: '切换生图 API',
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 130),
-        child: GestureDetector(
+        constraints: const BoxConstraints(maxWidth: 190),
+        child: _InputSelectorTrigger(
+          anchorKey: anchorKey,
           onTap: onTap,
           child: SelectorChipShell(
             child: Row(
@@ -1488,7 +1725,7 @@ class _ApiProfileSwitchButton extends StatelessWidget {
                   color: AppColors.primaryStrong(b),
                 ),
                 const SizedBox(width: AppSpace.xxs),
-                Flexible(child: SelectorChipLabel(value: activeProfile.name)),
+                Flexible(child: SelectorChipLabel(label: '渠道', value: activeProfile.name)),
               ],
             ),
           ),
@@ -1499,8 +1736,13 @@ class _ApiProfileSwitchButton extends StatelessWidget {
 }
 
 class _ModelSwitchButton extends StatelessWidget {
-  const _ModelSwitchButton({required this.model, required this.onTap});
+  const _ModelSwitchButton({
+    required this.anchorKey,
+    required this.model,
+    required this.onTap,
+  });
 
+  final GlobalKey anchorKey;
   final String model;
   final VoidCallback onTap;
 
@@ -1511,8 +1753,9 @@ class _ModelSwitchButton extends StatelessWidget {
     return Tooltip(
       message: '切换模型',
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 170),
-        child: GestureDetector(
+        constraints: const BoxConstraints(maxWidth: 230),
+        child: _InputSelectorTrigger(
+          anchorKey: anchorKey,
           onTap: onTap,
           child: SelectorChipShell(
             child: Row(
@@ -1524,7 +1767,7 @@ class _ModelSwitchButton extends StatelessWidget {
                   color: AppColors.primaryStrong(b),
                 ),
                 const SizedBox(width: AppSpace.xxs),
-                Flexible(child: SelectorChipLabel(value: model)),
+                Flexible(child: SelectorChipLabel(label: '模型', value: model)),
               ],
             ),
           ),
@@ -1537,11 +1780,13 @@ class _ModelSwitchButton extends StatelessWidget {
 class _SendButton extends StatelessWidget {
   const _SendButton({
     super.key,
+    required this.anchorKey,
     required this.enabled,
     required this.onTap,
     required this.onLongPress,
   });
 
+  final GlobalKey anchorKey;
   final bool enabled;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -1566,6 +1811,7 @@ class _SendButton extends StatelessWidget {
             onLongPress: enabled ? onLongPress : null,
             borderRadius: BorderRadius.circular(AppRadius.md),
             child: Center(
+              key: anchorKey,
               child: Icon(
                 Icons.arrow_upward_rounded,
                 size: AppIconSize.md,

@@ -13,6 +13,7 @@ import 'package:mint_image/core/models/generation_request.dart';
 import 'package:mint_image/core/models/image_record.dart';
 import 'package:mint_image/core/models/settings_model.dart';
 import 'package:mint_image/core/providers/app_providers.dart';
+import 'package:mint_image/core/providers/balance_provider.dart';
 import 'package:mint_image/core/providers/settings_provider.dart';
 import 'package:mint_image/features/input/background_selector.dart';
 import 'package:mint_image/features/input/bottom_input_bar.dart';
@@ -20,6 +21,8 @@ import 'package:mint_image/features/input/image_format_selector.dart';
 import 'package:mint_image/features/input/quality_selector.dart';
 import 'package:mint_image/features/input/quantity_selector.dart';
 import 'package:mint_image/features/input/size_selector.dart';
+
+import '../../shared/stub_balance_api.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -189,7 +192,7 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byType(ImageFormatSelector),
-        matching: find.text('PNG'),
+        matching: find.text('格式:PNG'),
       ),
     );
     await tester.pumpAndSettle();
@@ -266,7 +269,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byTooltip('切换生图 API'),
-        matching: find.text('API'),
+        matching: find.text('渠道:API'),
       ),
       findsOneWidget,
     );
@@ -301,7 +304,7 @@ void main() {
     await tester.longPress(find.byKey(const Key('submit-generation-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('切换到API配置并发送'), findsOneWidget);
+    expect(find.text('切换 API 并发送'), findsOneWidget);
     expect(find.text('备用'), findsOneWidget);
     expect(find.text('第三'), findsOneWidget);
 
@@ -326,7 +329,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byTooltip('切换模型'),
-        matching: find.text('model-a'),
+        matching: find.text('模型:model-a'),
       ),
       findsOneWidget,
     );
@@ -351,12 +354,20 @@ void main() {
   });
 }
 
-/// 参数胶囊现在只显示真实取值（决策 17），同一个词可能同时出现在
-/// 胶囊里和弹层选项里，所以按所属选择器限定查找范围。
-Finder _chipText(String text, Type selectorType) => find.descendant(
-  of: find.byType(selectorType),
-  matching: find.text(text),
-);
+/// 胶囊固定显示参数名，菜单选项仍只显示取值。
+Finder _chipText(String text, Type selectorType) {
+  final label = {
+    SizeSelector: '尺寸',
+    QualitySelector: '质量',
+    ImageFormatSelector: '格式',
+    QuantitySelector: '数量',
+    BackgroundSelector: '背景',
+  }[selectorType]!;
+  return find.descendant(
+    of: find.byType(selectorType),
+    matching: find.text('$label:$text'),
+  );
+}
 
 Future<void> _pumpInputBar(
   WidgetTester tester, {
@@ -377,6 +388,7 @@ Future<void> _pumpInputBar(
         promptOptimizationApiProvider.overrideWithValue(
           promptOptimizationApi ?? const PromptOptimizationApi(),
         ),
+        balanceQueryApiProvider.overrideWithValue(const StubBalanceApi()),
       ],
       child: MaterialApp(
         home: Scaffold(
