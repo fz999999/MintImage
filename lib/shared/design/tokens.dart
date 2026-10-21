@@ -14,21 +14,21 @@ class AppSpace {
   static const double xl = 32;
 }
 
-/// 圆角 5 档：角标 6 / 图卡·按钮·输入框 12 / 面板 16 / 输入栏·对话框·浮层 22 / 圆形 999。
+/// 圆角 5 档：角标 4 / 普通控件 6 / 卡片 10 / 浮层 12 / 圆形 999。
 class AppRadius {
   const AppRadius._();
 
   /// 角标、标签。
-  static const double xs = 6;
+  static const double xs = 4;
 
-  /// 图卡、按钮、输入框。
-  static const double sm = 12;
+  /// 按钮、输入框、选择器。
+  static const double sm = 6;
 
-  /// 面板、分区卡。
-  static const double md = 16;
+  /// 图卡、面板、分区卡。
+  static const double md = 10;
 
   /// 输入栏、对话框、浮层。
-  static const double lg = 22;
+  static const double lg = 12;
 
   /// 圆形。
   static const double full = 999;
@@ -40,30 +40,30 @@ class AppRadius {
   static BorderRadius get fullAll => BorderRadius.circular(full);
 }
 
-/// 字号 8 档：10 / 11 / 12 / 13 / 14 / 16 / 20 / 28。
+/// 字号 8 档：12 / 13 / 14 / 15 / 16 / 18 / 22 / 28。
 class AppFontSize {
   const AppFontSize._();
 
   /// 图上角标。
-  static const double caption = 10;
+  static const double caption = 12;
 
   /// 辅助说明。
-  static const double micro = 11;
+  static const double micro = 13;
 
   /// 标签、徽章。
-  static const double label = 12;
+  static const double label = 14;
 
   /// 正文小（元信息行）。
-  static const double bodySm = 13;
+  static const double bodySm = 15;
 
   /// 正文。
-  static const double body = 14;
+  static const double body = 16;
 
   /// 小标题。
-  static const double title = 16;
+  static const double title = 18;
 
   /// 大标题。
-  static const double headline = 20;
+  static const double headline = 22;
 
   /// 展示级标题。
   static const double display = 28;
@@ -79,7 +79,7 @@ class AppIconSize {
   static const double lg = 28;
 }
 
-/// 阴影。亮色是青色软阴影，深色是黑投影。
+/// 中性阴影：普通卡片轻微分层，浮层保留适度抬升。
 class AppShadow {
   const AppShadow._();
 
@@ -87,9 +87,9 @@ class AppShadow {
   static List<BoxShadow> card(Brightness b) => [
     BoxShadow(
       color: AppColors.shadow(b),
-      blurRadius: 16,
-      spreadRadius: -4,
-      offset: const Offset(0, 4),
+      blurRadius: 4,
+      spreadRadius: -1,
+      offset: const Offset(0, 1),
     ),
   ];
 
@@ -97,9 +97,9 @@ class AppShadow {
   static List<BoxShadow> raised(Brightness b) => [
     BoxShadow(
       color: AppColors.shadowStrong(b),
-      blurRadius: 28,
-      spreadRadius: -8,
-      offset: const Offset(0, 10),
+      blurRadius: 12,
+      spreadRadius: -3,
+      offset: const Offset(0, 3),
     ),
   ];
 
@@ -107,9 +107,9 @@ class AppShadow {
   static List<BoxShadow> floating(Brightness b) => [
     BoxShadow(
       color: AppColors.shadowStrong(b),
-      blurRadius: 32,
-      spreadRadius: -10,
-      offset: const Offset(0, 14),
+      blurRadius: 20,
+      spreadRadius: -4,
+      offset: const Offset(0, 6),
     ),
   ];
 

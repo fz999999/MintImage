@@ -10,9 +10,8 @@ import 'package:flutter/material.dart';
 /// final bg = AppColors.surface(b);
 /// ```
 ///
-/// 亮色基调 `#F8FAFF` 系（沿用历史配色）；深色取 Stitch 稿的中性灰
-/// （`#101416` / `#181C1E` / `#1C2022` / `#272B2C` / `#313537`）。
-/// 主色实底固定 `#0E7490`，浅主色 `#81D1F0` 只用于文字、描边、图标。
+/// 表面与边框采用中性灰，青色保留给主操作、选中和焦点。
+/// 主色实底固定 `#0E7490`，浅主色 `#81D1F0` 用于深色文字、描边、图标。
 class AppColors {
   const AppColors._();
 
@@ -22,43 +21,43 @@ class AppColors {
 
   /// 页面底色。
   static Color canvas(Brightness b) =>
-      _dark(b) ? const Color(0xFF101416) : const Color(0xFFF8FAFF);
+      _dark(b) ? const Color(0xFF181818) : const Color(0xFFF5F5F5);
 
   /// 页面底色渐变搭档。
   static Color canvasTint(Brightness b) =>
-      _dark(b) ? const Color(0xFF14181B) : const Color(0xFFEFF7FF);
+      _dark(b) ? const Color(0xFF1C1C1C) : const Color(0xFFF2F2F2);
 
   /// 卡片、面板、对话框实底。
   static Color surface(Brightness b) =>
-      _dark(b) ? const Color(0xFF181C1E) : const Color(0xFFFFFFFF);
+      _dark(b) ? const Color(0xFF202020) : const Color(0xFFFFFFFF);
 
   /// 低一档容器底（分区、输入框）。
   static Color surfaceSoft(Brightness b) =>
-      _dark(b) ? const Color(0xFF1C2022) : const Color(0xFFF0F9FF);
+      _dark(b) ? const Color(0xFF252525) : const Color(0xFFFAFAFA);
 
   /// 高一档容器底（hover、选中）。
   static Color surfaceMuted(Brightness b) =>
-      _dark(b) ? const Color(0xFF272B2C) : const Color(0xFFE5F2FF);
+      _dark(b) ? const Color(0xFF2D2D2D) : const Color(0xFFF0F0F0);
 
   /// 最高容器底（浮层、弹出菜单）。
   static Color surfaceHigh(Brightness b) =>
-      _dark(b) ? const Color(0xFF313537) : const Color(0xFFDBEDFF);
+      _dark(b) ? const Color(0xFF363636) : const Color(0xFFE8E8E8);
 
   /// 玻璃层填充（半透明，配 `BackdropFilter`）。
   static Color glassFill(Brightness b) =>
-      _dark(b) ? const Color(0xE61C2022) : const Color(0xE6FFFFFF);
+      _dark(b) ? const Color(0xF2202020) : const Color(0xF2FFFFFF);
 
   /// 玻璃层描边。
   static Color glassBorder(Brightness b) =>
-      _dark(b) ? const Color(0x14FFFFFF) : const Color(0xD1FFFFFF);
+      _dark(b) ? const Color(0x24FFFFFF) : const Color(0x1F000000);
 
   /// 常规描边。
   static Color border(Brightness b) =>
-      _dark(b) ? const Color(0x14FFFFFF) : const Color(0xFFD7E7F7);
+      _dark(b) ? const Color(0xFF3D3D3D) : const Color(0xFFDEDEDE);
 
-  /// 强描边（聚焦、选中）。
+  /// 强中性描边（hover、控件边界）；焦点使用 primary。
   static Color borderStrong(Brightness b) =>
-      _dark(b) ? const Color(0x2EFFFFFF) : const Color(0xFFB9D5EC);
+      _dark(b) ? const Color(0xFF606060) : const Color(0xFFBDBDBD);
 
   /// 压暗遮罩。
   static Color scrim(Brightness b) =>
@@ -83,19 +82,19 @@ class AppColors {
 
   /// 主色弱化底（选中项、标签底）。
   static Color primarySoft(Brightness b) =>
-      _dark(b) ? const Color(0xFF164E63) : const Color(0xFFB9EAFF);
+      _dark(b) ? const Color(0xFF203D45) : const Color(0xFFE5F2F5);
 
   // ------------------------------------------------------------------- 文字
 
   static Color textPrimary(Brightness b) =>
-      _dark(b) ? const Color(0xFFE0E3E5) : const Color(0xFF0B1C30);
+      _dark(b) ? const Color(0xFFF0F0F0) : const Color(0xFF242424);
 
   static Color textSecondary(Brightness b) =>
-      _dark(b) ? const Color(0xFFBEC8CD) : const Color(0xFF5C7386);
+      _dark(b) ? const Color(0xFFC4C4C4) : const Color(0xFF616161);
 
   /// 第三级文字（角标、辅助说明）。
   static Color textTertiary(Brightness b) =>
-      _dark(b) ? const Color(0xFF899297) : const Color(0xFF8497A8);
+      _dark(b) ? const Color(0xFF9D9D9D) : const Color(0xFF767676);
 
   // ---------------------------------------------------------------- 状态色
 
@@ -145,17 +144,17 @@ class AppColors {
 
   /// 图上角标/状态徽章的文字。
   static Color imageChipText(Brightness b) =>
-      _dark(b) ? const Color(0xFFE0E3E5) : const Color(0xFF0B1C30);
+      _dark(b) ? const Color(0xFFF0F0F0) : const Color(0xFF242424);
 
   // ------------------------------------------------------------------- 阴影
 
-  /// 彩色彩软阴影（亮）/ 黑投影（深）。
+  /// 普通卡片的轻微中性投影。
   static Color shadow(Brightness b) =>
-      _dark(b) ? const Color(0x99000000) : const Color(0x140E7490);
+      _dark(b) ? const Color(0x24000000) : const Color(0x0A000000);
 
   /// 更强的投影（浮层、输入栏）。
   static Color shadowStrong(Brightness b) =>
-      _dark(b) ? const Color(0xCC000000) : const Color(0x1A0E7490);
+      _dark(b) ? const Color(0x66000000) : const Color(0x24000000);
 }
 
 /// 状态叠层透明度（hover / press / 遮罩）。

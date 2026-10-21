@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'design/app_colors.dart';
 import 'design/tokens.dart';
@@ -12,17 +11,17 @@ export 'design/tokens.dart';
 /// 新代码请改用 `AppColors.xxx(brightness)`；
 /// 本类会随 UI 升级逐文件清空，**不要再新增引用**。
 class AppThemeTokens {
-  static const canvas = Color(0xFFF8FAFF);
-  static const canvasTint = Color(0xFFEFF7FF);
+  static const canvas = Color(0xFFF5F5F5);
+  static const canvasTint = Color(0xFFF2F2F2);
   static const surface = Colors.white;
-  static const surfaceSoft = Color(0xFFF0F9FF);
-  static const surfaceMuted = Color(0xFFE5F2FF);
+  static const surfaceSoft = Color(0xFFFAFAFA);
+  static const surfaceMuted = Color(0xFFF0F0F0);
   static const primary = Color(0xFF0E7490);
   static const primaryStrong = Color(0xFF005A71);
-  static const primarySoft = Color(0xFFB9EAFF);
-  static const textPrimary = Color(0xFF0B1C30);
-  static const textSecondary = Color(0xFF5C7386);
-  static const border = Color(0xFFD7E7F7);
+  static const primarySoft = Color(0xFFE5F2F5);
+  static const textPrimary = Color(0xFF242424);
+  static const textSecondary = Color(0xFF616161);
+  static const border = Color(0xFFDEDEDE);
   static const warningSurface = Color(0xFFFFF3D9);
   static const warningText = Color(0xFF9A6400);
   static const dangerSurface = Color(0xFFFFE7E7);
@@ -77,63 +76,71 @@ class AppDecorations {
 
 TextTheme _textTheme(Brightness brightness) {
   final primaryColor = AppColors.textPrimary(brightness);
-  return GoogleFonts.manropeTextTheme().copyWith(
-    headlineLarge: GoogleFonts.manrope(
-      fontSize: AppFontSize.display,
-      fontWeight: FontWeight.w700,
-      letterSpacing: -0.6,
-      color: primaryColor,
-    ),
-    headlineMedium: GoogleFonts.manrope(
-      fontSize: AppFontSize.headline,
-      fontWeight: FontWeight.w700,
-      letterSpacing: -0.2,
-      color: primaryColor,
-    ),
-    titleLarge: GoogleFonts.manrope(
-      fontSize: AppFontSize.headline,
-      fontWeight: FontWeight.w700,
-      color: primaryColor,
-    ),
-    titleMedium: GoogleFonts.manrope(
-      fontSize: AppFontSize.title,
-      fontWeight: FontWeight.w700,
-      color: primaryColor,
-    ),
-    bodyLarge: GoogleFonts.manrope(
-      fontSize: AppFontSize.body,
-      height: 1.45,
-      color: primaryColor,
-    ),
-    bodyMedium: GoogleFonts.manrope(
-      fontSize: AppFontSize.bodySm,
-      height: 1.45,
-      color: primaryColor,
-    ),
-    bodySmall: GoogleFonts.manrope(
-      fontSize: AppFontSize.label,
-      height: 1.4,
-      color: AppColors.textSecondary(brightness),
-    ),
-    labelLarge: GoogleFonts.manrope(
-      fontSize: AppFontSize.label,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.1,
-      color: AppColors.primaryStrong(brightness),
-    ),
-    labelMedium: GoogleFonts.manrope(
-      fontSize: AppFontSize.micro,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.2,
-      color: AppColors.primaryStrong(brightness),
-    ),
-    labelSmall: GoogleFonts.manrope(
-      fontSize: AppFontSize.caption,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.3,
-      color: AppColors.primaryStrong(brightness),
-    ),
-  );
+  return ThemeData(brightness: brightness).textTheme
+      .copyWith(
+        headlineLarge: TextStyle(
+          fontSize: AppFontSize.display,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.6,
+          color: primaryColor,
+        ),
+        headlineMedium: TextStyle(
+          fontSize: AppFontSize.headline,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+          color: primaryColor,
+        ),
+        titleLarge: TextStyle(
+          fontSize: AppFontSize.headline,
+          fontWeight: FontWeight.w700,
+          color: primaryColor,
+        ),
+        titleMedium: TextStyle(
+          fontSize: AppFontSize.title,
+          fontWeight: FontWeight.w600,
+          color: primaryColor,
+        ),
+        bodyLarge: TextStyle(
+          fontSize: AppFontSize.body,
+          fontWeight: FontWeight.w400,
+          height: 1.45,
+          color: primaryColor,
+        ),
+        bodyMedium: TextStyle(
+          fontSize: AppFontSize.bodySm,
+          fontWeight: FontWeight.w400,
+          height: 1.45,
+          color: primaryColor,
+        ),
+        bodySmall: TextStyle(
+          fontSize: AppFontSize.label,
+          fontWeight: FontWeight.w400,
+          height: 1.4,
+          color: AppColors.textSecondary(brightness),
+        ),
+        labelLarge: TextStyle(
+          fontSize: AppFontSize.label,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.1,
+          color: AppColors.textPrimary(brightness),
+        ),
+        labelMedium: TextStyle(
+          fontSize: AppFontSize.micro,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.2,
+          color: AppColors.textPrimary(brightness),
+        ),
+        labelSmall: TextStyle(
+          fontSize: AppFontSize.caption,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.3,
+          color: AppColors.textPrimary(brightness),
+        ),
+      )
+      .apply(
+        fontFamily: 'Segoe UI',
+        fontFamilyFallback: const ['Microsoft YaHei', 'sans-serif'],
+      );
 }
 
 ThemeData _buildBase(Brightness brightness) {
@@ -147,14 +154,13 @@ ThemeData _buildBase(Brightness brightness) {
       ).copyWith(
         primary: AppColors.primaryContainer(brightness),
         onPrimary: AppColors.onPrimaryContainer(brightness),
-        primaryContainer: isDark
-            ? AppColors.primarySoft(brightness)
-            : const Color(0xFFD9F1FF),
-        onPrimaryContainer: isDark
-            ? AppColors.textPrimary(brightness)
-            : AppColors.primaryStrong(brightness),
-        secondary: AppColors.primarySoft(brightness),
-        onSecondary: AppColors.primaryStrong(brightness),
+        primaryContainer: AppColors.primarySoft(brightness),
+        onPrimaryContainer: AppColors.primaryStrong(brightness),
+        secondary: AppColors.textSecondary(brightness),
+        onSecondary: AppColors.surface(brightness),
+        secondaryContainer: AppColors.surfaceMuted(brightness),
+        onSecondaryContainer: AppColors.textPrimary(brightness),
+        onSurfaceVariant: AppColors.textSecondary(brightness),
         surface: AppColors.surface(brightness),
         onSurface: AppColors.textPrimary(brightness),
         surfaceContainerLowest: AppColors.canvas(brightness),
@@ -162,14 +168,16 @@ ThemeData _buildBase(Brightness brightness) {
         surfaceContainer: AppColors.surfaceSoft(brightness),
         surfaceContainerHigh: AppColors.surfaceMuted(brightness),
         surfaceContainerHighest: AppColors.surfaceHigh(brightness),
-        outline: AppColors.border(brightness),
-        outlineVariant: AppColors.borderStrong(brightness),
+        outline: AppColors.borderStrong(brightness),
+        outlineVariant: AppColors.border(brightness),
         error: AppColors.dangerText(brightness),
         onError: isDark ? const Color(0xFF3D1A1A) : Colors.white,
       );
 
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Segoe UI',
+    fontFamilyFallback: const ['Microsoft YaHei', 'sans-serif'],
     brightness: brightness,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppColors.canvas(brightness),
@@ -198,23 +206,22 @@ ThemeData _buildBase(Brightness brightness) {
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: AppColors.surfaceHigh(brightness),
-      contentTextStyle: GoogleFonts.manrope(
-        color: AppColors.textPrimary(brightness),
-      ),
+      contentTextStyle: TextStyle(color: AppColors.textPrimary(brightness)),
       shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: AppColors.surfaceSoft(brightness),
-      labelStyle: GoogleFonts.manrope(
+      labelStyle: TextStyle(
         fontSize: AppFontSize.label,
-        color: AppColors.primaryStrong(brightness),
-        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary(brightness),
+        fontWeight: FontWeight.w500,
       ),
       selectedColor: AppColors.primarySoft(brightness),
-      side: BorderSide.none,
-      shape: RoundedRectangleBorder(borderRadius: AppRadius.fullAll),
+      side: BorderSide(color: AppColors.border(brightness)),
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
     ),
     inputDecorationTheme: InputDecorationTheme(
+      isDense: true,
       filled: true,
       fillColor: AppColors.surfaceSoft(brightness),
       hintStyle: textTheme.bodyMedium?.copyWith(
@@ -222,30 +229,35 @@ ThemeData _buildBase(Brightness brightness) {
       ),
       labelStyle: textTheme.labelMedium,
       border: OutlineInputBorder(
-        borderRadius: AppRadius.mdAll,
+        borderRadius: AppRadius.smAll,
         borderSide: BorderSide(color: AppColors.border(brightness)),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: AppRadius.mdAll,
+        borderRadius: AppRadius.smAll,
         borderSide: BorderSide(color: AppColors.border(brightness)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: AppRadius.mdAll,
-        borderSide: BorderSide(color: AppColors.primary(brightness), width: 1.4),
+        borderRadius: AppRadius.smAll,
+        borderSide: BorderSide(
+          color: AppColors.primary(brightness),
+          width: 1.4,
+        ),
       ),
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpace.md,
-        vertical: AppSpace.sm,
+        vertical: AppSpace.xs,
       ),
     ),
+    // 颜色交给控件自身的 scheme 默认值，避免覆盖 FilledButton.tonal。
+    // 普通 FilledButton 使用 primary，tonal 使用 secondaryContainer。
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: AppColors.primaryContainer(brightness),
-        foregroundColor: AppColors.onPrimaryContainer(brightness),
         textStyle: textTheme.labelLarge,
+        minimumSize: const Size(64, 34),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.md,
-          vertical: AppSpace.sm,
+          horizontal: AppSpace.sm,
+          vertical: AppSpace.xxs,
         ),
         shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
       ),
@@ -256,10 +268,26 @@ ThemeData _buildBase(Brightness brightness) {
         backgroundColor: AppColors.primaryContainer(brightness),
         foregroundColor: AppColors.onPrimaryContainer(brightness),
         textStyle: textTheme.labelLarge,
+        minimumSize: const Size(64, 34),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.md,
-          vertical: AppSpace.sm,
+          horizontal: AppSpace.sm,
+          vertical: AppSpace.xxs,
         ),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.textPrimary(brightness),
+        textStyle: textTheme.labelLarge,
+        minimumSize: const Size(64, 34),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.sm,
+          vertical: AppSpace.xxs,
+        ),
+        side: BorderSide(color: AppColors.borderStrong(brightness)),
         shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
       ),
     ),
@@ -267,14 +295,24 @@ ThemeData _buildBase(Brightness brightness) {
       style: TextButton.styleFrom(
         foregroundColor: AppColors.primary(brightness),
         textStyle: textTheme.labelLarge,
+        minimumSize: const Size(64, 34),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.sm,
+          vertical: AppSpace.xxs,
+        ),
         shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
       ),
     ),
     popupMenuTheme: PopupMenuThemeData(
       color: AppColors.surface(brightness),
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
+      surfaceTintColor: Colors.transparent,
+      elevation: 6,
+      shadowColor: AppColors.shadowStrong(brightness),
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.lgAll,
+        side: BorderSide(color: AppColors.border(brightness)),
+      ),
       textStyle: textTheme.bodyMedium,
     ),
     dialogTheme: DialogThemeData(
@@ -291,15 +329,15 @@ ThemeData _buildBase(Brightness brightness) {
       showDragHandle: true,
       dragHandleColor: AppColors.borderStrong(brightness),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppRadius.lg),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
-        foregroundColor: AppColors.primaryStrong(brightness),
-        backgroundColor: AppColors.surfaceSoft(brightness),
+        foregroundColor: AppColors.textSecondary(brightness),
+        minimumSize: const Size(34, 34),
+        padding: const EdgeInsets.all(AppSpace.xxs),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
       ),
     ),
@@ -309,8 +347,8 @@ ThemeData _buildBase(Brightness brightness) {
         vertical: AppSpace.sm,
       ),
       textColor: AppColors.textPrimary(brightness),
-      iconColor: AppColors.primaryStrong(brightness),
-      shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
+      iconColor: AppColors.textSecondary(brightness),
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.smAll),
     ),
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
@@ -318,7 +356,7 @@ ThemeData _buildBase(Brightness brightness) {
         borderRadius: AppRadius.xsAll,
         border: Border.all(color: AppColors.border(brightness)),
       ),
-      textStyle: GoogleFonts.manrope(
+      textStyle: TextStyle(
         fontSize: AppFontSize.micro,
         color: AppColors.textPrimary(brightness),
       ),
