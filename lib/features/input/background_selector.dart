@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../shared/widgets/desktop/desktop_menu.dart';
 
 import '../../core/models/generation_request.dart';
 import '../../core/models/model_capabilities.dart';
@@ -65,8 +67,8 @@ class BackgroundSelector extends StatelessWidget {
         ModelCapabilities.isTransparentBackgroundPreview(model);
     return Tooltip(
       message: isPreview ? '$_tooltip（当前模型为预览支持）' : _tooltip,
-      child: GestureDetector(
-        onTap: () => _showSheet(context),
+      child: SelectorChipTrigger(
+        onOpen: _showSheet,
         child: SelectorChipShell(
           active: _active,
           child: Row(
@@ -79,7 +81,7 @@ class BackgroundSelector extends StatelessWidget {
                 color: AppColors.primaryStrong(b),
               ),
               const SizedBox(width: AppSpace.xxs),
-              SelectorChipLabel(value: background.label),
+              SelectorChipLabel(label: '背景', value: background.label),
             ],
           ),
         ),
@@ -88,6 +90,41 @@ class BackgroundSelector extends StatelessWidget {
   }
 
   Future<void> _showSheet(BuildContext context) async {
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      final selected = await showDesktopMenu<ImageBackground>(
+        context: context,
+        title: '选择背景',
+        width: 360,
+        anchorRect: selectorChipAnchor(context),
+        items: [
+          DesktopMenuItem(
+            value: ImageBackground.auto,
+            label: '自动',
+            subtitle: '不指定背景，由模型自己决定（通常是实底）',
+            selected: background == ImageBackground.auto,
+          ),
+          DesktopMenuItem(
+            value: ImageBackground.transparent,
+            label: '透明',
+            enabled: _transparentSupported,
+            selected: _active,
+            subtitle: _transparentSupported
+                ? '背景镂空，只保留主体（需 PNG / WEBP）'
+                : '不可用：$_unsupportedReason',
+          ),
+          DesktopMenuItem(
+            value: ImageBackground.opaque,
+            label: '不透明',
+            subtitle: '明确要求纯实底背景',
+            selected: background == ImageBackground.opaque,
+          ),
+        ],
+      );
+      if (context.mounted && selected != null && selected != background) {
+        onSelected(selected);
+      }
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus(
       disposition: UnfocusDisposition.scope,
     );

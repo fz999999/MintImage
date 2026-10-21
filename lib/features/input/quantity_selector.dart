@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../shared/widgets/desktop/desktop_popover.dart';
 import 'package:flutter/services.dart';
 
 import '../../shared/theme.dart';
@@ -18,8 +20,8 @@ class QuantitySelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final b = Theme.of(context).brightness;
 
-    return GestureDetector(
-      onTap: () => _showQuantityModal(context),
+    return SelectorChipTrigger(
+      onOpen: _showQuantityModal,
       child: SelectorChipShell(
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -30,7 +32,7 @@ class QuantitySelector extends StatelessWidget {
               color: AppColors.primaryStrong(b),
             ),
             const SizedBox(width: AppSpace.xxs),
-            SelectorChipLabel(value: '$count'),
+            SelectorChipLabel(label: '数量', value: '$count'),
           ],
         ),
       ),
@@ -38,6 +40,16 @@ class QuantitySelector extends StatelessWidget {
   }
 
   Future<void> _showQuantityModal(BuildContext context) async {
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      final result = await showDesktopPopover<int>(
+        context: context,
+        width: 280,
+        anchorRect: selectorChipAnchor(context),
+        builder: (_) => _DesktopQuantityEditor(initial: count),
+      );
+      if (context.mounted && result != null) onSelected(result);
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus(
       disposition: UnfocusDisposition.scope,
     );
@@ -54,6 +66,104 @@ class QuantitySelector extends StatelessWidget {
       );
     }
   }
+}
+
+class _DesktopQuantityEditor extends StatefulWidget {
+  const _DesktopQuantityEditor({required this.initial});
+  final int initial;
+  @override
+  State<_DesktopQuantityEditor> createState() => _DesktopQuantityEditorState();
+}
+
+class _DesktopQuantityEditorState extends State<_DesktopQuantityEditor> {
+  late final TextEditingController _controller;
+  int? get _value => int.tryParse(_controller.text.trim());
+  String? get _error {
+    if (_controller.text.trim().isEmpty) return '请输入生成数量';
+    if (!RegExp(r'^\d+$').hasMatch(_controller.text.trim()) || _value == null) {
+      return '请输入整数';
+    }
+    if (_value! < 1 || _value! > 16) return '生成数量须在 1–16 之间';
+    return null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.initial}');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_controller.value.composing.isValid &&
+        !_controller.value.composing.isCollapsed) {
+      return;
+    }
+    if (_error == null) Navigator.of(context).pop(_value);
+  }
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('生成数量', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _submit(),
+          decoration: InputDecoration(
+            labelText: '数量（1–16）',
+            errorText: _error,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [1, 2, 4, 8, 16]
+              .map(
+                (n) => ChoiceChip(
+                  label: Text('$n'),
+                  selected: _error == null && _value == n,
+                  onSelected: (_) => setState(() {
+                    _controller.value = TextEditingValue(
+                      text: '$n',
+                      selection: TextSelection.collapsed(offset: '$n'.length),
+                    );
+                  }),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            FilledButton(
+              onPressed: _error == null ? _submit : null,
+              child: const Text('确定'),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 }
 
 class _QuantityDialog extends StatefulWidget {
@@ -151,9 +261,7 @@ class _QuantityDialogState extends State<_QuantityDialog> {
                       : AppColors.surfaceSoft(b),
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                   border: Border.all(
-                    color: active
-                        ? AppColors.primary(b)
-                        : AppColors.border(b),
+                    color: active ? AppColors.primary(b) : AppColors.border(b),
                   ),
                 ),
                 alignment: Alignment.center,

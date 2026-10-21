@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../shared/widgets/desktop/desktop_menu.dart';
 
 import '../../core/models/generation_request.dart';
 import '../../shared/theme.dart';
@@ -18,8 +20,8 @@ class ImageFormatSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final b = Theme.of(context).brightness;
 
-    return GestureDetector(
-      onTap: () => _showSheet(context),
+    return SelectorChipTrigger(
+      onOpen: _showSheet,
       child: SelectorChipShell(
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -30,7 +32,7 @@ class ImageFormatSelector extends StatelessWidget {
               color: AppColors.primaryStrong(b),
             ),
             const SizedBox(width: AppSpace.xxs),
-            SelectorChipLabel(value: selectedFormat.label),
+            SelectorChipLabel(label: '格式', value: selectedFormat.label),
           ],
         ),
       ),
@@ -38,6 +40,24 @@ class ImageFormatSelector extends StatelessWidget {
   }
 
   Future<void> _showSheet(BuildContext context) async {
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      final selected = await showDesktopMenu<ImageOutputFormat>(
+        context: context,
+        title: '输出格式',
+        anchorRect: selectorChipAnchor(context),
+        items: ImageOutputFormat.values
+            .map(
+              (format) => DesktopMenuItem(
+                value: format,
+                label: format.label,
+                selected: format == selectedFormat,
+              ),
+            )
+            .toList(),
+      );
+      if (context.mounted && selected != null) onSelected(selected);
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus(
       disposition: UnfocusDisposition.scope,
     );

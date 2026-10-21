@@ -1,4 +1,8 @@
+import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
+import '../../shared/widgets/desktop/desktop_dialog.dart';
 import 'package:flutter/material.dart';
 
 import '../../shared/theme.dart';
@@ -6,17 +10,16 @@ import '../../shared/theme.dart';
 // --- Data models ---
 
 enum _PresetCategory {
-  general('通用比例', Icons.aspect_ratio_rounded),
-  photo('照片', Icons.photo_camera_rounded),
-  screen('屏幕/视频', Icons.tv_rounded),
-  web('Web', Icons.monitor_rounded),
-  mobile('移动设备', Icons.phone_iphone_rounded),
-  print('打印', Icons.description_rounded),
-  artwork('图稿与插画', Icons.brush_rounded);
+  general('通用比例'),
+  photo('照片'),
+  screen('屏幕/视频'),
+  web('Web'),
+  mobile('移动设备'),
+  print('打印'),
+  artwork('图稿与插画');
 
-  const _PresetCategory(this.label, this.icon);
+  const _PresetCategory(this.label);
   final String label;
-  final IconData icon;
 }
 
 class _SizeItem {
@@ -127,6 +130,15 @@ Future<(int, int)?> showSizePickerModal(
   required int currentWidth,
   required int currentHeight,
 }) {
+  if (defaultTargetPlatform == TargetPlatform.windows) {
+    return showDialog<(int, int)>(
+      context: context,
+      builder: (_) => _SizePickerSheet(
+        currentWidth: currentWidth,
+        currentHeight: currentHeight,
+      ),
+    );
+  }
   return showModalBottomSheet<(int, int)>(
     context: context,
     isScrollControlled: true,
@@ -159,6 +171,8 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   _SizeItem? _selectedItem;
   late final TextEditingController _wCtrl;
   late final TextEditingController _hCtrl;
+  ScrollController? _desktopGridController;
+  String? _desktopGridKey;
 
   @override
   void initState() {
@@ -171,6 +185,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
     );
     _inferFromCurrent();
   }
+
   void _inferFromCurrent() {
     if (widget.currentWidth == 0 || widget.currentHeight == 0) {
       _mode = _Mode.auto;
@@ -193,12 +208,19 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   void dispose() {
     _wCtrl.dispose();
     _hCtrl.dispose();
+    _desktopGridController?.dispose();
     super.dispose();
   }
 
   (int, int) get _computedSize {
     if (_mode == _Mode.auto) return (0, 0);
     if (_mode == _Mode.custom) {
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        return (
+          int.tryParse(_wCtrl.text.trim()) ?? 0,
+          int.tryParse(_hCtrl.text.trim()) ?? 0,
+        );
+      }
       final w = int.tryParse(_wCtrl.text.trim()) ?? 1024;
       final h = int.tryParse(_hCtrl.text.trim()) ?? 1024;
       return (w > 0 ? w : 1024, h > 0 ? h : 1024);
@@ -208,7 +230,24 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   }
 
   String? get _validationError {
+    if (_mode == _Mode.preset &&
+        _selectedItem == null &&
+        defaultTargetPlatform == TargetPlatform.windows) {
+      return '请选择一个预设尺寸';
+    }
     if (_mode != _Mode.custom) return null;
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      final wText = _wCtrl.text.trim();
+      final hText = _hCtrl.text.trim();
+      if (wText.isEmpty || hText.isEmpty) return '请输入宽度和高度';
+      if (!RegExp(r'^\d+$').hasMatch(wText) ||
+          !RegExp(r'^\d+$').hasMatch(hText) ||
+          int.tryParse(wText) == null ||
+          int.tryParse(hText) == null) {
+        return '宽高须为整数';
+      }
+      if (_computedSize.$1 <= 0 || _computedSize.$2 <= 0) return '宽高须大于 0';
+    }
     final (w, h) = _computedSize;
     if (w % 16 != 0 || h % 16 != 0) return '宽高须为 16 的倍数';
     if (w > 3840 || h > 3840) return '单边最大 3840px';
@@ -219,10 +258,72 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
     if (ratio > 3.0) return '长短边比例不能超过 3:1';
     return null;
   }
+
   @override
   Widget build(BuildContext context) {
     final b = Theme.of(context).brightness;
     final size = _computedSize;
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      return Focus(
+        canRequestFocus: false,
+        onKeyEvent: (_, event) {
+          if (event.logicalKey == LogicalKeyboardKey.escape &&
+              event is KeyDownEvent) {
+            Navigator.of(context).pop();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            return KeyEventResult.skipRemainingHandlers;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: DesktopDialog(
+          title: '设置图像尺寸',
+          width: 820,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _validationError != null
+                    ? '当前输入待修正'
+                    : size.$1 == 0
+                    ? '自动'
+                    : '${size.$1}×${size.$2}',
+              ),
+              const SizedBox(height: 12),
+              _buildModeTabs(),
+              const SizedBox(height: 16),
+              if (_mode == _Mode.auto) _buildAutoContent(),
+              if (_mode == _Mode.preset) _buildDesktopPresets(),
+              if (_mode == _Mode.custom) _buildCustomContent(),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: _validationError == null
+                  ? () {
+                      if ((_wCtrl.value.composing.isValid &&
+                              !_wCtrl.value.composing.isCollapsed) ||
+                          (_hCtrl.value.composing.isValid &&
+                              !_hCtrl.value.composing.isCollapsed)) {
+                        return;
+                      }
+                      Navigator.of(context).pop(size);
+                    }
+                  : null,
+              child: const Text('确定'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface(b),
@@ -273,9 +374,9 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
       children: [
         Text(
           '设置图像尺寸',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
         const Spacer(),
         Container(
@@ -323,7 +424,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
   Widget _tabButton(String text, bool active, VoidCallback onTap) {
     final b = Theme.of(context).brightness;
     return Expanded(
-      child: GestureDetector(
+      child: _sizeTap(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
@@ -339,13 +440,30 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
             text,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              color: active ? AppColors.textPrimary(b) : AppColors.textSecondary(b),
+              color: active
+                  ? AppColors.textPrimary(b)
+                  : AppColors.textSecondary(b),
             ),
           ),
         ),
       ),
     );
   }
+
+  Widget _sizeTap({required VoidCallback onTap, required Widget child}) {
+    if (defaultTargetPlatform != TargetPlatform.windows) {
+      return GestureDetector(onTap: onTap, child: child);
+    }
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: child,
+      ),
+    );
+  }
+
   Widget _buildAutoContent() {
     final b = Theme.of(context).brightness;
     return Container(
@@ -361,19 +479,93 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           const SizedBox(height: 12),
           Text(
             '由模型自动决定尺寸',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           Text(
             '不传递尺寸参数，由模型根据内容自行选择',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary(b),
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary(b)),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDesktopPresets() {
+    final items = _presetData[_category]!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final category in _PresetCategory.values)
+              ChoiceChip(
+                label: Text(category.label),
+                selected: category == _category,
+                onSelected: (_) => setState(() => _category = category),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = math.max(1, (constraints.maxWidth / 128).floor());
+            final selectedIndex = items.indexOf(_selectedItem ?? items.first);
+            final availableHeight = math.max(
+              96.0,
+              math.min(360.0, MediaQuery.sizeOf(context).height - 290),
+            );
+            final rowsVisible = (availableHeight / 102).floor();
+            final initialRow = selectedIndex < 0 ? 0 : selectedIndex ~/ columns;
+            final maxOffset = math.max(
+              0.0,
+              ((items.length / columns).ceil() * 102 - 6) - availableHeight,
+            );
+            _desktopGridController ??= ScrollController();
+            final gridKey = '${_category.name}:$columns:$rowsVisible';
+            if (_desktopGridKey != gridKey) {
+              _desktopGridKey = gridKey;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted &&
+                    _desktopGridKey == gridKey &&
+                    _desktopGridController!.hasClients) {
+                  _desktopGridController!.jumpTo(
+                    math.min(maxOffset, initialRow * 102.0),
+                  );
+                }
+              });
+            }
+            return SizedBox(
+              height: math.min(
+                availableHeight,
+                (items.length / columns).ceil() * 102.0 - 6,
+              ),
+              child: GridView.builder(
+                controller: _desktopGridController,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisExtent: 96,
+                  mainAxisSpacing: 6,
+                  crossAxisSpacing: 6,
+                ),
+                itemCount: items.length,
+                itemBuilder: (_, index) => _presetTile(items[index]),
+              ),
+            );
+          },
+        ),
+        if (_selectedItem == null)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('请选择一个预设尺寸'),
+          ),
+      ],
     );
   }
 
@@ -408,7 +600,11 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
         LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
-            final crossAxisCount = width > 500 ? 6 : width > 360 ? 5 : 4;
+            final crossAxisCount = width > 500
+                ? 6
+                : width > 360
+                ? 5
+                : 4;
             final gridHeight = width > 400 ? 360.0 : 280.0;
             return SizedBox(
               height: gridHeight,
@@ -428,6 +624,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
       ],
     );
   }
+
   Widget _categoryChip(_PresetCategory cat, bool active) {
     final b = Theme.of(context).brightness;
     return GestureDetector(
@@ -438,16 +635,23 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           vertical: 6,
         ),
         decoration: BoxDecoration(
-          color: active ? AppColors.primary(b).withValues(alpha: 0.08) : AppColors.surfaceSoft(b),
+          color: active
+              ? AppColors.primary(b).withValues(alpha: 0.08)
+              : AppColors.surfaceSoft(b),
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: active ? AppColors.primary(b) : AppColors.border(b).withValues(alpha: 0.5),
+            color: active
+                ? AppColors.primary(b)
+                : AppColors.border(b).withValues(alpha: 0.5),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(cat.icon, size: 14, color: active ? AppColors.primary(b) : AppColors.textSecondary(b)),
+            _categoryIcon(
+              cat,
+              active ? AppColors.primary(b) : AppColors.textSecondary(b),
+            ),
             const SizedBox(width: AppSpace.xxs),
             Text(
               cat.label,
@@ -463,6 +667,49 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
     );
   }
 
+  Widget _categoryIcon(
+    _PresetCategory category,
+    Color color,
+  ) => switch (category) {
+    _PresetCategory.general => Icon(
+      Icons.aspect_ratio_rounded,
+      size: 14,
+      color: color,
+    ),
+    _PresetCategory.photo => Icon(
+      Icons.photo_camera_rounded,
+      size: 14,
+      color: color,
+    ),
+    _PresetCategory.screen => Icon(Icons.tv_rounded, size: 14, color: color),
+    _PresetCategory.web => Icon(Icons.monitor_rounded, size: 14, color: color),
+    _PresetCategory.mobile => Icon(
+      Icons.phone_iphone_rounded,
+      size: 14,
+      color: color,
+    ),
+    _PresetCategory.print => Icon(
+      Icons.description_rounded,
+      size: 14,
+      color: color,
+    ),
+    _PresetCategory.artwork => Icon(
+      Icons.brush_rounded,
+      size: 14,
+      color: color,
+    ),
+  };
+
+  Widget _deviceIcon(IconData data, Color color) {
+    if (data == Icons.tablet_mac) {
+      return Icon(Icons.tablet_mac, size: 18, color: color);
+    }
+    if (data == Icons.phone_android) {
+      return Icon(Icons.phone_android, size: 18, color: color);
+    }
+    return Icon(Icons.phone_iphone, size: 18, color: color);
+  }
+
   Widget _presetTile(_SizeItem item) {
     final b = Theme.of(context).brightness;
     final active = _selectedItem == item && _mode == _Mode.preset;
@@ -472,15 +719,19 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
     final boxW = isHorizontal || isSquare ? 18.0 : 18.0 * item.w / item.h;
     final boxH = !isHorizontal || isSquare ? 18.0 : 18.0 * item.h / item.w;
 
-    return GestureDetector(
+    return _sizeTap(
       onTap: () => setState(() => _selectedItem = item),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
         decoration: BoxDecoration(
-          color: active ? AppColors.primary(b).withValues(alpha: 0.08) : AppColors.surfaceSoft(b),
+          color: active
+              ? AppColors.primary(b).withValues(alpha: 0.08)
+              : AppColors.surfaceSoft(b),
           borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
-            color: active ? AppColors.primary(b) : AppColors.border(b).withValues(alpha: 0.5),
+            color: active
+                ? AppColors.primary(b)
+                : AppColors.border(b).withValues(alpha: 0.5),
           ),
         ),
         child: Column(
@@ -488,7 +739,10 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (iconData != null)
-              Icon(iconData, size: 18, color: active ? AppColors.primary(b) : AppColors.textSecondary(b))
+              _deviceIcon(
+                iconData,
+                active ? AppColors.primary(b) : AppColors.textSecondary(b),
+              )
             else
               SizedBox(
                 width: 20,
@@ -500,7 +754,9 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(2),
                       border: Border.all(
-                        color: active ? AppColors.primary(b) : AppColors.textSecondary(b),
+                        color: active
+                            ? AppColors.primary(b)
+                            : AppColors.textSecondary(b),
                         width: 1.5,
                       ),
                     ),
@@ -531,6 +787,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
       ),
     );
   }
+
   Widget _buildCustomContent() {
     final b = Theme.of(context).brightness;
     final error = _validationError;
@@ -546,7 +803,10 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                 decoration: const InputDecoration(
                   labelText: '宽度',
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -566,7 +826,10 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                 decoration: const InputDecoration(
                   labelText: '高度',
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -593,6 +856,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
       ],
     );
   }
+
   Widget _buildActions((int, int) size) {
     return Row(
       children: [
@@ -627,4 +891,3 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
     );
   }
 }
-
