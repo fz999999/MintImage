@@ -1,0 +1,204 @@
+<!DOCTYPE html><html lang="zh-CN" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>设置 - 大川生图工具</title>
+<!-- Tailwind CSS v3 CDN with forms & container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              200: '#99f6e4',
+              300: '#5eead4',
+              400: '#2dd4bf',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+              900: '#134e4a',
+              950: '#042f2e',
+            },
+            sidebar: '#eef6f9',
+            canvas: '#f8fafc',
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"PingFang SC"', '"Microsoft YaHei"', '"Segoe UI"', 'Roboto', 'sans-serif'],
+          },
+          boxShadow: {
+            'card-sm': '0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.02)',
+            'card': '0 4px 6px -1px rgba(15, 23, 42, 0.04), 0 2px 4px -2px rgba(15, 23, 42, 0.02)',
+            'card-hover': '0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -4px rgba(15, 23, 42, 0.03)',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased font-sans select-none overflow-hidden h-screen flex flex-col">
+<!-- BEGIN: Desktop Window Titlebar -->
+
+<!-- END: Desktop Window Titlebar -->
+<!-- BEGIN: Main Work Area Container -->
+<div class="flex-1 flex overflow-hidden">
+<!-- BEGIN: Left Navigation Sidebar -->
+
+<!-- END: Left Navigation Sidebar -->
+<!-- BEGIN: Right-Hand Settings Content Panel -->
+<main class="flex-1 bg-slate-50/70 overflow-y-auto px-10 py-8 scroll-smooth" data-purpose="settings-panel-content">
+<div class="max-w-5xl mx-auto space-y-6 pb-16">
+<!-- Header Title Banner -->
+
+<!-- 1. Open Source Card (开源地址) -->
+
+<!-- 2. Request Timeout Card (请求超时) -->
+
+<!-- 3. Backup & Recovery Card (数据备份与恢复) -->
+
+<!-- 4. Image Generation API Section (生图API) -->
+<section class="space-y-3" data-purpose="section-generation-api">
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-teal-50 text-brand-700 border border-teal-100 flex items-center justify-center shrink-0">
+<svg class="w-4 h-4 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<div class="flex items-center gap-2">
+<h2 class="text-sm font-bold text-slate-800">生图 API</h2>
+<span class="text-xs bg-brand-50 text-brand-700 font-semibold px-2 py-0.5 rounded-full border border-teal-200/60">2 个配置</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="inline-flex p-0.5 rounded-lg bg-slate-200/60 text-xs font-medium text-slate-600">
+<button class="px-2.5 py-1 rounded-md bg-white text-slate-800 shadow-sm font-semibold transition-all" type="button">全部 (2)</button>
+<button class="px-2.5 py-1 rounded-md text-slate-500 hover:text-slate-800 transition-all" type="button">仅启用 (1)</button>
+</div>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-700 hover:bg-brand-800 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow transition-all" type="button">
+<svg class="w-3.5 h-3.5 text-teal-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="">添加服务商</span>
+</button>
+</div>
+</div>
+
+<div class="bg-white rounded-2xl border border-slate-200/80 shadow-card-sm divide-y divide-slate-100 overflow-hidden">
+<!-- Provider Row 1: 万川 (Active) -->
+<div class="p-4 bg-gradient-to-r from-white via-white to-teal-50/20 hover:bg-teal-50/10 transition-colors">
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+<div class="flex items-start gap-3.5">
+<div class="w-9 h-9 rounded-xl bg-teal-50 text-brand-700 border border-teal-200/70 flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+万
+</div>
+<div class="space-y-1.5">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-bold text-slate-900 text-sm">万川</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>使用中
+</span>
+<span class="text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded">OpenAI 兼容</span>
+<div class="flex items-center gap-1 text-slate-400 font-mono text-xs bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
+<span class="">https://chuanapi.com</span>
+<svg class="w-3 h-3 text-slate-400 hover:text-slate-600 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-wrap text-xs text-slate-500">
+<span class="">模型 (3):</span>
+<span class="text-[11px] bg-teal-50 text-teal-800 border border-teal-200 px-2 py-0.5 rounded font-mono font-medium">gpt-image-2</span>
+<span class="text-[11px] bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 rounded font-mono">dall-e-3</span>
+<span class="text-[11px] bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 rounded font-mono">flux-pro</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-3 self-end lg:self-center">
+<div class="flex items-center gap-3 text-xs border-r border-slate-200/80 pr-3">
+<div class="flex flex-col items-end">
+<span class="text-[10px] text-slate-400 uppercase tracking-wider">延迟响应</span>
+<span class="font-mono font-semibold text-emerald-700 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>182 ms
+</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] text-slate-400 uppercase tracking-wider">账户余额</span>
+<span class="font-medium text-slate-700">¥ 128.40</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5"><span class="px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200 inline-flex items-center gap-1 cursor-default"><svg class="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill-rule="evenodd"></path></svg>已启用</span><button class="px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-brand-700 bg-slate-50 hover:bg-brand-50 rounded-lg border border-slate-200 transition-colors flex items-center gap-1" title="测试连通性" type="button"><svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg><span class="">测试</span></button><button class="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200/70" title="编辑配置" type="button"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button><button class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0 border border-transparent hover:border-red-200/70" title="删除配置" type="button"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button></div>
+</div>
+</div>
+</div>
+
+<!-- Provider Row 2: Aihub -->
+<div class="p-4 hover:bg-slate-50/60 transition-colors">
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+<div class="flex items-start gap-3.5">
+<div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+Ai
+</div>
+<div class="space-y-1.5">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-bold text-slate-800 text-sm">Aihub</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">未启用</span>
+<span class="text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded">REST API</span>
+<div class="flex items-center gap-1 text-slate-400 font-mono text-xs bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
+<span class="">https://aihub.dog</span>
+<svg class="w-3 h-3 text-slate-400 hover:text-slate-600 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-wrap text-xs text-slate-500">
+<span class="">模型 (4):</span>
+<span class="text-[11px] bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded font-mono">gpt-image-2.5-flare</span>
+<span class="text-[11px] bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded font-mono">midjourney-v6</span>
+<span class="text-[11px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 font-medium">+2 更多</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-3 self-end lg:self-center">
+<div class="flex items-center gap-3 text-xs border-r border-slate-200/80 pr-3">
+<div class="flex flex-col items-end">
+<span class="text-[10px] text-slate-400 uppercase tracking-wider">延迟响应</span>
+<span class="font-mono font-medium text-slate-600 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>340 ms
+</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] text-slate-400 uppercase tracking-wider">账户余额</span>
+<span class="font-medium text-slate-700">$ 12.00</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5"><button class="px-2.5 py-1 text-xs font-semibold text-brand-700 hover:text-white bg-brand-50 hover:bg-brand-700 rounded-lg border border-teal-200/80 transition-colors inline-flex items-center justify-center min-w-[58px]" title="切换为主用服务商" type="button">启用</button><button class="px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-brand-700 bg-slate-50 hover:bg-brand-50 rounded-lg border border-slate-200 transition-colors flex items-center gap-1" title="测试连通性" type="button"><svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg><span class="">测试</span></button><button class="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200/70" title="编辑配置" type="button"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button><button class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0 border border-transparent hover:border-red-200/70" title="删除配置" type="button"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. Prompt Optimization API Section (提示词优化API) -->
+<section class="space-y-3.5" data-purpose="section-prompt-api">
+
+<!-- Empty State Notice Card -->
+
+<!-- Add Prompt API Button -->
+
+</section>
+<!-- 6. Danger Zone (清除历史记录) -->
+<section class="pt-2" data-purpose="danger-zone">
+
+</section>
+</div>
+</main>
+<!-- END: Right-Hand Settings Content Panel -->
+</div>
+<!-- END: Main Work Area Container -->
+
+
+
+
+</body></html>
