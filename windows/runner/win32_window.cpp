@@ -134,10 +134,11 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
+  // Initial size is in physical pixels; Flutter handles DPI scaling of content.
   HWND window = CreateWindow(
       window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
-      Scale(size.width, scale_factor), Scale(size.height, scale_factor),
+      static_cast<int>(size.width), static_cast<int>(size.height),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
 
   if (!window) {

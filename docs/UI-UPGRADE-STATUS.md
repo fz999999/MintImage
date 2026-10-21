@@ -34,7 +34,7 @@
 | 9/10 hover 三圆钮、180ms 上移 4px | `image_cell.dart` `_HoverCircleButton`、`AnimatedContainer` |
 | 16 参数行 `Wrap` | `bottom_input_bar.dart` `Row(Expanded(Wrap), BalanceLabel)` |
 | 17 胶囊去前缀加图标 | 七个 selector 各自图标 + 真实值；`SelectorChipShell` 统一外壳 |
-| 18 余额占位 | `lib/features/input/balance_label.dart`，当前恒传 `null`（不渲染） |
+| 18 余额 | `lib/features/input/balance_label.dart`（纯展示）+ `channel_balance.dart`（取数），右上角随当前中转站切换；数据源见决策 18 更新 |
 | 19 附件上限 8 | `appendImageFromRecord` / `_handlePasteShortcut` / `_pickAttachments` 三入口 + `_prefillAttachments` 兜底 |
 | 21 备份分两组 | `settings_page.dart` `_DataBackupCard` + `_BackupGroup` |
 | 22 超时行内编辑 | `_RequestTimeoutCard`，clamp 5–3600，默认仍 600 |
