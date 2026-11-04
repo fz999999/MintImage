@@ -196,9 +196,17 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('流式请求'),
-                      subtitle: const Text('启用后发送 stream: true，可降低超时风险'),
-                      value: _useStreaming,
-                      onChanged: (v) => setState(() => _useStreaming = v),
+                      subtitle: Text(
+                        _apiMode == ImageGenerationApiMode.imagesAsync
+                            ? '异步模式会提交任务并自动查询结果'
+                            : '启用后逐步接收结果，可降低超时风险',
+                      ),
+                      value:
+                          _useStreaming &&
+                          _apiMode != ImageGenerationApiMode.imagesAsync,
+                      onChanged: _apiMode == ImageGenerationApiMode.imagesAsync
+                          ? null
+                          : (v) => setState(() => _useStreaming = v),
                     ),
                     const SizedBox(height: 14),
                     ModelNameField(
@@ -240,7 +248,8 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
         apiKey: _apiKeyController.text.trim(),
         model: _modelController.text.trim(),
         apiMode: _apiMode,
-        useStreaming: _useStreaming,
+        useStreaming:
+            _useStreaming && _apiMode != ImageGenerationApiMode.imagesAsync,
       );
       await notifier.setActiveProfile(created.id);
     } else {
@@ -251,7 +260,8 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
           apiKey: _apiKeyController.text.trim(),
           model: _modelController.text.trim(),
           apiMode: _apiMode,
-          useStreaming: _useStreaming,
+          useStreaming:
+              _useStreaming && _apiMode != ImageGenerationApiMode.imagesAsync,
         ),
       );
     }

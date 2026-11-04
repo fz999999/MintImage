@@ -145,7 +145,8 @@ class OpenAiClient {
       );
 
       final result = await _readStreamingResult(
-        response.data,
+        response,
+        title,
         isImagesApi: isImagesApi,
       );
       stopwatch.stop();
@@ -220,7 +221,8 @@ class OpenAiClient {
         cancelToken: cancelToken,
       );
       final result = await _readStreamingResult(
-        response.data,
+        response,
+        title,
         isImagesApi: true,
       );
       stopwatch.stop();
@@ -299,9 +301,11 @@ class OpenAiClient {
   }
 
   Future<Map<String, dynamic>> _readStreamingResult(
-    ResponseBody? responseBody, {
+    Response<ResponseBody> response,
+    String title, {
     required bool isImagesApi,
   }) async {
+    final responseBody = response.data;
     if (responseBody == null) {
       return isImagesApi ? {'data': []} : {'output': []};
     }
@@ -310,6 +314,8 @@ class OpenAiClient {
     final outputItems = <Map<String, dynamic>>[];
     Map<String, dynamic>? completedResponse;
     String? currentEventType;
+    bool? isEventStream;
+    final jsonBody = StringBuffer();
 
     await for (final rawLine
         in responseBody.stream
@@ -317,6 +323,15 @@ class OpenAiClient {
             .transform(utf8.decoder)
             .transform(const LineSplitter())) {
       final line = rawLine.trim();
+      if (isEventStream == null && line.isNotEmpty) {
+        isEventStream =
+            line.startsWith(':') ||
+            const ['data:', 'event:', 'id:', 'retry:'].any(line.startsWith);
+      }
+      if (isEventStream == false) {
+        jsonBody.writeln(rawLine);
+        continue;
+      }
       if (line.isEmpty) {
         currentEventType = null;
         continue;
@@ -354,11 +369,17 @@ class OpenAiClient {
         final error = detail['error'];
         final reason = error is Map ? error['message'] : error;
         throw ApiException(
-          '流式请求失败：${reason ?? detail['message'] ?? detail['incomplete_details'] ?? eventType}',
+          _withResponseBody(
+            '流式请求失败：${reason ?? detail['message'] ?? detail['incomplete_details'] ?? eventType}',
+            data,
+          ),
         );
       }
 
       if (isImagesApi) {
+        if (data['task_id'] != null || data['data'] is List) {
+          return data;
+        }
         if (_isImageStreamResultEvent(eventType)) {
           final b64 = data['b64_json'] as String?;
           if (b64 != null && b64.isNotEmpty) {
@@ -384,6 +405,19 @@ class OpenAiClient {
           });
         }
       }
+    }
+
+    if (isEventStream == false) {
+      // Some Images providers return a JSON task even when stream was requested.
+      return _parseJsonResponse(
+        Response<Object?>(
+          data: jsonBody.toString(),
+          requestOptions: response.requestOptions,
+          statusCode: response.statusCode,
+          headers: response.headers,
+        ),
+        title,
+      );
     }
 
     if (isImagesApi) {
@@ -456,7 +490,10 @@ class OpenAiClient {
     final contentType =
         response.headers.value(Headers.contentTypeHeader) ?? 'unknown';
     final message = _withStatusCode(
-      '接口响应不是有效的 JSON 对象（Content-Type: $contentType），请检查 Base URL 或服务端返回格式。',
+      _withResponseBody(
+        '接口响应不是有效的 JSON 对象（Content-Type: $contentType），请检查 Base URL 或服务端返回格式。',
+        response.data,
+      ),
       response.statusCode,
     );
     unawaited(
@@ -470,7 +507,8 @@ class OpenAiClient {
 
   static String extractErrorMessage(DioException error) {
     final statusCode = error.response?.statusCode;
-    Object? responseData = error.response?.data;
+    final rawResponseData = error.response?.data;
+    Object? responseData = rawResponseData;
     if (responseData is String) {
       try {
         responseData = jsonDecode(responseData);
@@ -485,46 +523,76 @@ class OpenAiClient {
       final nestedError = map['error'];
 
       if (nestedError is Map && nestedError['message'] is String) {
-        apiMessage = nestedError['message'] as String;
+        final message = (nestedError['message'] as String).trim();
+        if (message.isNotEmpty) {
+          apiMessage = message;
+        }
       } else if (nestedError is String && nestedError.trim().isNotEmpty) {
         apiMessage = nestedError.trim();
       }
 
       apiMessage ??= switch (map['message']) {
-        String value => value,
+        String value when value.trim().isNotEmpty => value.trim(),
         _ => null,
       };
     } else if (responseData is String && responseData.trim().isNotEmpty) {
       apiMessage = responseData.trim();
     }
 
-    if (apiMessage != null && apiMessage.isNotEmpty) {
-      return _withStatusCode(apiMessage, statusCode);
+    final cause = error.error?.toString() ?? error.message;
+    final message =
+        apiMessage ??
+        switch (error.type) {
+          DioExceptionType.connectionTimeout ||
+          DioExceptionType.sendTimeout ||
+          DioExceptionType.receiveTimeout => '请求超时，请检查超时设置或稍后重试。',
+          DioExceptionType.connectionError =>
+            '网络连接失败，请检查网络或 Base URL。${cause == null ? '' : '\n$cause'}',
+          DioExceptionType.badCertificate => '证书校验失败，请检查 HTTPS 配置。',
+          DioExceptionType.badResponse =>
+            rawResponseData == null ||
+                    (rawResponseData is String &&
+                        rawResponseData.trim().isEmpty)
+                ? '请求失败，接口返回内容为空。'
+                : '请求失败。',
+          DioExceptionType.cancel => '请求已取消。',
+          DioExceptionType.unknown =>
+            error.message ?? error.error?.toString() ?? '请求失败，请稍后重试。',
+        };
+    return _withStatusCode(
+      _withResponseBody(message, rawResponseData),
+      statusCode,
+    );
+  }
+
+  static String _withResponseBody(String message, Object? data) {
+    if (data == null || (data is String && data.trim().isEmpty)) {
+      return message;
     }
 
-    switch (error.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        return '请求超时，请检查超时设置或稍后重试。';
-      case DioExceptionType.connectionError:
-        final cause = error.error?.toString() ?? error.message;
-        return _withStatusCode(
-          '网络连接失败，请检查网络或 Base URL。${cause == null ? '' : '\n$cause'}',
-          statusCode,
-        );
-      case DioExceptionType.badCertificate:
-        return _withStatusCode('证书校验失败，请检查 HTTPS 配置。', statusCode);
-      case DioExceptionType.badResponse:
-        return _withStatusCode('请求失败，请检查接口返回。', statusCode);
-      case DioExceptionType.cancel:
-        return '请求已取消。';
-      case DioExceptionType.unknown:
-        return _withStatusCode(
-          error.message ?? error.error?.toString() ?? '请求失败，请稍后重试。',
-          statusCode,
-        );
+    if (data is String) {
+      final text = data.trim();
+      try {
+        data = jsonDecode(text);
+      } on FormatException {
+        data = text;
+      }
     }
+
+    String body;
+    if (data is String) {
+      body = data;
+    } else {
+      try {
+        body = const JsonEncoder.withIndent('  ').convert(data);
+      } catch (_) {
+        body = data.toString();
+      }
+    }
+    if (body == message) {
+      return message;
+    }
+    return '$message\n\n接口返回：\n$body';
   }
 
   static String _withStatusCode(String message, int? statusCode) {

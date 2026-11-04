@@ -4,9 +4,9 @@ import '../models/generation_request.dart';
 import '../models/generation_result.dart';
 import '../models/settings_model.dart';
 import 'api_request_logger.dart';
+import 'image_task_api.dart';
 import 'openai_client.dart';
 import 'responses_image_api.dart';
-import 'rightapi_image_api.dart';
 
 class ImageGenerationApi {
   const ImageGenerationApi({this.requestLogService});
@@ -76,39 +76,37 @@ class ImageGenerationApi {
       'quality': request.quality.apiValue,
       'output_format': request.outputFormat.apiValue,
     };
+    final useAsync = profile.apiMode == ImageGenerationApiMode.imagesAsync;
+    if (useAsync) {
+      body['async'] = true;
+    }
     if (request.apiSize != null) {
       body['size'] = request.apiSize;
     }
     if (responseFormat != null && responseFormat.trim().isNotEmpty) {
-      // GPT Image models omit this legacy field; RightAPI returns URLs.
-      if (!_isGptImage2Family(profile.model) && !profile.usesRightApiImages) {
+      // GPT Image models omit this legacy field; task APIs return URLs.
+      if (!_isGptImage2Family(profile.model) && !useAsync) {
         body['response_format'] = responseFormat;
       }
     }
 
-    if (profile.usesRightApiImages) {
-      final response = await submitRightApiImageTask(
-        client: client,
-        path: '/v1/images/generations',
-        body: body,
-        timeoutSeconds: timeoutSeconds,
-        cancelToken: cancelToken,
-      );
-      return _parseResults(response);
-    }
-
-    final response = profile.useStreaming
-        ? await client.postJsonStreaming(
-            '/v1/images/generations',
-            body,
-            cancelToken: cancelToken,
-            isImagesApi: true,
-          )
-        : await client.postJson(
-            '/v1/images/generations',
-            body,
-            cancelToken: cancelToken,
-          );
+    final response = await requestImageResult(
+      client: client,
+      timeoutSeconds: timeoutSeconds,
+      cancelToken: cancelToken,
+      submit: () => profile.useStreaming && !useAsync
+          ? client.postJsonStreaming(
+              '/v1/images/generations',
+              body,
+              cancelToken: cancelToken,
+              isImagesApi: true,
+            )
+          : client.postJson(
+              '/v1/images/generations',
+              body,
+              cancelToken: cancelToken,
+            ),
+    );
 
     return _parseResults(response);
   }

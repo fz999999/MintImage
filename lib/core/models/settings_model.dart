@@ -8,6 +8,7 @@ const _uuid = Uuid();
 
 enum ImageGenerationApiMode {
   images('images', 'Images API (/v1/images)', 'Images API', 'gpt-image-2'),
+  imagesAsync('images_async', 'Images API（异步任务）', 'Images 异步', 'gpt-image-2'),
   responses(
     'responses',
     'Responses API (/v1/responses)',
@@ -29,7 +30,8 @@ enum ImageGenerationApiMode {
 
   String get generationPath {
     return switch (this) {
-      ImageGenerationApiMode.images => '/v1/images/generations',
+      ImageGenerationApiMode.images ||
+      ImageGenerationApiMode.imagesAsync => '/v1/images/generations',
       ImageGenerationApiMode.responses => '/v1/responses',
     };
   }
@@ -73,11 +75,21 @@ class ApiProfile {
   }
 
   factory ApiProfile.fromJson(Map<String, dynamic> json) {
-    final apiMode = ImageGenerationApiMode.fromStorageValue(json['apiMode']);
+    var apiMode = ImageGenerationApiMode.fromStorageValue(json['apiMode']);
+    var baseUrl = json['baseUrl'] as String? ?? 'https://api.openai.com';
+    if (apiMode == ImageGenerationApiMode.images) {
+      final legacyUrl = _legacyRightApiBaseUrl(baseUrl);
+      if (legacyUrl != null) {
+        // Migrate old profiles to the explicit protocol, keeping URL cleanup
+        // separate from request dispatch. New hosts need no provider detection.
+        apiMode = ImageGenerationApiMode.imagesAsync;
+        baseUrl = legacyUrl;
+      }
+    }
     return ApiProfile(
       id: json['id'] as String,
       name: json['name'] as String? ?? '默认',
-      baseUrl: json['baseUrl'] as String? ?? 'https://api.openai.com',
+      baseUrl: baseUrl,
       apiKey: json['apiKey'] as String? ?? '',
       model: json['model'] as String? ?? apiMode.defaultModel,
       apiMode: apiMode,
@@ -93,28 +105,35 @@ class ApiProfile {
   final ImageGenerationApiMode apiMode;
   final bool useStreaming;
 
-  bool get usesRightApiImages {
-    final host = Uri.tryParse(baseUrl.trim())?.host.toLowerCase();
-    return apiMode == ImageGenerationApiMode.images &&
-        (host == 'rightapi.ai' || host == 'www.rightapi.ai');
-  }
-
   String get normalizedBaseUrl {
     final normalized = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    if (usesRightApiImages) {
-      final uri = Uri.parse(normalized);
-      if (const [
-        '',
-        '/v1',
-        '/draw',
-        '/draw/v1',
-      ].contains(uri.path.toLowerCase())) {
-        // Current image endpoints live at the site root, including task lookup.
-        return uri
-            .replace(host: 'rightapi.ai', path: '')
-            .toString()
-            .replaceAll(RegExp(r'/+$'), '');
-      }
+    if (apiMode != ImageGenerationApiMode.responses &&
+        normalized.endsWith('/v1')) {
+      return normalized.substring(0, normalized.length - 3);
+    }
+    return normalized;
+  }
+
+  static String? _legacyRightApiBaseUrl(String baseUrl) {
+    final normalized = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final uri = Uri.tryParse(normalized);
+    if (uri == null ||
+        !const [
+          'rightapi.ai',
+          'www.rightapi.ai',
+        ].contains(uri.host.toLowerCase())) {
+      return null;
+    }
+    if (const [
+      '',
+      '/v1',
+      '/draw',
+      '/draw/v1',
+    ].contains(uri.path.toLowerCase())) {
+      return uri
+          .replace(host: 'rightapi.ai', path: '')
+          .toString()
+          .replaceAll(RegExp(r'/+$'), '');
     }
     return normalized;
   }
@@ -124,7 +143,8 @@ class ApiProfile {
 
   String get editEndpoint {
     return switch (apiMode) {
-      ImageGenerationApiMode.images => '$normalizedBaseUrl/v1/images/edits',
+      ImageGenerationApiMode.images || ImageGenerationApiMode.imagesAsync =>
+        '$normalizedBaseUrl/v1/images/edits',
       ImageGenerationApiMode.responses => '$normalizedBaseUrl/v1/responses',
     };
   }

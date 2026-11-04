@@ -3,11 +3,61 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mint_image/core/api/openai_client.dart';
 import 'package:mint_image/core/api/prompt_optimization_api.dart';
 import 'package:mint_image/core/models/settings_model.dart';
 
 void main() {
   group('PromptOptimizationApi', () {
+    for (final protocol in [
+      PromptOptimizationProtocol.openAiChatCompletions,
+      PromptOptimizationProtocol.openAiResponses,
+    ]) {
+      for (final contentType in [ContentType.json, ContentType.text]) {
+        test(
+          'preserves HTTP error details for $protocol ($contentType)',
+          () async {
+            final body = {
+              'error': {'code': 'rate_limit_exceeded'},
+              'detail': '请求频率超限，请稍后重试',
+              'request_id': 'req_optimization_test',
+            };
+            final server = await _startServer((request) async {
+              await request.drain<void>();
+              request.response.statusCode = HttpStatus.tooManyRequests;
+              request.response.headers.contentType = contentType;
+              request.response.write(jsonEncode(body));
+              await request.response.close();
+            });
+            addTearDown(() => server.close(force: true));
+
+            await expectLater(
+              const PromptOptimizationApi().optimize(
+                prompt: 'cat',
+                direction: PromptOptimizationDirection.strengthen,
+                profile: _profileFor(server, protocol: protocol),
+                timeoutSeconds: 10,
+              ),
+              throwsA(
+                isA<ApiException>()
+                    .having((error) => error.statusCode, 'statusCode', 429)
+                    .having(
+                      (error) => error.message,
+                      'message',
+                      allOf(
+                        startsWith('HTTP 429：'),
+                        endsWith(
+                          const JsonEncoder.withIndent('  ').convert(body),
+                        ),
+                      ),
+                    ),
+              ),
+            );
+          },
+        );
+      }
+    }
+
     test(
       'uses OpenAI Chat Completions format and parses message text',
       () async {

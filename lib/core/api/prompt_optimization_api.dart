@@ -275,7 +275,8 @@ class PromptOptimizationApi {
     } on DioException catch (error) {
       stopwatch.stop();
       final responseData = await _decodeResponseData(error.response?.data);
-      final message = _extractErrorMessage(error, responseData);
+      error.response?.data = responseData;
+      final message = OpenAiClient.extractErrorMessage(error);
       unawaited(
         requestLogService?.logError(
           title,
@@ -284,7 +285,7 @@ class PromptOptimizationApi {
           '响应体:\n${_summarizeData(responseData)}',
         ),
       );
-      throw ApiException(message);
+      throw ApiException(message, statusCode: error.response?.statusCode);
     }
   }
 
@@ -295,7 +296,7 @@ class PromptOptimizationApi {
 
     final text = await data.stream
         .map<List<int>>((chunk) => chunk)
-        .transform(utf8.decoder)
+        .transform(const Utf8Decoder(allowMalformed: true))
         .join();
     if (text.trim().isEmpty) {
       return text;
@@ -306,33 +307,6 @@ class PromptOptimizationApi {
     } catch (_) {
       return text;
     }
-  }
-
-  String _extractErrorMessage(DioException error, Object? responseData) {
-    if (responseData is ResponseBody) {
-      return OpenAiClient.extractErrorMessage(error);
-    }
-
-    final statusCode = error.response?.statusCode;
-    String? apiMessage;
-    if (responseData is Map) {
-      final map = Map<String, dynamic>.from(responseData);
-      final nestedError = map['error'];
-      if (nestedError is Map && nestedError['message'] is String) {
-        apiMessage = nestedError['message'] as String;
-      }
-      apiMessage ??= switch (map['message']) {
-        String value => value,
-        _ => null,
-      };
-    } else if (responseData is String && responseData.trim().isNotEmpty) {
-      apiMessage = responseData.trim();
-    }
-
-    if (apiMessage != null && apiMessage.trim().isNotEmpty) {
-      return statusCode == null ? apiMessage : 'HTTP $statusCode：$apiMessage';
-    }
-    return OpenAiClient.extractErrorMessage(error);
   }
 
   Future<Map<String, dynamic>> _readStreamingResponse(

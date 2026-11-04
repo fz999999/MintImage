@@ -117,8 +117,10 @@ void main() {
     'https://rightapi.ai/draw/v1/',
   ]) {
     test('RightAPI image endpoints normalize $baseUrl to the site root', () {
-      final profile = ApiProfile.initial().copyWith(baseUrl: baseUrl);
-      expect(profile.usesRightApiImages, isTrue);
+      final profile = ApiProfile.fromJson(
+        ApiProfile.initial().copyWith(baseUrl: baseUrl).toJson(),
+      );
+      expect(profile.apiMode, ImageGenerationApiMode.imagesAsync);
       expect(profile.normalizedBaseUrl, 'https://rightapi.ai');
       expect(
         profile.generationEndpoint,
@@ -133,16 +135,44 @@ void main() {
       baseUrl: 'https://rightapi.ai/codex/v1/',
       apiMode: ImageGenerationApiMode.responses,
     );
-    expect(profile.usesRightApiImages, isFalse);
+    expect(profile.apiMode, ImageGenerationApiMode.responses);
     expect(profile.normalizedBaseUrl, 'https://rightapi.ai/codex/v1');
   });
 
-  test('RightAPI detection requires its exact host', () {
-    final profile = ApiProfile.initial().copyWith(
-      baseUrl: 'https://rightapi.ai.example.com/draw/',
+  test('legacy migration requires the exact former host', () {
+    final profile = ApiProfile.fromJson(
+      ApiProfile.initial()
+          .copyWith(baseUrl: 'https://rightapi.ai.example.com/draw/')
+          .toJson(),
     );
-    expect(profile.usesRightApiImages, isFalse);
+    expect(profile.apiMode, ImageGenerationApiMode.images);
     expect(profile.normalizedBaseUrl, 'https://rightapi.ai.example.com/draw');
+  });
+
+  for (final baseUrl in [
+    'https://api.site',
+    'https://another.example/gateway',
+  ]) {
+    test('async Images protocol persists independently of $baseUrl', () {
+      final profile = ApiProfile.initial().copyWith(
+        baseUrl: '$baseUrl/v1/',
+        apiMode: ImageGenerationApiMode.imagesAsync,
+      );
+      final decoded = ApiProfile.fromJson(profile.toJson());
+      expect(decoded.apiMode, ImageGenerationApiMode.imagesAsync);
+      expect(decoded.normalizedBaseUrl, baseUrl);
+      expect(decoded.generationEndpoint, '$baseUrl/v1/images/generations');
+      expect(decoded.editEndpoint, '$baseUrl/v1/images/edits');
+    });
+  }
+
+  test('migrated async profiles retain the protocol after a domain change', () {
+    final profile = ApiProfile.fromJson(
+      ApiProfile.initial().copyWith(baseUrl: 'https://rightapi.ai').toJson(),
+    ).copyWith(baseUrl: 'https://api.site');
+    final decoded = ApiProfile.fromJson(profile.toJson());
+    expect(decoded.apiMode, ImageGenerationApiMode.imagesAsync);
+    expect(decoded.normalizedBaseUrl, 'https://api.site');
   });
 
   test('legacy b64_json responseFormat is normalized to null', () {

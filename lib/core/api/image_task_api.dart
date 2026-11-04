@@ -1,12 +1,13 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import 'openai_client.dart';
 
-/// RightAPI returns a task ID first, then an Images response from /v1/tasks.
-Future<Map<String, dynamic>> submitRightApiImageTask({
+/// Accept immediate Images results or poll /v1/tasks when a task_id is returned.
+Future<Map<String, dynamic>> requestImageResult({
   required OpenAiClient client,
-  required String path,
-  required Map<String, dynamic> body,
+  required Future<Map<String, dynamic>> Function() submit,
   required int timeoutSeconds,
   CancelToken? cancelToken,
 }) async {
@@ -17,7 +18,7 @@ Future<Map<String, dynamic>> submitRightApiImageTask({
     final remaining = timeout - stopwatch.elapsed;
     return operation.timeout(
       remaining > Duration.zero ? remaining : Duration.zero,
-      onTimeout: () => throw const ApiException('RightAPI 异步任务轮询超时。'),
+      onTimeout: () => throw const ApiException('图片请求或异步任务轮询超时。'),
     );
   }
 
@@ -28,9 +29,7 @@ Future<Map<String, dynamic>> submitRightApiImageTask({
   }
 
   checkCancellation();
-  var response = await withinDeadline(
-    client.postJson(path, {...body, 'async': true}, cancelToken: cancelToken),
-  );
+  var response = await withinDeadline(submit());
   String? taskId;
   while (true) {
     checkCancellation();
@@ -39,21 +38,28 @@ Future<Map<String, dynamic>> submitRightApiImageTask({
       final error = response['error'];
       final detail = error is Map ? error['message'] : error;
       throw ApiException(
-        'RightAPI 任务失败（$status）：${detail ?? response['message'] ?? '未知错误'}',
+        '异步任务失败（$status）：${detail ?? response['message'] ?? '未知错误'}'
+        '\n\n接口返回：\n${const JsonEncoder.withIndent('  ').convert(response)}',
       );
     }
     if (response['data'] is List) {
       return response;
     }
     if (status == 'completed') {
-      throw const ApiException('接口响应缺少图片数据。');
+      throw ApiException(
+        '接口响应缺少图片数据。'
+        '\n\n接口返回：\n${const JsonEncoder.withIndent('  ').convert(response)}',
+      );
     }
     final returnedTaskId = response['task_id'];
     if (taskId == null) {
       if (returnedTaskId is! String || returnedTaskId.trim().isEmpty) {
-        throw const ApiException('RightAPI 异步提交未返回 task_id。');
+        throw ApiException(
+          '接口响应缺少图片数据或有效的 task_id。'
+          '\n\n接口返回：\n${const JsonEncoder.withIndent('  ').convert(response)}',
+        );
       }
-      taskId = returnedTaskId;
+      taskId = returnedTaskId.trim();
     }
 
     await withinDeadline(

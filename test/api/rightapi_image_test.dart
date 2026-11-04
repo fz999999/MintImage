@@ -11,6 +11,201 @@ import 'package:mint_image/core/models/generation_request.dart';
 import 'package:mint_image/core/models/settings_model.dart';
 
 void main() {
+  for (final baseUrl in [
+    'http://api.site',
+    'http://future-provider.example/gateway/v1/',
+  ]) {
+    for (final apiMode in [
+      ImageGenerationApiMode.images,
+      ImageGenerationApiMode.imagesAsync,
+    ]) {
+      for (final useStreaming in [false, true]) {
+        test('polls $baseUrl using $apiMode (stream=$useStreaming)', () async {
+          var submissions = 0;
+          var polls = 0;
+          final prefix = baseUrl.contains('gateway') ? '/gateway' : '';
+          await _withRightApiServer(
+            (request) async {
+              expect(
+                request.headers.value(HttpHeaders.authorizationHeader),
+                'Bearer test-key',
+              );
+              if (request.method == 'POST') {
+                submissions++;
+                expect(request.uri.path, '$prefix/v1/images/generations');
+                final body =
+                    jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+                final useAsync = apiMode == ImageGenerationApiMode.imagesAsync;
+                expect(body['async'], useAsync ? isTrue : isNull);
+                expect(
+                  body['stream'],
+                  useStreaming && !useAsync ? isTrue : isNull,
+                );
+                request.response.headers.contentType = ContentType.text;
+                request.response.write(
+                  const JsonEncoder.withIndent('  ').convert({
+                    'task_id': 'task any-domain',
+                    'status': 'processing',
+                  }),
+                );
+                await request.response.close();
+              } else {
+                polls++;
+                expect(
+                  Uri.decodeComponent(request.uri.path),
+                  '$prefix/v1/tasks/task any-domain',
+                );
+                await _respond(request, {
+                  'data': [
+                    {'url': 'https://example.com/protocol.webp'},
+                  ],
+                });
+              }
+            },
+            () async {
+              final results = await const ImageGenerationApi().generate(
+                _request(),
+                _profile(
+                  baseUrl: baseUrl,
+                  apiMode: apiMode,
+                  useStreaming: useStreaming,
+                ),
+                timeoutSeconds: 10,
+              );
+              expect(
+                results.single.imageUrl,
+                'https://example.com/protocol.webp',
+              );
+            },
+          );
+          expect(submissions, 1);
+          expect(polls, 1);
+        });
+      }
+    }
+  }
+
+  for (final useStreaming in [false, true]) {
+    test(
+      'multipart edits follow returned tasks (stream=$useStreaming)',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'async-image-edit-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final image = await File(
+          '${directory.path}/image.png',
+        ).writeAsBytes([1, 2, 3]);
+        await _withRightApiServer(
+          (request) async {
+            if (request.method == 'POST') {
+              expect(request.uri.path, '/v1/images/edits');
+              expect(
+                request.headers.contentType?.mimeType,
+                'multipart/form-data',
+              );
+              final body = await utf8.decoder.bind(request).join();
+              expect(body, contains('name="image[]"'));
+              expect(body, contains('filename="image.png"'));
+              await _respond(request, {
+                'task_id': 'task_edit',
+                'status': 'queued',
+              });
+            } else {
+              expect(request.uri.path, '/v1/tasks/task_edit');
+              await _respond(request, {
+                'data': [
+                  {'url': 'https://example.com/multipart.webp'},
+                ],
+              });
+            }
+          },
+          () async {
+            final results = await const ImageEditApi().edit(
+              _request(imagePaths: [image.path]),
+              _profile(baseUrl: 'http://api.site', useStreaming: useStreaming),
+              timeoutSeconds: 10,
+            );
+            expect(
+              results.single.imageUrl,
+              'https://example.com/multipart.webp',
+            );
+          },
+        );
+      },
+    );
+  }
+
+  test('polling HTTP errors retain the full response body', () async {
+    final body = {
+      'detail': '查询次数过多',
+      'request_id': 'req_polling_limit',
+      'retry_after': 60,
+    };
+    await _withRightApiServer(
+      (request) async {
+        await request.drain<void>();
+        if (request.method == 'POST') {
+          await _respond(request, {
+            'task_id': 'task_limited',
+            'status': 'processing',
+          });
+        } else {
+          request.response.statusCode = 429;
+          await _respond(request, body);
+        }
+      },
+      () async {
+        await expectLater(
+          const ImageGenerationApi().generate(
+            _request(),
+            _profile(baseUrl: 'http://api.site'),
+            timeoutSeconds: 10,
+          ),
+          throwsA(
+            isA<ApiException>()
+                .having((error) => error.statusCode, 'statusCode', 429)
+                .having(
+                  (error) => error.message,
+                  'message',
+                  endsWith(const JsonEncoder.withIndent('  ').convert(body)),
+                ),
+          ),
+        );
+      },
+    );
+  });
+
+  test('an invalid task response retains the provider details', () async {
+    final body = {
+      'task_id': ' ',
+      'detail': 'invalid task',
+      'request_id': 'req_invalid',
+    };
+    await _withRightApiServer(
+      (request) async {
+        await request.drain<void>();
+        await _respond(request, body);
+      },
+      () async {
+        await expectLater(
+          const ImageGenerationApi().generate(
+            _request(),
+            _profile(baseUrl: 'http://api.site'),
+            timeoutSeconds: 10,
+          ),
+          throwsA(
+            isA<ApiException>().having(
+              (error) => error.message,
+              'message',
+              endsWith(const JsonEncoder.withIndent('  ').convert(body)),
+            ),
+          ),
+        );
+      },
+    );
+  });
+
   test(
     'RightAPI generation preserves pixel size and polls for the image',
     () async {
@@ -69,9 +264,12 @@ void main() {
     },
   );
 
-  test(
-    'RightAPI edits use the edits endpoint and retain image options',
-    () async {
+  for (final baseUrl in [
+    'http://www.rightapi.ai/draw/v1/',
+    'http://api.site',
+    'http://future-provider.example',
+  ]) {
+    test('async edits retain image options on $baseUrl', () async {
       final directory = await Directory.systemTemp.createTemp('rightapi-edit-');
       addTearDown(() => directory.delete(recursive: true));
       final first = await File(
@@ -115,8 +313,11 @@ void main() {
           final results = await const ImageEditApi().edit(
             _request(imagePaths: [first.path, second.path]),
             _profile(
-              baseUrl: 'http://www.rightapi.ai/draw/v1/',
+              baseUrl: baseUrl,
               useStreaming: true,
+              apiMode: baseUrl.contains('/draw')
+                  ? ImageGenerationApiMode.images
+                  : ImageGenerationApiMode.imagesAsync,
             ),
             responseFormat: 'url',
             timeoutSeconds: 30,
@@ -124,8 +325,8 @@ void main() {
           expect(results.single.imageUrl, 'https://example.com/edited.webp');
         },
       );
-    },
-  );
+    });
+  }
 
   for (final status in ['failed', 'expired', 'canceled', 'cancelled']) {
     test('RightAPI stops on $status during submission', () async {
@@ -327,14 +528,18 @@ Future<void> _respond(HttpRequest request, Map<String, dynamic> body) async {
 ApiProfile _profile({
   String baseUrl = 'http://rightapi.ai',
   bool useStreaming = false,
+  ImageGenerationApiMode apiMode = ImageGenerationApiMode.images,
 }) {
-  return ApiProfile(
-    id: 'rightapi',
-    name: 'RightAPI',
-    baseUrl: baseUrl,
-    apiKey: 'test-key',
-    model: 'gpt-image-2.5-flare',
-    useStreaming: useStreaming,
+  return ApiProfile.fromJson(
+    ApiProfile(
+      id: 'rightapi',
+      name: 'RightAPI',
+      baseUrl: baseUrl,
+      apiKey: 'test-key',
+      model: 'gpt-image-2.5-flare',
+      useStreaming: useStreaming,
+      apiMode: apiMode,
+    ).toJson(),
   );
 }
 

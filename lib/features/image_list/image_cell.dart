@@ -465,6 +465,7 @@ class ImageCell extends ConsumerWidget {
       builder: (context) {
         return AlertDialog(
           title: const Text('失败原因'),
+          scrollable: true,
           content: SelectableText(displayMessage),
           actions: [
             FilledButton(

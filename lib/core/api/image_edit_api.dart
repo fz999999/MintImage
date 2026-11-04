@@ -5,9 +5,9 @@ import '../models/generation_request.dart';
 import '../models/generation_result.dart';
 import '../models/settings_model.dart';
 import 'api_request_logger.dart';
+import 'image_task_api.dart';
 import 'openai_client.dart';
 import 'responses_image_api.dart';
-import 'rightapi_image_api.dart';
 
 class ImageEditApi {
   const ImageEditApi({this.requestLogService});
@@ -86,13 +86,15 @@ class ImageEditApi {
       return parseResponsesImageResults(response);
     }
 
-    if (profile.usesRightApiImages) {
+    final useAsync = profile.apiMode == ImageGenerationApiMode.imagesAsync;
+    if (useAsync) {
       final body = <String, dynamic>{
         'model': profile.model,
         'prompt': request.prompt,
         'n': 1,
         'quality': request.quality.apiValue,
         'output_format': request.outputFormat.apiValue,
+        'async': true,
         'image': [
           for (final path in request.imagePaths) await imagePathToDataUrl(path),
         ],
@@ -100,10 +102,10 @@ class ImageEditApi {
       if (request.apiSize != null) {
         body['size'] = request.apiSize;
       }
-      final response = await submitRightApiImageTask(
+      final response = await requestImageResult(
         client: client,
-        path: '/v1/images/edits',
-        body: body,
+        submit: () =>
+            client.postJson('/v1/images/edits', body, cancelToken: cancelToken),
         timeoutSeconds: timeoutSeconds,
         cancelToken: cancelToken,
       );
@@ -138,17 +140,22 @@ class ImageEditApi {
       );
     }
 
-    final response = profile.useStreaming
-        ? await client.postMultipartStreaming(
-            '/v1/images/edits',
-            formData,
-            cancelToken: cancelToken,
-          )
-        : await client.postMultipart(
-            '/v1/images/edits',
-            formData,
-            cancelToken: cancelToken,
-          );
+    final response = await requestImageResult(
+      client: client,
+      timeoutSeconds: timeoutSeconds,
+      cancelToken: cancelToken,
+      submit: () => profile.useStreaming
+          ? client.postMultipartStreaming(
+              '/v1/images/edits',
+              formData,
+              cancelToken: cancelToken,
+            )
+          : client.postMultipart(
+              '/v1/images/edits',
+              formData,
+              cancelToken: cancelToken,
+            ),
+    );
 
     return _parseResults(response);
   }

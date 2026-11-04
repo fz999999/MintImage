@@ -29,6 +29,30 @@ void main() {
     expect(find.text('接口返回 429：额度不足'), findsOneWidget);
   });
 
+  testWidgets('long error responses can be read and the dialog closed', (
+    tester,
+  ) async {
+    final message =
+        'HTTP 429：请求失败。\n\n接口返回：\n'
+        '${List.generate(200, (index) => '错误详情 $index').join('\n')}';
+    await _pumpImageCell(tester, _record.copyWith(errorMessage: message));
+    await tester.tap(find.text('失败'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(message), findsOneWidget);
+    final scrollView = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(SingleChildScrollView),
+    );
+    await tester.drag(scrollView, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+  });
+
   testWidgets('shows regenerate action for completed records', (tester) async {
     var regenerated = false;
     await _pumpImageCell(

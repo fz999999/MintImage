@@ -87,6 +87,7 @@ void main() {
                 contains('HTTP 200'),
                 contains('JSON 对象'),
                 contains('text/plain'),
+                contains('接口返回：'),
               ),
             ),
           ),
@@ -109,9 +110,132 @@ void main() {
         isA<ApiException>().having(
           (error) => error.message,
           'message',
-          'HTTP 401：Invalid API key',
+          allOf(
+            startsWith('HTTP 401：Invalid API key'),
+            contains('"message": "Invalid API key"'),
+          ),
         ),
       ),
+    );
+  });
+
+  for (final method in [
+    'GET',
+    'POST',
+    'multipart',
+    'stream',
+    'multipart stream',
+  ]) {
+    test('$method preserves the full HTTP 429 error response', () async {
+      final body = {
+        'error': {'code': 'rate_limit_exceeded'},
+        'detail': '请求过于频繁，请稍后重试',
+        'request_id': 'req_rate_limit_test',
+        'retry_after': 60,
+      };
+      final server = await _respondWithText(
+        jsonEncode(body),
+        statusCode: HttpStatus.tooManyRequests,
+        contentType: ContentType.json,
+      );
+      addTearDown(() => server.close(force: true));
+      final client = _clientFor(server);
+      addTearDown(client.close);
+      final response = switch (method) {
+        'GET' => client.getJson('/v1/tasks/test'),
+        'POST' => client.postJson('/v1/images/generations', {}),
+        'multipart' => client.postMultipart('/v1/images/edits', FormData()),
+        'stream' => client.postJsonStreaming('/v1/images/generations', {}),
+        _ => client.postMultipartStreaming('/v1/images/edits', FormData()),
+      };
+
+      await expectLater(
+        response,
+        throwsA(
+          isA<ApiException>()
+              .having((error) => error.statusCode, 'statusCode', 429)
+              .having(
+                (error) => error.message,
+                'message',
+                allOf(
+                  startsWith('HTTP 429：'),
+                  endsWith(const JsonEncoder.withIndent('  ').convert(body)),
+                ),
+              ),
+        ),
+      );
+    });
+  }
+
+  for (final body in [
+    ['请求频率超限', '请等待 60 秒'],
+    'Too many requests',
+    '<html><body>429 Too Many Requests</body></html>',
+  ]) {
+    test('preserves a non-object HTTP error response: $body', () {
+      final options = RequestOptions(path: '/v1/images/generations');
+      final error = DioException(
+        requestOptions: options,
+        type: DioExceptionType.badResponse,
+        response: Response<Object?>(
+          requestOptions: options,
+          statusCode: 429,
+          data: body,
+        ),
+      );
+      final message = OpenAiClient.extractErrorMessage(error);
+      expect(message, startsWith('HTTP 429：'));
+      if (body is String) {
+        expect(message, 'HTTP 429：$body');
+      } else {
+        expect(jsonDecode(message.split('接口返回：\n').last), body);
+      }
+    });
+  }
+
+  test('preserves provider metadata and long error details', () {
+    final options = RequestOptions(path: '/v1/images/generations');
+    final body = {
+      'error': {
+        'message': 'Quota exhausted',
+        'code': 'insufficient_quota',
+        'details': List.filled(1200, '完整错误详情').join(),
+      },
+      'request_id': 'req_quota_test',
+    };
+    final error = DioException(
+      requestOptions: options,
+      type: DioExceptionType.badResponse,
+      response: Response<Object?>(
+        requestOptions: options,
+        statusCode: 429,
+        data: jsonEncode(body),
+      ),
+    );
+
+    final message = OpenAiClient.extractErrorMessage(error);
+    expect(message, startsWith('HTTP 429：Quota exhausted'));
+    expect(jsonDecode(message.split('接口返回：\n').last), body);
+  });
+
+  test('an empty nested message does not hide the provider message', () {
+    final options = RequestOptions(path: '/v1/images/generations');
+    final error = DioException(
+      requestOptions: options,
+      type: DioExceptionType.badResponse,
+      response: Response<Object?>(
+        requestOptions: options,
+        statusCode: 429,
+        data: {
+          'error': {'message': '   '},
+          'message': '请求频率超限',
+        },
+      ),
+    );
+
+    expect(
+      OpenAiClient.extractErrorMessage(error),
+      startsWith('HTTP 429：请求频率超限'),
     );
   });
 
@@ -139,7 +263,13 @@ void main() {
       ),
     );
 
-    expect(OpenAiClient.extractErrorMessage(error), 'HTTP 504：Gateway timeout');
+    expect(
+      OpenAiClient.extractErrorMessage(error),
+      allOf(
+        startsWith('HTTP 504：Gateway timeout'),
+        contains('"message": "Gateway timeout"'),
+      ),
+    );
   });
 
   test('extractErrorMessage preserves RightAPI string errors', () {
@@ -154,24 +284,28 @@ void main() {
       ),
     );
 
-    expect(OpenAiClient.extractErrorMessage(error), 'HTTP 400：模型已停用，请选择其他模型');
+    expect(
+      OpenAiClient.extractErrorMessage(error),
+      allOf(
+        startsWith('HTTP 400：模型已停用，请选择其他模型'),
+        contains('"error": "模型已停用，请选择其他模型"'),
+      ),
+    );
   });
 }
 
 Future<HttpServer> _respondWithText(
   String body, {
   int statusCode = HttpStatus.ok,
+  ContentType? contentType,
 }) async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   unawaited(
     server.forEach((request) async {
       await request.drain<void>();
       request.response.statusCode = statusCode;
-      request.response.headers.contentType = ContentType(
-        'text',
-        'plain',
-        charset: 'utf-8',
-      );
+      request.response.headers.contentType =
+          contentType ?? ContentType('text', 'plain', charset: 'utf-8');
       request.response.write(body);
       await request.response.close();
     }),

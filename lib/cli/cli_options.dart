@@ -27,7 +27,7 @@ ArgParser createCliParser() => createProfileListParser()
   ..addOption('model', help: '模型名。环境变量 MINT_IMAGE_MODEL。')
   ..addOption(
     'api-mode',
-    allowed: ['images', 'responses'],
+    allowed: ['images', 'images_async', 'responses'],
     help: 'API 协议，默认继承 MintImage 配置，未配置时为 images。',
   )
   ..addOption('size', defaultsTo: '1024x1024', help: '宽x高或 auto，具体支持范围由服务商决定。')

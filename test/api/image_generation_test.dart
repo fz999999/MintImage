@@ -105,7 +105,10 @@ void main() {
           isA<ApiException>().having(
             (error) => error.message,
             'message',
-            'HTTP 401：Invalid API key',
+            allOf(
+              startsWith('HTTP 401：Invalid API key'),
+              contains('"message": "Invalid API key"'),
+            ),
           ),
         ),
       );

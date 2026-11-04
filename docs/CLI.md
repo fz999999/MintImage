@@ -141,7 +141,7 @@ cat prompt.txt | ./bin/mint-image generate --prompt-file -
 | `--base-url` | `MINT_IMAGE_BASE_URL` | 继承配置；无配置时为 `https://api.openai.com`；可带 `/v1` |
 | `--api-key` | `MINT_IMAGE_API_KEY` | 继承配置；可通过参数或环境变量覆盖 |
 | `--model` | `MINT_IMAGE_MODEL` | 继承配置；无配置时使用应用现有的协议默认模型 |
-| `--api-mode` | — | 继承配置，未配置时 `images`；可选 `responses` |
+| `--api-mode` | — | 继承配置，未配置时 `images`；可选 `images_async`（异步任务）、`responses` |
 | `--prompt` / `-p` | — | 提示词；与 `--prompt-file` 二选一 |
 | `--prompt-file` | — | UTF-8 文件，`-` 表示 stdin |
 | `--image` | — | 参考图路径，可重复 |
@@ -156,7 +156,7 @@ cat prompt.txt | ./bin/mint-image generate --prompt-file -
 | `--stream` / `--no-stream` | — | 继承配置；无配置时默认关闭 |
 | `--help` / `-h` | — | 参数帮助 |
 
-具体模型、像素尺寸、质量和格式的支持范围由 API 服务商决定。RightAPI 使用 `https://rightapi.ai` 和 Images 模式，复用桌面端的异步提交与任务轮询。TryAIGC 使用 `https://api.tryaigc.cn`，`gpt-image-2` 默认按非流式 Images 协议提交。Responses 模式可用 `--api-mode responses --model 你的模型` 指定服务商支持的模型。
+具体模型、像素尺寸、质量和格式的支持范围由 API 服务商决定。RightAPI 使用 `https://api.site` 和 `--api-mode images_async`，复用桌面端的异步提交与任务轮询。异步模式按协议工作，适用于任何支持 `async: true`、`task_id` 和 `/v1/tasks/{task_id}` 的地址；普通 `images` 模式收到任务号时也会自动轮询。TryAIGC 使用 `https://api.tryaigc.cn`，`gpt-image-2` 默认按非流式 Images 协议提交。Responses 模式可用 `--api-mode responses --model 你的模型` 指定服务商支持的模型。
 
 ## Agent 输出协议与错误
 

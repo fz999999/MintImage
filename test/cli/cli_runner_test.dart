@@ -403,6 +403,51 @@ void main() {
     expect(paths, ['/v1/responses']);
   });
 
+  for (final inheritProtocol in [false, true]) {
+    test('runs async Images tasks (saved=$inheritProtocol)', () async {
+      final settings = inheritProtocol
+          ? await writeSettings([
+              savedProfile(
+                'saved',
+                '异步图片',
+                apiMode: 'images_async',
+                stream: true,
+              ),
+            ])
+          : null;
+      respond = (request) async {
+        if (request.method == 'POST') {
+          final body =
+              jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+          expect(body['async'], isTrue);
+          expect(body.containsKey('stream'), isFalse);
+          await _json(request, {'task_id': 'task_cli', 'status': 'processing'});
+        } else {
+          expect(request.uri.path, '/v1/tasks/task_cli');
+          await _json(request, {
+            'data': [
+              {'b64_json': _pngBase64},
+            ],
+          });
+        }
+      };
+
+      final result = await run(
+        [
+          '--prompt',
+          'cat',
+          if (!inheritProtocol) ...['--api-mode', 'images_async', '--stream'],
+        ],
+        env: settings == null
+            ? environment
+            : {'MINT_IMAGE_SETTINGS_FILE': settings.path},
+      );
+      expect(result.code, 0);
+      expect(paths, ['/v1/images/generations', '/v1/tasks/task_cli']);
+      expect(result.error, isEmpty);
+    });
+  }
+
   test('explicit mode and --no-stream override the saved options', () async {
     final settings = await writeSettings([
       savedProfile('saved', 'Responses 配置', apiMode: 'responses', stream: true),
