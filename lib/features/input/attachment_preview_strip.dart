@@ -1,9 +1,13 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../../core/services/attachment_picker_service.dart';
 import '../../shared/theme.dart';
+
+const double _thumbnailSize = 44;
 
 class AttachmentPreviewStrip extends StatelessWidget {
   const AttachmentPreviewStrip({
@@ -29,7 +33,7 @@ class AttachmentPreviewStrip extends StatelessWidget {
         children: [
           Expanded(
             child: SizedBox(
-              height: 44,
+              height: _thumbnailSize,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -67,22 +71,27 @@ class _AttachmentThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 44,
-      height: 44,
+      width: _thumbnailSize,
+      height: _thumbnailSize,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: Image.file(
-              File(attachment.path),
-              width: 44,
-              height: 44,
+            child: Image(
+              image: _AttachmentImage(
+                File(attachment.path),
+                pixelSize:
+                    (_thumbnailSize * MediaQuery.devicePixelRatioOf(context))
+                        .ceil(),
+              ),
+              width: _thumbnailSize,
+              height: _thumbnailSize,
               fit: BoxFit.cover,
-              cacheWidth: (44 * MediaQuery.devicePixelRatioOf(context)).ceil(),
+              filterQuality: FilterQuality.high,
               errorBuilder: (context, error, stackTrace) => Container(
-                width: 44,
-                height: 44,
+                width: _thumbnailSize,
+                height: _thumbnailSize,
                 color: AppThemeTokens.surfaceSoft,
                 alignment: Alignment.center,
                 child: const Icon(
@@ -117,4 +126,37 @@ class _AttachmentThumb extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AttachmentImage extends FileImage {
+  const _AttachmentImage(super.file, {required this.pixelSize});
+
+  final int pixelSize;
+
+  @override
+  ImageStreamCompleter loadImage(FileImage key, ImageDecoderCallback decode) {
+    return super.loadImage(key, (buffer, {getTargetSize}) {
+      return decode(
+        buffer,
+        getTargetSize: (width, height) {
+          // BoxFit.cover needs enough pixels on the shorter side so cropping
+          // a landscape image into a square never enlarges a tiny decode.
+          final scale = math.min(1.0, pixelSize / math.min(width, height));
+          return ui.TargetImageSize(
+            width: (width * scale).ceil(),
+            height: (height * scale).ceil(),
+          );
+        },
+      );
+    });
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is _AttachmentImage &&
+      super == other &&
+      pixelSize == other.pixelSize;
+
+  @override
+  int get hashCode => Object.hash(super.hashCode, pixelSize);
 }

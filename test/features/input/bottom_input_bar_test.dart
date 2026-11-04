@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import 'package:mint_image/core/models/settings_model.dart';
 import 'package:mint_image/core/providers/app_providers.dart';
 import 'package:mint_image/core/providers/settings_provider.dart';
 import 'package:mint_image/core/services/attachment_picker_service.dart';
+import 'package:mint_image/features/input/attachment_preview_strip.dart';
 import 'package:mint_image/features/input/bottom_input_bar.dart';
 
 void main() {
@@ -349,6 +351,93 @@ void main() {
     expect(submittedRequest!.quality, ImageQuality.medium);
     expect(submittedRequest!.outputFormat, ImageOutputFormat.webp);
   });
+
+  for (final imageSize in [
+    const Size(640, 160),
+    const Size(160, 640),
+    const Size(320, 320),
+  ]) {
+    testWidgets('edit attachments keep enough decoded pixels for $imageSize', (
+      tester,
+    ) async {
+      addTearDown(tester.view.reset);
+      final file = (await tester.runAsync(() async {
+        final directory = await Directory.systemTemp.createTemp(
+          'edit-preview-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder);
+        canvas.drawRect(Offset.zero & imageSize, Paint()..color = Colors.green);
+        final picture = recorder.endRecording();
+        final image = await picture.toImage(
+          imageSize.width.toInt(),
+          imageSize.height.toInt(),
+        );
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        image.dispose();
+        picture.dispose();
+        return File(
+          '${directory.path}/original.png',
+        ).writeAsBytes(bytes!.buffer.asUint8List());
+      }))!;
+      final inputBarKey = GlobalKey<BottomInputBarState>();
+      GenerationRequest? submittedRequest;
+
+      for (final pixelRatio in [1.25, 3.0]) {
+        tester.view
+          ..physicalSize = Size(800 * pixelRatio, 600 * pixelRatio)
+          ..devicePixelRatio = pixelRatio;
+        if (inputBarKey.currentState == null) {
+          await _pumpInputBar(
+            tester,
+            inputBarKey: inputBarKey,
+            onSubmit: (request) async => submittedRequest = request,
+          );
+          await tester.runAsync(
+            () => inputBarKey.currentState!.prefillForEdit(
+              _webpRecord.copyWith(resultImagePath: file.path),
+            ),
+          );
+        }
+        await tester.pump();
+
+        final preview = find.descendant(
+          of: find.byType(AttachmentPreviewStrip),
+          matching: find.byType(Image),
+        );
+        final rawImage = find.descendant(
+          of: preview,
+          matching: find.byType(RawImage),
+        );
+        for (
+          var attempt = 0;
+          attempt < 100 && tester.widget<RawImage>(rawImage).image == null;
+          attempt++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump();
+        }
+        final decoded = tester.widget<RawImage>(rawImage).image!;
+
+        expect(decoded.width, greaterThanOrEqualTo((44 * pixelRatio).ceil()));
+        expect(decoded.height, greaterThanOrEqualTo((44 * pixelRatio).ceil()));
+        expect(
+          decoded.width / decoded.height,
+          moreOrLessEquals(imageSize.aspectRatio, epsilon: 0.02),
+        );
+        expect(decoded.width, lessThan(imageSize.width));
+        expect(decoded.height, lessThan(imageSize.height));
+      }
+
+      await tester.tap(find.byKey(const Key('submit-generation-button')));
+      await tester.pump();
+      expect(submittedRequest!.imagePaths, [file.path]);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('shows inline api source switcher and can change profile', (
     tester,
