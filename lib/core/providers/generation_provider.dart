@@ -61,6 +61,10 @@ class GenerationController extends StateNotifier<GenerationState> {
       throw const ApiException('当前 API 配置不存在，请重新选择。');
     }
 
+    final validation = request.validate(
+      usesResponsesApi: profile.apiMode == ImageGenerationApiMode.responses,
+    );
+    if (validation != null) throw ApiException(validation);
     final records = List.generate(
       request.count,
       (index) => ImageRecord.pending(
@@ -123,6 +127,9 @@ class GenerationController extends StateNotifier<GenerationState> {
         customHeight: record.height,
         quality: ImageQuality.fromApiValue(record.quality),
         outputFormat: ImageOutputFormat.fromApiValue(record.outputFormat),
+        frameCount: record.frameCount,
+        frameDurationMs: record.frameDurationMs,
+        complexity: ImageComplexity.fromApiValue(record.complexity),
         count: 1,
         apiProfileId: apiProfileId,
       ),
@@ -227,6 +234,7 @@ class GenerationController extends StateNotifier<GenerationState> {
         status: ImageRecordStatus.done,
         resultImagePath: storedImage.localPath,
         resultImageUrl: storedImage.imageUrl,
+        outputFormat: storedImage.outputFormat,
         resultB64: result.b64Json,
         rawApiResponseValue: result.rawResponseValue,
         durationMs: stopwatch.elapsedMilliseconds,

@@ -360,6 +360,9 @@ class SettingsModel {
     this.lastCustomHeight = 0,
     this.lastQuality = ImageQuality.auto,
     this.lastOutputFormat = ImageOutputFormat.png,
+    this.lastFrameCount = 9,
+    this.lastFrameDurationMs = 200,
+    this.lastComplexity,
     this.previewInfoCollapsed = false,
     this.webDavBackupConfig,
   });
@@ -441,6 +444,14 @@ class SettingsModel {
       ),
       lastQuality: _normalizeImageQuality(json['lastQuality']),
       lastOutputFormat: _normalizeImageOutputFormat(json['lastOutputFormat']),
+      lastFrameCount: (json['lastFrameCount'] as int? ?? 9).clamp(2, 64),
+      lastFrameDurationMs: (json['lastFrameDurationMs'] as int? ?? 200).clamp(
+        20,
+        2000,
+      ),
+      lastComplexity: ImageComplexity.fromApiValue(
+        json['lastComplexity'] as String?,
+      ),
       previewInfoCollapsed: _normalizeBool(json['previewInfoCollapsed']),
       webDavBackupConfig: _normalizeWebDavBackupConfig(
         json['webDavBackupConfig'],
@@ -459,6 +470,9 @@ class SettingsModel {
   final int lastCustomHeight;
   final ImageQuality lastQuality;
   final ImageOutputFormat lastOutputFormat;
+  final int lastFrameCount;
+  final int lastFrameDurationMs;
+  final ImageComplexity? lastComplexity;
   final bool previewInfoCollapsed;
   final WebDavBackupConfig? webDavBackupConfig;
 
@@ -520,6 +534,10 @@ class SettingsModel {
     int? lastCustomHeight,
     ImageQuality? lastQuality,
     ImageOutputFormat? lastOutputFormat,
+    int? lastFrameCount,
+    int? lastFrameDurationMs,
+    ImageComplexity? lastComplexity,
+    bool clearLastComplexity = false,
     bool? previewInfoCollapsed,
     WebDavBackupConfig? webDavBackupConfig,
     bool clearWebDavBackupConfig = false,
@@ -543,6 +561,11 @@ class SettingsModel {
       lastCustomHeight: lastCustomHeight ?? this.lastCustomHeight,
       lastQuality: lastQuality ?? this.lastQuality,
       lastOutputFormat: lastOutputFormat ?? this.lastOutputFormat,
+      lastFrameCount: lastFrameCount ?? this.lastFrameCount,
+      lastFrameDurationMs: lastFrameDurationMs ?? this.lastFrameDurationMs,
+      lastComplexity: clearLastComplexity
+          ? null
+          : lastComplexity ?? this.lastComplexity,
       previewInfoCollapsed: previewInfoCollapsed ?? this.previewInfoCollapsed,
       webDavBackupConfig: clearWebDavBackupConfig
           ? null
@@ -565,6 +588,9 @@ class SettingsModel {
       'lastCustomHeight': lastCustomHeight,
       'lastQuality': lastQuality.apiValue,
       'lastOutputFormat': lastOutputFormat.apiValue,
+      'lastFrameCount': lastFrameCount,
+      'lastFrameDurationMs': lastFrameDurationMs,
+      'lastComplexity': lastComplexity?.apiValue,
       'previewInfoCollapsed': previewInfoCollapsed,
       'webDavBackupConfig': webDavBackupConfig?.toJson(),
     };

@@ -67,6 +67,9 @@ void main() {
       height: 1024,
       quality: ImageQuality.high.apiValue,
       outputFormat: ImageOutputFormat.png.apiValue,
+      frameCount: 24,
+      frameDurationMs: 80,
+      complexity: 'low',
       model: 'gpt-image-2',
       status: ImageRecordStatus.done,
       errorMessage: null,
@@ -137,6 +140,9 @@ void main() {
     final records = await imageDao.loadAll();
     expect(records, hasLength(1));
     expect(records.single.id, 'record-1');
+    expect(records.single.frameCount, 24);
+    expect(records.single.frameDurationMs, 80);
+    expect(records.single.complexity, 'low');
     expect(await File(records.single.resultImagePath!).readAsBytes(), [
       1,
       2,

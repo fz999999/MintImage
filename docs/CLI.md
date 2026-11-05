@@ -45,7 +45,9 @@ echo $?
 
 `--count 4 --parallel 2` 会提交 4 个独立请求，每个请求一张图片，最多同时运行 2 个任务。某个任务失败后，其他任务继续执行。任务的超时从该任务开始执行时计算，包括生成、异步轮询和图片下载所用的网络时间。可以同时启动多个 CLI 进程，使用各自的提示词和参数。
 
-`--output-dir` 默认 `./mint-image-output`，自动生成包含随机运行 ID 的文件名，支持多个进程共用目录。自动文件名的扩展名按实际返回的 PNG/JPEG/WebP 格式决定。
+`--output-dir` 默认 `./mint-image-output`，自动生成包含随机运行 ID 的文件名，支持多个进程共用目录。自动文件名的扩展名按实际返回的 PNG/JPEG/WebP/GIF/SVG 格式决定。
+
+GPT Image 2.6 支持 `--format gif` 和 `--format svg`，会自动关闭单次请求的流式返回。GIF 可传 `--frame-count 9 --frame-duration-ms 200`；两种格式均仅支持 Images API 文生图。`--complexity low|medium|high` 设置规划复杂度，`--quality xhigh|max` 选择新增质量档位。支持范围和动画像素预算见 [GPT Image 2.6 调查](GPT_IMAGE_2_6.md)。
 
 单张图也可通过 `--output ./cat.png` 指定文件路径。它只支持 `--count 1`，不能同时使用 `--output-dir`。文件已存在时会报错，多个进程争用同一路径时也不会覆盖已有内容。指定路径的扩展名必须匹配 `--format`，服务端实际返回其他格式时会报告错误。
 
@@ -146,8 +148,11 @@ cat prompt.txt | ./bin/mint-image generate --prompt-file -
 | `--prompt-file` | — | UTF-8 文件，`-` 表示 stdin |
 | `--image` | — | 参考图路径，可重复 |
 | `--size` | — | `1024x1024`，也支持其他正整数 `宽x高` 或 `auto` |
-| `--quality` | — | `auto`，可选 `low`、`medium`、`high` |
-| `--format` | — | `png`，可选 `jpeg`、`webp` |
+| `--quality` | — | `auto`，可选 `low`、`medium`、`high`、`xhigh`、`max`，取决于模型 |
+| `--format` | — | `png`，可选 `jpeg`、`webp`、`gif`、`svg` |
+| `--complexity` | — | 不传则使用服务端默认；可选 `low`、`medium`、`high`，仅 Images API |
+| `--frame-count` | — | GIF 帧数 2–64，默认 9 |
+| `--frame-duration-ms` | — | GIF 每帧 20–2000 毫秒，默认 200 |
 | `--count` | — | `1`，独立请求数，正整数 |
 | `--parallel` | — | `1`，并发任务数，正整数；实际不超过 count |
 | `--timeout` | — | 继承 MintImage 全局设置；无配置时 `600` 秒 |

@@ -35,6 +35,12 @@ class ImageRecordsTable extends Table {
 
   TextColumn get outputFormat => text().withDefault(const Constant('png'))();
 
+  IntColumn get frameCount => integer().withDefault(const Constant(9))();
+
+  IntColumn get frameDurationMs => integer().withDefault(const Constant(200))();
+
+  TextColumn get complexity => text().nullable()();
+
   TextColumn get model => text()();
 
   TextColumn get status => text()();
@@ -123,7 +129,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -172,6 +178,23 @@ class AppDatabase extends _$AppDatabase {
           imageRecordsTable.outputFormat,
         );
         await _backfillOutputFormat();
+      }
+      if (from < 8) {
+        await _addColumnIfMissing(
+          migrator,
+          imageRecordsTable,
+          imageRecordsTable.frameCount,
+        );
+        await _addColumnIfMissing(
+          migrator,
+          imageRecordsTable,
+          imageRecordsTable.frameDurationMs,
+        );
+        await _addColumnIfMissing(
+          migrator,
+          imageRecordsTable,
+          imageRecordsTable.complexity,
+        );
       }
     },
   );

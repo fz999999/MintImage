@@ -21,6 +21,10 @@ class ImageEditApi {
     required int timeoutSeconds,
     CancelToken? cancelToken,
   }) async {
+    final validation = request.validate(
+      usesResponsesApi: profile.apiMode == ImageGenerationApiMode.responses,
+    );
+    if (validation != null) throw ApiException(validation);
     if (request.imagePaths.isEmpty) {
       throw const ApiException('图生图请求缺少附件。');
     }
@@ -94,6 +98,8 @@ class ImageEditApi {
         'n': 1,
         'quality': request.quality.apiValue,
         'output_format': request.outputFormat.apiValue,
+        if (request.complexity != null)
+          'complexity': request.complexity!.apiValue,
         'async': true,
         'image': [
           for (final path in request.imagePaths) await imagePathToDataUrl(path),
@@ -120,6 +126,8 @@ class ImageEditApi {
       MapEntry('n', '1'),
       MapEntry('quality', request.quality.apiValue),
       MapEntry('output_format', request.outputFormat.apiValue),
+      if (request.complexity != null)
+        MapEntry('complexity', request.complexity!.apiValue),
     ];
     if (request.apiSize != null) {
       fields.add(MapEntry('size', request.apiSize!));
@@ -162,9 +170,7 @@ class ImageEditApi {
 
   bool _isGptImage2Family(String model) {
     final value = model.trim().toLowerCase();
-    return value == 'gpt-image-2' ||
-        value == 'gpt-image-2.5' ||
-        value.startsWith('gpt-image-2.5-');
+    return RegExp(r'^gpt-image-2(?:\.\d+)?(?:-|$)').hasMatch(value);
   }
 
   List<GenerationResult> _parseResults(Map<String, dynamic> response) {

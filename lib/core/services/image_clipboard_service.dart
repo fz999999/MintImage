@@ -102,7 +102,9 @@ class ImageClipboardService {
     if (outputFormat == 'png' ||
         outputFormat == 'jpg' ||
         outputFormat == 'jpeg' ||
-        outputFormat == 'webp') {
+        outputFormat == 'webp' ||
+        outputFormat == 'gif' ||
+        outputFormat == 'svg') {
       return outputFormat == 'jpg' ? 'jpeg' : outputFormat;
     }
 
@@ -116,7 +118,9 @@ class ImageClipboardService {
     if (extension == 'png' ||
         extension == 'jpg' ||
         extension == 'jpeg' ||
-        extension == 'webp') {
+        extension == 'webp' ||
+        extension == 'gif' ||
+        extension == 'svg') {
       return extension == 'jpg' ? 'jpeg' : extension;
     }
 

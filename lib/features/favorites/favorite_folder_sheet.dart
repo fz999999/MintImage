@@ -8,6 +8,7 @@ import '../../core/models/favorite_folder.dart';
 import '../../core/models/image_record.dart';
 import '../../core/providers/favorite_folders_provider.dart';
 import '../../shared/theme.dart';
+import '../../shared/widgets/record_svg_image.dart';
 
 Future<String?> showFavoriteFolderBrowserSheet(BuildContext context) {
   return showModalBottomSheet<String>(
@@ -430,6 +431,9 @@ class _FolderPreviewStrip extends StatelessWidget {
   }
 
   Widget _buildImage(ImageRecord record) {
+    if (record.isSvg) {
+      return RecordSvgImage(record: record, fit: BoxFit.cover);
+    }
     final localPath = record.resultImagePath ?? record.sourceImagePath;
     if (localPath != null && File(localPath).existsSync()) {
       return Image.file(
@@ -449,7 +453,6 @@ class _FolderPreviewStrip extends StatelessWidget {
         height: double.infinity,
         fit: BoxFit.cover,
         memCacheWidth: 100,
-        maxWidthDiskCache: 100,
         placeholder: (_, _) => const ColoredBox(color: AppThemeTokens.surface),
         errorWidget: (_, _, _) =>
             const Icon(Icons.image_not_supported_rounded, size: 14),

@@ -20,6 +20,7 @@ import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
 import 'attachment_preview_strip.dart';
 import 'image_format_selector.dart';
+import 'generation_options_button.dart';
 import 'prompt_editor_page.dart';
 import 'quality_selector.dart';
 import 'quantity_selector.dart';
@@ -54,6 +55,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   SizePreset _sizePreset = SizePreset.auto;
   ImageQuality _quality = ImageQuality.auto;
   ImageOutputFormat _outputFormat = ImageOutputFormat.png;
+  int _frameCount = 9;
+  int _frameDurationMs = 200;
+  ImageComplexity? _complexity;
   int _count = 1;
   int _customWidth = 0;
   int _customHeight = 0;
@@ -81,6 +85,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     _customHeight = settings.lastCustomHeight;
     _quality = settings.lastQuality;
     _outputFormat = settings.lastOutputFormat;
+    _frameCount = settings.lastFrameCount;
+    _frameDurationMs = settings.lastFrameDurationMs;
+    _complexity = settings.lastComplexity;
   }
 
   @override
@@ -109,13 +116,20 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   }
 
   Future<void> prefillForEdit(ImageRecord record) async {
+    if (record.isSvg) {
+      _showMessage('SVG 不支持作为图生图参考图，请先导出为 PNG。');
+      return;
+    }
     prefillPrompt(record.prompt);
     if (!mounted) {
       return;
     }
 
     _applyGenerationOptionsFromRecord(record);
-
+    if (_outputFormat.requiresImagesGeneration) {
+      setState(() => _outputFormat = ImageOutputFormat.png);
+      _persistLastGenerationOptions();
+    }
     await _prefillAttachments(
       record.resultImagePath == null
           ? record.sourceAttachmentPaths
@@ -124,6 +138,10 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   }
 
   Future<bool> appendImageFromRecord(ImageRecord record) async {
+    if (record.isSvg) {
+      _showMessage('SVG 不支持作为图生图参考图，请先导出为 PNG。');
+      return false;
+    }
     final path = _attachmentPathForRecord(record);
     if (path == null) {
       _showMessage('这条记录没有可加入附件的本地图片。');
@@ -212,6 +230,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       _customHeight = record.height;
       _quality = ImageQuality.fromApiValue(record.quality);
       _outputFormat = ImageOutputFormat.fromApiValue(record.outputFormat);
+      _frameCount = record.frameCount;
+      _frameDurationMs = record.frameDurationMs;
+      _complexity = ImageComplexity.fromApiValue(record.complexity);
       _count = 1;
     });
     _persistLastGenerationOptions();
@@ -227,6 +248,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
             customHeight: _customHeight,
             quality: _quality,
             outputFormat: _outputFormat,
+            frameCount: _frameCount,
+            frameDurationMs: _frameDurationMs,
+            complexity: _complexity,
           ),
     );
   }
@@ -541,6 +565,27 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                       },
                                     ),
                                     const SizedBox(width: 6),
+                                    if (activeProfile.apiMode !=
+                                        ImageGenerationApiMode.responses) ...[
+                                      GenerationOptionsButton(
+                                        isGif:
+                                            _outputFormat ==
+                                            ImageOutputFormat.gif,
+                                        frameCount: _frameCount,
+                                        frameDurationMs: _frameDurationMs,
+                                        complexity: _complexity,
+                                        onSelected: (options) {
+                                          setState(() {
+                                            _frameCount = options.frameCount;
+                                            _frameDurationMs =
+                                                options.frameDurationMs;
+                                            _complexity = options.complexity;
+                                          });
+                                          _persistLastGenerationOptions();
+                                        },
+                                      ),
+                                      const SizedBox(width: 6),
+                                    ],
                                     QuantitySelector(
                                       count: _count,
                                       onSelected: (count) {
@@ -785,19 +830,28 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     });
 
     try {
-      await widget.onSubmit(
-        GenerationRequest(
-          prompt: prompt,
-          imagePaths: _attachments.map((item) => item.path).toList(),
-          sizePreset: _sizePreset,
-          customWidth: _customWidth,
-          customHeight: _customHeight,
-          quality: _quality,
-          outputFormat: _outputFormat,
-          count: _count,
-          apiProfileId: selectedProfileId,
-        ),
+      final request = GenerationRequest(
+        prompt: prompt,
+        imagePaths: _attachments.map((item) => item.path).toList(),
+        sizePreset: _sizePreset,
+        customWidth: _customWidth,
+        customHeight: _customHeight,
+        quality: _quality,
+        outputFormat: _outputFormat,
+        frameCount: _frameCount,
+        frameDurationMs: _frameDurationMs,
+        complexity: activeProfile.apiMode == ImageGenerationApiMode.responses
+            ? null
+            : _complexity,
+        count: _count,
+        apiProfileId: selectedProfileId,
       );
+      final validation = request.validate(
+        usesResponsesApi:
+            activeProfile.apiMode == ImageGenerationApiMode.responses,
+      );
+      if (validation != null) throw ApiException(validation);
+      await widget.onSubmit(request);
 
       _promptController.clear();
       _setAttachments(const []);

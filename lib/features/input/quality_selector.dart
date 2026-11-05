@@ -58,8 +58,8 @@ class QualitySelector extends StatelessWidget {
       showDragHandle: true,
       builder: (ctx) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: ListView(
+            shrinkWrap: true,
             children: ImageQuality.values.map((q) {
               final active = q == selectedQuality;
               return ListTile(

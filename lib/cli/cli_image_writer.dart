@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/api/openai_client.dart';
 import '../core/models/generation_result.dart';
+import '../core/models/encoded_image_format.dart';
 import 'cli_error.dart';
 import 'cli_options.dart';
 
@@ -102,11 +103,11 @@ class CliImageWriter {
         '接口返回成功，但没有图片 Base64 或 URL。',
       );
     }
-    final extension = _imageExtension(bytes);
+    final extension = encodedImageExtension(bytes);
     if (extension == null) {
       throw const CliException(
         'invalid_response',
-        '返回内容不是有效的 PNG/JPEG/WebP 图片（可能是空数据或错误页面）。',
+        '返回内容不是有效的 PNG/JPEG/WebP/GIF/SVG 图片（可能是空数据或错误页面）。',
       );
     }
     if (options.outputPath != null &&
@@ -136,27 +137,4 @@ class CliImageWriter {
   }
 
   void close() => _downloader.close(force: true);
-}
-
-String? _imageExtension(List<int> bytes) {
-  if (bytes.length >= 8 &&
-      _matches(bytes, [137, 80, 78, 71, 13, 10, 26, 10], 0)) {
-    return 'png';
-  }
-  if (bytes.length >= 3 && _matches(bytes, [255, 216, 255], 0)) {
-    return 'jpeg';
-  }
-  if (bytes.length >= 12 &&
-      _matches(bytes, [82, 73, 70, 70], 0) &&
-      _matches(bytes, [87, 69, 66, 80], 8)) {
-    return 'webp';
-  }
-  return null;
-}
-
-bool _matches(List<int> bytes, List<int> expected, int offset) {
-  for (var i = 0; i < expected.length; i++) {
-    if (bytes[offset + i] != expected[i]) return false;
-  }
-  return true;
 }

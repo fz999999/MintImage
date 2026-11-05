@@ -13,6 +13,7 @@ import '../../core/models/image_record.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../shared/theme.dart';
+import '../../shared/widgets/record_svg_image.dart';
 
 class ImagePreviewPage extends ConsumerStatefulWidget {
   const ImagePreviewPage({
@@ -48,6 +49,7 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
   double? _baselineScale;
   double _currentScale = 1.0;
   bool _infoCollapsed = false;
+  final Map<String, Size> _svgSizes = {};
 
   ImageRecord get _currentRecord => _records[_currentIndex];
   PhotoViewController get _photoViewController =>
@@ -370,6 +372,13 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
                         ),
                         _FileSizePreviewChip(labelFuture: _fileSizeLabelFuture),
                         _PreviewChip(label: record.outputFormatLabel),
+                        if (record.outputFormat == 'gif')
+                          _PreviewChip(
+                            label:
+                                '${record.frameCount} 帧 · ${record.frameDurationMs} ms/帧',
+                          ),
+                        if (record.complexity != null)
+                          _PreviewChip(label: '复杂度 ${record.complexity}'),
                         _PreviewChip(label: record.qualityLabel),
                         _PreviewChip(label: record.model),
                       ],
@@ -481,6 +490,22 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
   ) {
     final record = _records[index];
     final controller = _photoControllers[index];
+    if (record.isSvg) {
+      return PhotoViewGalleryPageOptions.customChild(
+        child: RecordSvgImage(record: record),
+        childSize:
+            _svgSizes[record.id] ??
+            Size(
+              record.width > 0 ? record.width.toDouble() : 1024,
+              record.height > 0 ? record.height.toDouble() : 1024,
+            ),
+        controller: controller.photoViewController,
+        scaleStateController: controller.scaleStateController,
+        minScale: PhotoViewComputedScale.contained * _minScaleFactor,
+        maxScale: PhotoViewComputedScale.contained * _maxScaleFactor,
+        initialScale: PhotoViewComputedScale.contained,
+      );
+    }
     final provider = _previewImageProvider(record);
 
     if (provider == null) {
@@ -510,6 +535,17 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
   }
 
   Future<String?> _resolveActualSizeLabel() async {
+    final record = _currentRecord;
+    if (record.isSvg) {
+      try {
+        final size = await svgSizeForRecord(record);
+        if (size == null) return null;
+        if (mounted) setState(() => _svgSizes[record.id] = size);
+        return '实际尺寸${size.width.round()}x${size.height.round()}';
+      } catch (_) {
+        return null;
+      }
+    }
     final provider = _previewImageProvider();
     if (provider == null) {
       return null;
@@ -672,7 +708,7 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
         return extension;
       }
     }
-    return 'png';
+    return _currentRecord.outputFormat;
   }
 
   bool _isNearBaseline(double scale, double baselineScale) =>

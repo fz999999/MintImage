@@ -6,12 +6,18 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/generation_result.dart';
+import '../models/encoded_image_format.dart';
 
 class StoredImageResult {
-  const StoredImageResult({required this.localPath, required this.imageUrl});
+  const StoredImageResult({
+    required this.localPath,
+    required this.imageUrl,
+    this.outputFormat,
+  });
 
   final String? localPath;
   final String? imageUrl;
+  final String? outputFormat;
 }
 
 class ImageStorageService {
@@ -25,13 +31,19 @@ class ImageStorageService {
     final outputDirectory = await _ensureOutputDirectory();
 
     if (result.b64Json != null && result.b64Json!.isNotEmpty) {
-      final bytes = base64Decode(result.b64Json!);
-      final file = File(
-        p.join(outputDirectory.path, '$recordId.$fileExtension'),
-      );
+      final raw = result.b64Json!.trim();
+      final bytes = raw.startsWith('data:')
+          ? UriData.parse(raw).contentAsBytes()
+          : base64Decode(raw);
+      final extension = encodedImageExtension(bytes) ?? fileExtension;
+      final file = File(p.join(outputDirectory.path, '$recordId.$extension'));
       await file.writeAsBytes(bytes, flush: true);
 
-      return StoredImageResult(localPath: file.path, imageUrl: result.imageUrl);
+      return StoredImageResult(
+        localPath: file.path,
+        imageUrl: result.imageUrl,
+        outputFormat: extension,
+      );
     }
 
     if (result.imageUrl != null && result.imageUrl!.isNotEmpty) {
@@ -39,11 +51,15 @@ class ImageStorageService {
         outputDirectory: outputDirectory,
         recordId: recordId,
         imageUrl: result.imageUrl!,
+        fileExtension: fileExtension,
       );
 
       return StoredImageResult(
         localPath: localPath,
         imageUrl: localPath == null ? result.imageUrl : null,
+        outputFormat: localPath == null
+            ? null
+            : p.extension(localPath).substring(1),
       );
     }
 
@@ -63,6 +79,7 @@ class ImageStorageService {
     required Directory outputDirectory,
     required String recordId,
     required String imageUrl,
+    required String fileExtension,
   }) async {
     HttpClient? client;
     try {
@@ -74,10 +91,13 @@ class ImageStorageService {
       }
 
       final bytes = await consolidateHttpClientResponseBytes(response);
-      final extension = _resolveExtension(
-        imageUrl,
-        response.headers.contentType,
-      );
+      final extension =
+          encodedImageExtension(bytes) ??
+          _resolveExtension(
+            imageUrl,
+            response.headers.contentType,
+            fileExtension,
+          );
       final file = File(p.join(outputDirectory.path, '$recordId.$extension'));
       await file.writeAsBytes(bytes, flush: true);
       return file.path;
@@ -88,7 +108,11 @@ class ImageStorageService {
     }
   }
 
-  String _resolveExtension(String imageUrl, ContentType? contentType) {
+  String _resolveExtension(
+    String imageUrl,
+    ContentType? contentType,
+    String fallback,
+  ) {
     final uri = Uri.tryParse(imageUrl);
     final path = uri?.path ?? imageUrl;
     final parsedExtension = p.extension(path).replaceFirst('.', '').trim();
@@ -101,7 +125,8 @@ class ImageStorageService {
       'image/png' => 'png',
       'image/webp' => 'webp',
       'image/gif' => 'gif',
-      _ => 'png',
+      'image/svg+xml' => 'svg',
+      _ => fallback,
     };
   }
 }

@@ -3,6 +3,25 @@ import 'package:mint_image/core/models/generation_request.dart';
 
 void main() {
   group('GenerationRequest', () {
+    for (final format in [ImageOutputFormat.gif, ImageOutputFormat.svg]) {
+      test(
+        'preserves ${format.label} and animation options in serialized requests',
+        () {
+          final request = GenerationRequest.fromJson({
+            'outputFormat': format.apiValue,
+            'frameCount': 24,
+            'frameDurationMs': 80,
+            'complexity': 'low',
+          });
+          final restored = GenerationRequest.fromJson(request.toJson());
+          expect(restored.outputFormat, format);
+          expect(restored.frameCount, 24);
+          expect(restored.frameDurationMs, 80);
+          expect(restored.complexity, ImageComplexity.low);
+          expect(restored.copyWith(prompt: 'new').frameCount, 24);
+        },
+      );
+    }
     test('serializes and deserializes correctly', () {
       const request = GenerationRequest(
         prompt: 'a futuristic skyline at sunrise',
@@ -90,7 +109,7 @@ void main() {
         'customWidth': 1024,
         'customHeight': 1024,
         'quality': ImageQuality.auto.apiValue,
-        'outputFormat': 'gif',
+        'outputFormat': 'unsupported',
         'count': 1,
         'apiProfileId': 'default',
       });

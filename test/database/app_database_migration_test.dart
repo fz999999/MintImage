@@ -66,6 +66,14 @@ void main() {
         )
         .get();
     expect(rows.single.data['output_format'], 'webp');
+    final animation = await database
+        .customSelect(
+          "SELECT frame_count, frame_duration_ms, complexity FROM image_records_table WHERE id = 'record-webp'",
+        )
+        .getSingle();
+    expect(animation.data['frame_count'], 9);
+    expect(animation.data['frame_duration_ms'], 200);
+    expect(animation.data['complexity'], isNull);
 
     final favoriteTables = await database
         .customSelect(

@@ -268,6 +268,68 @@ void main() {
     expect(find.byTooltip('优化提示词'), findsOneWidget);
   });
 
+  testWidgets('edits GIF frame options and submits them', (tester) async {
+    GenerationRequest? submitted;
+    await _pumpInputBar(
+      tester,
+      settings: _settings.copyWith(
+        lastOutputFormat: ImageOutputFormat.gif,
+        lastSizePreset: SizePreset.auto,
+      ),
+      onSubmit: (request) async => submitted = request,
+    );
+    await tester.tap(find.byKey(const Key('generation-options-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('gif-frame-count')), '12');
+    await tester.enterText(find.byKey(const Key('gif-frame-duration')), '150');
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('prompt-input')),
+      '一只招手的小猫，无缝循环',
+    );
+    await tester.tap(find.byKey(const Key('submit-generation-button')));
+    await tester.pump();
+    expect(submitted!.outputFormat, ImageOutputFormat.gif);
+    expect(submitted!.frameCount, 12);
+    expect(submitted!.frameDurationMs, 150);
+  });
+
+  testWidgets(
+    'rejects SVG output with attachments without clearing the draft',
+    (tester) async {
+      var submitted = false;
+      final key = GlobalKey<BottomInputBarState>();
+      await _pumpInputBar(
+        tester,
+        inputBarKey: key,
+        onSubmit: (_) async => submitted = true,
+      );
+      await tester.runAsync(
+        () => key.currentState!.prefillFromRecord(
+          _webpRecord.copyWith(
+            outputFormat: 'svg',
+            sourceImagePaths: [
+              File('test/fixtures/animation.gif').absolute.path,
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('submit-generation-button')));
+      await tester.pump();
+      expect(submitted, isFalse);
+      expect(find.text('SVG 仅支持文生图，请移除参考图或选择 PNG/JPEG/WEBP。'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('prompt-input')))
+            .controller!
+            .text,
+        '湖边木屋',
+      );
+    },
+  );
+
   testWidgets('uses last selected generation options from settings', (
     tester,
   ) async {

@@ -20,6 +20,10 @@ class ImageGenerationApi {
     required int timeoutSeconds,
     CancelToken? cancelToken,
   }) async {
+    final validation = request.validate(
+      usesResponsesApi: profile.apiMode == ImageGenerationApiMode.responses,
+    );
+    if (validation != null) throw ApiException(validation);
     final client = OpenAiClient(
       profile,
       timeoutSeconds: timeoutSeconds,
@@ -75,6 +79,12 @@ class ImageGenerationApi {
       'n': 1,
       'quality': request.quality.apiValue,
       'output_format': request.outputFormat.apiValue,
+      if (request.complexity != null)
+        'complexity': request.complexity!.apiValue,
+      if (request.outputFormat == ImageOutputFormat.gif) ...{
+        'frame_count': request.frameCount,
+        'frame_duration_ms': request.frameDurationMs,
+      },
     };
     final useAsync = profile.apiMode == ImageGenerationApiMode.imagesAsync;
     if (useAsync) {
@@ -94,7 +104,10 @@ class ImageGenerationApi {
       client: client,
       timeoutSeconds: timeoutSeconds,
       cancelToken: cancelToken,
-      submit: () => profile.useStreaming && !useAsync
+      submit: () =>
+          profile.useStreaming &&
+              !useAsync &&
+              !request.outputFormat.requiresImagesGeneration
           ? client.postJsonStreaming(
               '/v1/images/generations',
               body,
@@ -113,9 +126,7 @@ class ImageGenerationApi {
 
   bool _isGptImage2Family(String model) {
     final value = model.trim().toLowerCase();
-    return value == 'gpt-image-2' ||
-        value == 'gpt-image-2.5' ||
-        value.startsWith('gpt-image-2.5-');
+    return RegExp(r'^gpt-image-2(?:\.\d+)?(?:-|$)').hasMatch(value);
   }
 
   List<GenerationResult> _parseResults(Map<String, dynamic> response) {

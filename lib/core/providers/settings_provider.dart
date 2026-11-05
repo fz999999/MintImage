@@ -185,6 +185,9 @@ class SettingsController extends StateNotifier<SettingsModel> {
     required int customHeight,
     required ImageQuality quality,
     required ImageOutputFormat outputFormat,
+    int frameCount = 9,
+    int frameDurationMs = 200,
+    ImageComplexity? complexity,
   }) async {
     state = state.copyWith(
       lastSizePreset: sizePreset,
@@ -192,6 +195,10 @@ class SettingsController extends StateNotifier<SettingsModel> {
       lastCustomHeight: customHeight,
       lastQuality: quality,
       lastOutputFormat: outputFormat,
+      lastFrameCount: frameCount,
+      lastFrameDurationMs: frameDurationMs,
+      lastComplexity: complexity,
+      clearLastComplexity: complexity == null,
     );
     await _persist();
   }

@@ -3,6 +3,26 @@ import 'package:mint_image/core/models/generation_request.dart';
 import 'package:mint_image/core/models/settings_model.dart';
 
 void main() {
+  test('settings retain GIF timing, SVG format and complexity', () {
+    final settings = SettingsModel.initial().copyWith(
+      lastOutputFormat: ImageOutputFormat.gif,
+      lastFrameCount: 16,
+      lastFrameDurationMs: 120,
+      lastComplexity: ImageComplexity.medium,
+    );
+    final restored = SettingsModel.decode(settings.encode());
+    expect(restored.lastOutputFormat, ImageOutputFormat.gif);
+    expect(restored.lastFrameCount, 16);
+    expect(restored.lastFrameDurationMs, 120);
+    expect(restored.lastComplexity, ImageComplexity.medium);
+    final svg = restored.copyWith(
+      lastOutputFormat: ImageOutputFormat.svg,
+      clearLastComplexity: true,
+    );
+    final restoredSvg = SettingsModel.decode(svg.encode());
+    expect(restoredSvg.lastOutputFormat, ImageOutputFormat.svg);
+    expect(restoredSvg.lastComplexity, isNull);
+  });
   test('initial settings use a 600 second timeout', () {
     final settings = SettingsModel.initial();
 

@@ -30,7 +30,13 @@ class ImageSaveService {
       return FlutterFileDialog.saveFile(
         params: SaveFileDialogParams(
           sourceFilePath: sourceFile.path,
-          mimeTypesFilter: const ['image/png', 'image/jpeg', 'image/webp'],
+          mimeTypesFilter: const [
+            'image/png',
+            'image/jpeg',
+            'image/webp',
+            'image/gif',
+            'image/svg+xml',
+          ],
           localOnly: true,
         ),
       );

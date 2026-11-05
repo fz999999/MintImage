@@ -58,8 +58,8 @@ class ImageFormatSelector extends StatelessWidget {
       showDragHandle: true,
       builder: (ctx) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: ListView(
+            shrinkWrap: true,
             children: ImageOutputFormat.values.map((format) {
               final active = format == selectedFormat;
               return ListTile(
@@ -68,6 +68,9 @@ class ImageFormatSelector extends StatelessWidget {
                   color: active ? AppThemeTokens.primary : Colors.grey,
                 ),
                 title: Text(format.label),
+                subtitle: format.requiresImagesGeneration
+                    ? const Text('仅限 Images API 文生图，自动关闭流式请求')
+                    : null,
                 onTap: () {
                   Navigator.of(ctx).pop();
                   onSelected(format);

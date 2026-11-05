@@ -10,6 +10,7 @@ import '../../core/providers/generation_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
+import '../../shared/widgets/record_svg_image.dart';
 import 'image_preview_page.dart';
 
 class ImageCell extends ConsumerWidget {
@@ -224,6 +225,9 @@ class ImageCell extends ConsumerWidget {
       return const _LoadingThumb();
     }
 
+    if (record.isSvg) {
+      return RecordSvgImage(record: record, fit: BoxFit.cover);
+    }
     if (record.resultImagePath != null &&
         File(record.resultImagePath!).existsSync()) {
       return Image.file(
@@ -328,7 +332,7 @@ class ImageCell extends ConsumerWidget {
                       onRegenerate();
                     },
                   ),
-                if (canEdit)
+                if (canEdit && !record.isSvg)
                   ListTile(
                     leading: const Icon(Icons.edit_rounded),
                     title: const Text('以此改图'),
@@ -407,6 +411,7 @@ class ImageCell extends ConsumerWidget {
   }
 
   bool get _canCopyImage {
+    if (record.isSvg) return false;
     return record.resultImagePath != null ||
         record.sourceImagePath != null ||
         record.resultB64 != null ||
@@ -414,6 +419,7 @@ class ImageCell extends ConsumerWidget {
   }
 
   bool get _canAppendCurrentImageToAttachments {
+    if (record.isSvg) return false;
     final resultImagePath = record.resultImagePath;
     if (resultImagePath != null && File(resultImagePath).existsSync()) {
       return true;
@@ -693,6 +699,16 @@ class _ActualImageSizeChip extends StatelessWidget {
       return null;
     }
 
+    if (record.isSvg) {
+      try {
+        final size = await svgSizeForRecord(record);
+        return size == null
+            ? null
+            : '${size.width.round()}×${size.height.round()}';
+      } catch (_) {
+        return null;
+      }
+    }
     final provider = _imageProvider();
     if (provider == null) {
       return null;

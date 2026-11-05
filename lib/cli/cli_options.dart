@@ -33,10 +33,24 @@ ArgParser createCliParser() => createProfileListParser()
   ..addOption('size', defaultsTo: '1024x1024', help: '宽x高或 auto，具体支持范围由服务商决定。')
   ..addOption(
     'quality',
-    allowed: ['auto', 'low', 'medium', 'high'],
+    allowed: ['auto', 'low', 'medium', 'high', 'xhigh', 'max'],
     defaultsTo: 'auto',
   )
-  ..addOption('format', allowed: ['png', 'jpeg', 'webp'], defaultsTo: 'png')
+  ..addOption(
+    'format',
+    allowed: ['png', 'jpeg', 'webp', 'gif', 'svg'],
+    defaultsTo: 'png',
+  )
+  ..addOption(
+    'complexity',
+    allowed: ['low', 'medium', 'high'],
+    help: 'GPT Image 2.6 规划复杂度；省略时使用服务端默认值。',
+  )
+  ..addOption('frame-count', help: 'GIF 帧数：2–64，默认 9；仅用于 --format gif。')
+  ..addOption(
+    'frame-duration-ms',
+    help: 'GIF 每帧时长：20–2000 毫秒，默认 200；服务端按 10 毫秒取整。',
+  )
   ..addOption('count', defaultsTo: '1', help: '独立生成任务数（每次请求一张图）。')
   ..addOption('parallel', defaultsTo: '1', help: '同时执行的任务数。')
   ..addOption('timeout', help: '网络总超时秒数，默认继承 MintImage 设置或 600 秒。')
@@ -177,6 +191,8 @@ class CliOptions {
         ImageOutputFormat.png => ext == '.png',
         ImageOutputFormat.jpeg => ext == '.jpeg' || ext == '.jpg',
         ImageOutputFormat.webp => ext == '.webp',
+        ImageOutputFormat.gif => ext == '.gif',
+        ImageOutputFormat.svg => ext == '.svg',
       };
       if (!valid) {
         throw const CliException(
@@ -255,19 +271,36 @@ class CliOptions {
           ? args['stream'] as bool
           : savedProfile?.useStreaming ?? false,
     );
+    if (format != ImageOutputFormat.gif &&
+        (args.wasParsed('frame-count') ||
+            args.wasParsed('frame-duration-ms'))) {
+      throw const CliException('invalid_arguments', '帧数和帧时长仅适用于 --format gif。');
+    }
+    final request = GenerationRequest(
+      prompt: prompt,
+      imagePaths: imagePaths,
+      sizePreset: size == 'auto' ? SizePreset.auto : SizePreset.custom,
+      customWidth: width ?? 1024,
+      customHeight: height ?? 1024,
+      quality: ImageQuality.fromApiValue(args['quality'] as String),
+      outputFormat: format,
+      complexity: ImageComplexity.fromApiValue(args['complexity'] as String?),
+      frameCount: _positiveInteger(args, 'frame-count', fallback: 9),
+      frameDurationMs: _positiveInteger(
+        args,
+        'frame-duration-ms',
+        fallback: 200,
+      ),
+      count: 1,
+      apiProfileId: profile.id,
+    );
+    final validation = request.validate(
+      usesResponsesApi: mode == ImageGenerationApiMode.responses,
+    );
+    if (validation != null) throw CliException('invalid_arguments', validation);
     return CliOptions(
       profile: profile,
-      request: GenerationRequest(
-        prompt: prompt,
-        imagePaths: imagePaths,
-        sizePreset: size == 'auto' ? SizePreset.auto : SizePreset.custom,
-        customWidth: width ?? 1024,
-        customHeight: height ?? 1024,
-        quality: ImageQuality.fromApiValue(args['quality'] as String),
-        outputFormat: format,
-        count: 1,
-        apiProfileId: profile.id,
-      ),
+      request: request,
       count: count,
       parallel: parallel,
       timeoutSeconds: timeout,

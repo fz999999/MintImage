@@ -7,6 +7,8 @@ import 'package:mint_image/cli/cli_runner.dart';
 import 'package:mint_image/core/models/settings_model.dart';
 import 'package:path/path.dart' as p;
 
+import '../fixtures/generated_images.dart';
+
 const _pngBase64 =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1cAAAAASUVORK5CYII=';
 const _key = 'fixture-secret-key';
@@ -67,6 +69,89 @@ void main() {
     ],
     env ?? environment,
     input: input,
+  );
+
+  for (final format in ['gif', 'svg']) {
+    test(
+      'CLI generates and saves $format without streaming or transcoding',
+      () async {
+        final bytes = format == 'gif'
+            ? base64Decode(animatedGifBase64)
+            : utf8.encode(generatedSvg);
+        respond = (request) async {
+          final body =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+          expect(body['output_format'], format);
+          expect(body, isNot(contains('stream')));
+          expect(body['complexity'], 'low');
+          await _json(request, {
+            'data': [
+              {'b64_json': base64Encode(bytes)},
+            ],
+          });
+        };
+        final output = p.join(directory.path, 'animation.$format');
+        final result = await run([
+          'generate',
+          '--no-app-config',
+          '--prompt',
+          'looping logo',
+          '--model',
+          'gpt-image-2.6-sunburst',
+          '--format',
+          format,
+          '--stream',
+          '--complexity',
+          'low',
+          '--output',
+          output,
+          if (format == 'gif') ...[
+            '--frame-count',
+            '12',
+            '--frame-duration-ms',
+            '150',
+          ],
+        ]);
+        expect(result.code, 0, reason: result.output);
+        expect(await File(output).readAsBytes(), bytes);
+      },
+    );
+    test('CLI rejects $format with Responses API before submitting', () async {
+      final result = await run([
+        'generate',
+        '--no-app-config',
+        '--prompt',
+        'logo',
+        '--format',
+        format,
+        '--api-mode',
+        'responses',
+      ]);
+      expect(result.code, 2);
+      expect(paths, isEmpty);
+    });
+  }
+
+  test(
+    'CLI validates animation ranges and rejects GIF options for PNG',
+    () async {
+      for (final options in [
+        ['--format', 'gif', '--frame-count', '65'],
+        ['--format', 'gif', '--frame-duration-ms', '19'],
+        ['--format', 'png', '--frame-count', '9'],
+      ]) {
+        final result = await run([
+          'generate',
+          '--no-app-config',
+          '--prompt',
+          'loop',
+          ...options,
+        ]);
+        expect(result.code, 2);
+      }
+      expect(paths, isEmpty);
+    },
   );
 
   Map<String, Object?> savedProfile(
