@@ -24,6 +24,11 @@ import 'prompt_optimization_profile_edit_page.dart';
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
+  static const _wideLayoutBreakpoint = 840.0;
+  static const _wideContentMaxWidth = 1120.0;
+  static const _compactContentMaxWidth = 720.0;
+  static const _sectionSpacing = 24.0;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
@@ -38,178 +43,374 @@ class SettingsPage extends ConsumerWidget {
             colors: [AppThemeTokens.canvas, AppThemeTokens.canvasTint],
           ),
         ),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
-          children: [
-            const _AppInfoCard(),
-            const SizedBox(height: 12),
-            _RequestTimeoutCard(
-              timeoutSeconds: settings.requestTimeoutSeconds,
-              onEdit: () => _editRequestTimeout(context, ref, settings),
-            ),
-            const SizedBox(height: 12),
-            _ActionCard(
-              icon: Icons.receipt_long_rounded,
-              title: '请求日志',
-              description: '查看当前进程记录的请求、响应和错误详情。',
-              actionLabel: '查看日志',
-              onAction: () => _openRequestLogs(context),
-            ),
-            const SizedBox(height: 12),
-            _DataBackupCard(
-              webDavConfig: settings.webDavBackupConfig,
-              onExportToFile: () => _exportBackupToFile(context, ref, settings),
-              onRestoreFromFile: () =>
-                  _restoreBackupFromFile(context, ref, settings),
-              onEditWebDav: () => _editWebDavConfig(context, ref, settings),
-              onSyncToWebDav: () => _syncBackupToWebDav(context, ref, settings),
-              onRestoreFromWebDav: () =>
-                  _restoreBackupFromWebDav(context, ref, settings),
-            ),
-            const SizedBox(height: 16),
-            _SectionTitle(
-              icon: Icons.auto_awesome_motion_rounded,
-              title: '生图API',
-            ),
-            const SizedBox(height: 8),
-            for (final profile in settings.profiles)
-              Slidable(
-                key: ValueKey('image-${profile.id}'),
-                endActionPane: settings.profiles.length <= 1
-                    ? null
-                    : ActionPane(
-                        motion: const ScrollMotion(),
-                        children: [
-                          SlidableAction(
-                            onPressed: (_) async {
-                              await ref
-                                  .read(settingsProvider.notifier)
-                                  .deleteProfile(profile.id);
-                            },
-                            backgroundColor: Colors.red.shade400,
-                            foregroundColor: Colors.white,
-                            icon: Icons.delete_rounded,
-                            label: '删除',
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= _wideLayoutBreakpoint;
+            final apiSections = [
+              _buildImageProfilesSection(context, ref, settings, wide: wide),
+              const SizedBox(height: _sectionSpacing),
+              _buildPromptOptimizationSection(
+                context,
+                ref,
+                settings,
+                wide: wide,
+              ),
+              const SizedBox(height: _sectionSpacing),
+              _buildRequestGroup(context, ref, settings),
+            ];
+            final dataSections = [
+              _buildBackupGroup(context, ref, settings),
+              const SizedBox(height: _sectionSpacing),
+              _SettingsGroup(
+                title: '历史记录',
+                children: [
+                  _SettingsTile(
+                    icon: Icons.delete_sweep_rounded,
+                    title: '清除历史记录',
+                    subtitle: '删除所有生成记录，不会清除 API 配置',
+                    destructive: true,
+                    onTap: () => _clearHistory(context, ref),
+                  ),
+                ],
+              ),
+              const SizedBox(height: _sectionSpacing),
+              _buildAboutGroup(context),
+            ];
+
+            return ListView(
+              padding: EdgeInsets.fromLTRB(
+                wide ? 24 : 16,
+                8,
+                wide ? 24 : 16,
+                32,
+              ),
+              children: [
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: wide
+                          ? _wideContentMaxWidth
+                          : _compactContentMaxWidth,
+                    ),
+                    child: wide
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: apiSections,
+                                ),
+                              ),
+                              const SizedBox(width: _sectionSpacing),
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: dataSections,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ...apiSections,
+                              const SizedBox(height: _sectionSpacing),
+                              ...dataSections,
+                            ],
                           ),
-                        ],
-                      ),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _ImageProfileCard(
-                    profile: profile,
-                    isActive: profile.id == settings.activeProfileId,
-                    onTap: () async {
-                      await ref
-                          .read(settingsProvider.notifier)
-                          .setActiveProfile(profile.id);
-                    },
-                    onEdit: () => _openImageEditor(context, profile: profile),
                   ),
                 ),
-              ),
-            _AddConfigButton(
-              icon: Icons.add_rounded,
-              label: '添加生图 API',
-              onTap: () => _openImageEditor(context),
-            ),
-            const SizedBox(height: 18),
-            const Divider(),
-            const SizedBox(height: 14),
-            _SectionTitle(icon: Icons.auto_fix_high_rounded, title: '提示词优化API'),
-            const SizedBox(height: 8),
-            if (settings.promptOptimizationProfiles.isEmpty) ...[
-              _EmptyConfigHint(text: '还没有提示词优化 API。添加后，首页输入框右侧会启用提示词优化。'),
-              const SizedBox(height: 8),
-            ],
-            for (final profile in settings.promptOptimizationProfiles)
-              Slidable(
-                key: ValueKey('optimizer-${profile.id}'),
-                endActionPane: ActionPane(
-                  motion: const ScrollMotion(),
-                  children: [
-                    SlidableAction(
-                      onPressed: (_) async {
-                        await ref
-                            .read(settingsProvider.notifier)
-                            .deletePromptOptimizationProfile(profile.id);
-                      },
-                      backgroundColor: Colors.red.shade400,
-                      foregroundColor: Colors.white,
-                      icon: Icons.delete_rounded,
-                      label: '删除',
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _PromptOptimizationProfileCard(
-                    profile: profile,
-                    isActive:
-                        profile.id ==
-                        settings.activePromptOptimizationProfileId,
-                    onTap: () async {
-                      await ref
-                          .read(settingsProvider.notifier)
-                          .setActivePromptOptimizationProfile(profile.id);
-                    },
-                    onEdit: () => _openPromptOptimizationEditor(
-                      context,
-                      profile: profile,
-                    ),
-                  ),
-                ),
-              ),
-            _AddConfigButton(
-              icon: Icons.add_rounded,
-              label: '添加提示词优化 API',
-              onTap: () => _openPromptOptimizationEditor(context),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonalIcon(
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: const Text('清除历史记录'),
-                      content: const Text('这会删除所有生成记录，但不会清除 API 配置。'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('取消'),
-                        ),
-                        FilledButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('确认清除'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-
-                if (confirmed != true || !context.mounted) {
-                  return;
-                }
-
-                await ref.read(imageListProvider.notifier).clearHistory();
-                if (!context.mounted) {
-                  return;
-                }
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('历史记录已清空。')));
-              },
-              icon: const Icon(Icons.delete_sweep_rounded),
-              label: const Text('清除历史记录'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppThemeTokens.dangerSurface,
-                foregroundColor: AppThemeTokens.dangerText,
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
+  }
+
+  Widget _buildImageProfilesSection(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsModel settings, {
+    required bool wide,
+  }) {
+    final canDelete = settings.profiles.length > 1;
+    return _ProfileSection(
+      icon: Icons.auto_awesome_motion_rounded,
+      title: '生图 API',
+      subtitle: '点击卡片切换当前使用的配置',
+      addLabel: '添加',
+      onAdd: () => _openImageEditor(context),
+      emptyText: '还没有生图 API，添加后即可开始生成图片。',
+      children: [
+        for (final profile in settings.profiles)
+          _ProfileCard(
+            key: ValueKey('image-${profile.id}'),
+            name: profile.name,
+            badge: profile.apiMode.shortLabel,
+            baseUrl: profile.normalizedBaseUrl,
+            model: profile.model,
+            isActive: profile.id == settings.activeProfileId,
+            swipeToDelete: !wide,
+            onTap: () => ref
+                .read(settingsProvider.notifier)
+                .setActiveProfile(profile.id),
+            onEdit: () => _openImageEditor(context, profile: profile),
+            onDelete: canDelete
+                ? () => _deleteProfile(
+                    context,
+                    name: profile.name,
+                    confirm: wide,
+                    delete: () => ref
+                        .read(settingsProvider.notifier)
+                        .deleteProfile(profile.id),
+                  )
+                : null,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPromptOptimizationSection(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsModel settings, {
+    required bool wide,
+  }) {
+    return _ProfileSection(
+      icon: Icons.auto_fix_high_rounded,
+      title: '提示词优化 API',
+      subtitle: '用于首页输入框右侧的提示词优化',
+      addLabel: '添加',
+      onAdd: () => _openPromptOptimizationEditor(context),
+      emptyText: '还没有提示词优化 API。添加后，首页输入框右侧会启用提示词优化。',
+      children: [
+        for (final profile in settings.promptOptimizationProfiles)
+          _ProfileCard(
+            key: ValueKey('optimizer-${profile.id}'),
+            name: profile.name,
+            badge: profile.protocol.label,
+            baseUrl: profile.normalizedBaseUrl,
+            model: profile.model,
+            isActive: profile.id == settings.activePromptOptimizationProfileId,
+            swipeToDelete: !wide,
+            onTap: () => ref
+                .read(settingsProvider.notifier)
+                .setActivePromptOptimizationProfile(profile.id),
+            onEdit: () =>
+                _openPromptOptimizationEditor(context, profile: profile),
+            onDelete: () => _deleteProfile(
+              context,
+              name: profile.name,
+              confirm: wide,
+              delete: () => ref
+                  .read(settingsProvider.notifier)
+                  .deletePromptOptimizationProfile(profile.id),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRequestGroup(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsModel settings,
+  ) {
+    return _SettingsGroup(
+      title: '请求',
+      children: [
+        _SettingsTile(
+          icon: Icons.timer_outlined,
+          title: '请求超时',
+          subtitle: '生成较慢时可以适当调高',
+          trailing: _ValuePill(text: '${settings.requestTimeoutSeconds} 秒'),
+          onTap: () => _editRequestTimeout(context, ref, settings),
+        ),
+        _SettingsTile(
+          icon: Icons.receipt_long_rounded,
+          title: '请求日志',
+          subtitle: '查看当前进程记录的请求、响应和错误详情',
+          trailing: _supportsDetachedLogWindow
+              ? const Icon(
+                  Icons.open_in_new_rounded,
+                  size: 18,
+                  color: AppThemeTokens.textSecondary,
+                )
+              : null,
+          showChevron: !_supportsDetachedLogWindow,
+          onTap: () => _openRequestLogs(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBackupGroup(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsModel settings,
+  ) {
+    final webDavConfig = settings.webDavBackupConfig;
+    final webDavConfigured = webDavConfig?.isConfigured ?? false;
+    return _SettingsGroup(
+      title: '数据备份与恢复',
+      children: [
+        _SettingsTile(
+          icon: Icons.settings_input_component_rounded,
+          title: 'WebDAV 设置',
+          subtitle: webDavConfigured
+              ? webDavConfig!.remoteDirectory
+              : '配置后可在多台设备间同步数据',
+          trailing: webDavConfigured
+              ? const _ValuePill(text: '已配置')
+              : const _ValuePill(
+                  text: '未配置',
+                  color: AppThemeTokens.warningSurface,
+                  textColor: AppThemeTokens.warningText,
+                ),
+          onTap: () => _editWebDavConfig(context, ref, settings),
+        ),
+        _SettingsTile(
+          icon: Icons.cloud_upload_rounded,
+          title: '同步到 WebDAV',
+          subtitle: '上传设置、历史记录、收藏夹和图片',
+          onTap: () => _syncBackupToWebDav(context, ref, settings),
+        ),
+        _SettingsTile(
+          icon: Icons.cloud_download_rounded,
+          title: '从 WebDAV 恢复',
+          subtitle: '下载最新备份并替换本地数据',
+          onTap: () => _restoreBackupFromWebDav(context, ref, settings),
+        ),
+        _SettingsTile(
+          icon: Icons.upload_file_rounded,
+          title: '导出到文件',
+          subtitle: '保存为 .mintbackup 备份文件',
+          onTap: () => _exportBackupToFile(context, ref, settings),
+        ),
+        _SettingsTile(
+          icon: Icons.restore_page_rounded,
+          title: '从文件恢复',
+          subtitle: '选择 .mintbackup 文件恢复数据',
+          onTap: () => _restoreBackupFromFile(context, ref, settings),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAboutGroup(BuildContext context) {
+    return _SettingsGroup(
+      title: '关于',
+      children: [
+        const _SettingsTile(
+          icon: Icons.sell_outlined,
+          title: 'MintImage',
+          subtitle: '当前版本',
+          trailing: _ValuePill(text: AppVersion.current),
+        ),
+        _SettingsTile(
+          icon: Icons.code_rounded,
+          title: '开源地址',
+          subtitle: AppVersion.repositoryUrl,
+          trailing: const Icon(
+            Icons.open_in_new_rounded,
+            size: 18,
+            color: AppThemeTokens.textSecondary,
+          ),
+          showChevron: false,
+          onTap: () => _openRepository(context),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _deleteProfile(
+    BuildContext context, {
+    required String name,
+    required bool confirm,
+    required Future<void> Function() delete,
+  }) async {
+    if (confirm) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('删除配置'),
+            content: Text('确定删除「$name」吗？此操作无法撤销。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppThemeTokens.dangerText,
+                ),
+                child: const Text('删除'),
+              ),
+            ],
+          );
+        },
+      );
+      if (confirmed != true) {
+        return;
+      }
+    }
+    await delete();
+  }
+
+  Future<void> _clearHistory(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('清除历史记录'),
+          content: const Text('这会删除所有生成记录，但不会清除 API 配置。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('确认清除'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    await ref.read(imageListProvider.notifier).clearHistory();
+    if (!context.mounted) {
+      return;
+    }
+    _showSnack(context, '历史记录已清空。');
+  }
+
+  Future<void> _openRepository(BuildContext context) async {
+    var launched = false;
+    try {
+      launched = await launchUrl(
+        Uri.parse(AppVersion.repositoryUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      launched = false;
+    }
+
+    if (!launched && context.mounted) {
+      _showSnack(context, '无法打开 GitHub 地址。');
+    }
   }
 
   Future<void> _openImageEditor(
@@ -878,326 +1079,518 @@ class SettingsPage extends ConsumerWidget {
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 }
 
-class _AppInfoCard extends StatelessWidget {
-  const _AppInfoCard();
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppThemeTokens.surfaceMuted,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: AppThemeTokens.primaryStrong),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleSmall?.copyWith(
+                  color: AppThemeTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (subtitle != null)
+                Text(
+                  subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppThemeTokens.textSecondary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+      ],
+    );
+  }
+}
+
+class _ProfileSection extends StatelessWidget {
+  const _ProfileSection({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.addLabel,
+    required this.onAdd,
+    required this.emptyText,
+    required this.children,
+  });
+
+  static const _twoColumnMinWidth = 600.0;
+  static const _spacing = 12.0;
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String addLabel;
+  final VoidCallback onAdd;
+  final String emptyText;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(
+          icon: icon,
+          title: title,
+          subtitle: subtitle,
+          trailing: children.isEmpty
+              ? null
+              : TextButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: Text(addLabel),
+                ),
+        ),
+        const SizedBox(height: 12),
+        if (children.isEmpty)
+          _EmptyConfigHint(
+            text: emptyText,
+            actionLabel: addLabel,
+            onAction: onAdd,
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= _twoColumnMinWidth
+                  ? 2
+                  : 1;
+              final itemWidth =
+                  ((constraints.maxWidth - _spacing * (columns - 1)) / columns)
+                      .floorToDouble();
+              return Wrap(
+                spacing: _spacing,
+                runSpacing: _spacing,
+                children: [
+                  for (final child in children)
+                    SizedBox(width: itemWidth, child: child),
+                ],
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class _EmptyConfigHint extends StatelessWidget {
+  const _EmptyConfigHint({
+    required this.text,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final String text;
+  final String actionLabel;
+  final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: AppDecorations.card(radius: 28),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppThemeTokens.border),
+      ),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppThemeTokens.surfaceSoft,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.info_outline_rounded),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppThemeTokens.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '关于 MintImage',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 14),
-          _InfoRow(
-            icon: Icons.sell_outlined,
-            label: '版本',
-            value: AppVersion.current,
-          ),
-          const SizedBox(height: 10),
-          _InfoRow(
-            icon: Icons.code_rounded,
-            label: '开源地址',
-            value: AppVersion.repositoryUrl,
-            onTap: () => _openRepository(context),
+          const SizedBox(width: 12),
+          FilledButton.tonalIcon(
+            onPressed: onAction,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: Text(actionLabel),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
           ),
         ],
       ),
     );
   }
-
-  Future<void> _openRepository(BuildContext context) async {
-    var launched = false;
-    try {
-      launched = await launchUrl(
-        Uri.parse(AppVersion.repositoryUrl),
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {
-      launched = false;
-    }
-
-    if (!launched && context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('无法打开 GitHub 地址。')));
-    }
-  }
 }
 
-class _DataBackupCard extends StatelessWidget {
-  const _DataBackupCard({
-    required this.webDavConfig,
-    required this.onExportToFile,
-    required this.onRestoreFromFile,
-    required this.onEditWebDav,
-    required this.onSyncToWebDav,
-    required this.onRestoreFromWebDav,
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({
+    super.key,
+    required this.name,
+    required this.badge,
+    required this.baseUrl,
+    required this.model,
+    required this.isActive,
+    required this.swipeToDelete,
+    required this.onTap,
+    required this.onEdit,
+    this.onDelete,
   });
 
-  final WebDavBackupConfig? webDavConfig;
-  final VoidCallback onExportToFile;
-  final VoidCallback onRestoreFromFile;
-  final VoidCallback onEditWebDav;
-  final VoidCallback onSyncToWebDav;
-  final VoidCallback onRestoreFromWebDav;
+  final String name;
+  final String badge;
+  final String baseUrl;
+  final String model;
+  final bool isActive;
+  final bool swipeToDelete;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback? onDelete;
+
+  static const _radius = 18.0;
 
   @override
   Widget build(BuildContext context) {
-    final configured = webDavConfig?.isConfigured ?? false;
-    final status = configured ? webDavConfig!.remoteDirectory : '未配置';
-
-    return Container(
-      decoration: AppDecorations.card(radius: 22),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppThemeTokens.surfaceSoft,
-                  borderRadius: BorderRadius.circular(12),
+    final textTheme = Theme.of(context).textTheme;
+    final card = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(_radius),
+        boxShadow: AppDecorations.softShadow,
+      ),
+      child: Material(
+        color: isActive ? AppThemeTokens.surfaceSoft : AppThemeTokens.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_radius),
+          side: BorderSide(
+            color: isActive ? AppThemeTokens.primary : AppThemeTokens.border,
+            width: isActive ? 1.4 : 1,
+          ),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 8, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Icon(
+                    isActive
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 20,
+                    color: isActive
+                        ? AppThemeTokens.primary
+                        : AppThemeTokens.textSecondary.withValues(alpha: 0.5),
+                  ),
                 ),
-                child: const Icon(Icons.cloud_sync_rounded, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: AppThemeTokens.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (isActive) ...[
+                                  const SizedBox(width: 8),
+                                  const _ValuePill(
+                                    text: '使用中',
+                                    color: AppThemeTokens.primary,
+                                    textColor: Colors.white,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          _CardIconButton(
+                            tooltip: '编辑',
+                            icon: Icons.edit_rounded,
+                            onPressed: onEdit,
+                          ),
+                          if (!swipeToDelete && onDelete != null) ...[
+                            const SizedBox(width: 2),
+                            _CardIconButton(
+                              tooltip: '删除',
+                              icon: Icons.delete_outline_rounded,
+                              color: AppThemeTokens.dangerText,
+                              onPressed: onDelete!,
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: _ValuePill(
+                              text: badge,
+                              color: isActive
+                                  ? Colors.white
+                                  : AppThemeTokens.surfaceMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              baseUrl,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: AppThemeTokens.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '模型：$model',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (!swipeToDelete || onDelete == null) {
+      return card;
+    }
+
+    return Slidable(
+      endActionPane: ActionPane(
+        motion: const ScrollMotion(),
+        children: [
+          SlidableAction(
+            onPressed: (_) => onDelete!(),
+            backgroundColor: Colors.red.shade400,
+            foregroundColor: Colors.white,
+            icon: Icons.delete_rounded,
+            label: '删除',
+            borderRadius: BorderRadius.circular(_radius),
+          ),
+        ],
+      ),
+      child: card,
+    );
+  }
+}
+
+class _CardIconButton extends StatelessWidget {
+  const _CardIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.color = AppThemeTokens.primaryStrong,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(foregroundColor: color),
+      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.title, required this.children});
+
+  static const _radius = 20.0;
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: AppThemeTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(_radius),
+            boxShadow: AppDecorations.softShadow,
+          ),
+          child: Material(
+            color: AppThemeTokens.surface,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(_radius),
+              side: const BorderSide(color: AppThemeTokens.border),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < children.length; i++) ...[
+                  if (i > 0) const Divider(height: 1, indent: 62),
+                  children[i],
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.destructive = false,
+    this.showChevron = true,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final bool destructive;
+  final bool showChevron;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final accent = destructive
+        ? AppThemeTokens.dangerText
+        : AppThemeTokens.primaryStrong;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: destructive
+                    ? AppThemeTokens.dangerSurface
+                    : AppThemeTokens.surfaceSoft,
+                borderRadius: BorderRadius.circular(11),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '数据备份与恢复',
-                      style: Theme.of(context).textTheme.titleSmall,
+              child: Icon(icon, size: 19, color: accent),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleSmall?.copyWith(
+                      color: destructive
+                          ? AppThemeTokens.dangerText
+                          : AppThemeTokens.textPrimary,
+                      fontWeight: FontWeight.w700,
                     ),
+                  ),
+                  if (subtitle != null) ...[
                     const SizedBox(height: 2),
                     Text(
-                      'WebDAV：$status',
-                      maxLines: 1,
+                      subtitle!,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: textTheme.bodySmall?.copyWith(
                         color: AppThemeTokens.textSecondary,
                       ),
                     ),
                   ],
-                ),
+                ],
+              ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+            if (onTap != null && showChevron) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: AppThemeTokens.textSecondary.withValues(alpha: 0.7),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _BackupActionButton(
-                icon: Icons.upload_file_rounded,
-                label: '导出到文件',
-                onPressed: onExportToFile,
-              ),
-              _BackupActionButton(
-                icon: Icons.restore_page_rounded,
-                label: '从文件恢复',
-                onPressed: onRestoreFromFile,
-              ),
-              _BackupActionButton(
-                icon: Icons.settings_input_component_rounded,
-                label: 'WebDAV 设置',
-                onPressed: onEditWebDav,
-              ),
-              _BackupActionButton(
-                icon: Icons.cloud_upload_rounded,
-                label: '同步到 WebDAV',
-                onPressed: onSyncToWebDav,
-              ),
-              _BackupActionButton(
-                icon: Icons.cloud_download_rounded,
-                label: '从 WebDAV 恢复',
-                onPressed: onRestoreFromWebDav,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BackupActionButton extends StatelessWidget {
-  const _BackupActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton.tonalIcon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Row(
-      children: [
-        Icon(icon, size: 18, color: AppThemeTokens.primaryStrong),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 64,
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppThemeTokens.textSecondary,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: onTap == null
-                  ? AppThemeTokens.textPrimary
-                  : AppThemeTokens.primaryStrong,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        if (onTap != null) ...[
-          const SizedBox(width: 8),
-          const Icon(
-            Icons.open_in_new_rounded,
-            size: 16,
-            color: AppThemeTokens.primaryStrong,
-          ),
-        ],
-      ],
-    );
-
-    if (onTap == null) {
-      return content;
-    }
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: content,
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.icon, required this.title});
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 17, color: AppThemeTokens.primaryStrong),
-        const SizedBox(width: 7),
-        Text(
-          title,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: AppThemeTokens.textPrimary,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AddConfigButton extends StatelessWidget {
-  const _AddConfigButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppThemeTokens.surfaceSoft,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppThemeTokens.border),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: AppThemeTokens.primaryStrong),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppThemeTokens.primaryStrong,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
           ],
         ),
       ),
@@ -1205,380 +1598,33 @@ class _AddConfigButton extends StatelessWidget {
   }
 }
 
-class _EmptyConfigHint extends StatelessWidget {
-  const _EmptyConfigHint({required this.text});
+class _ValuePill extends StatelessWidget {
+  const _ValuePill({
+    required this.text,
+    this.color = AppThemeTokens.surfaceMuted,
+    this.textColor = AppThemeTokens.primaryStrong,
+  });
 
   final String text;
+  final Color color;
+  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppThemeTokens.border),
+        color: color,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: AppThemeTokens.textSecondary,
-          fontWeight: FontWeight.w600,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.w800,
         ),
-      ),
-    );
-  }
-}
-
-class _ImageProfileCard extends StatelessWidget {
-  const _ImageProfileCard({
-    required this.profile,
-    required this.isActive,
-    required this.onTap,
-    required this.onEdit,
-  });
-
-  final ApiProfile profile;
-  final bool isActive;
-  final VoidCallback onTap;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    final tint = isActive ? AppThemeTokens.surfaceSoft : Colors.white;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          decoration: AppDecorations.card(radius: 18, color: tint),
-          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      profile.name,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: AppThemeTokens.textPrimary,
-                      ),
-                    ),
-                  ),
-                  if (isActive)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            size: 14,
-                            color: AppThemeTokens.primary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '使用中',
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: '编辑',
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_rounded, size: 19),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 34,
-                      height: 34,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppThemeTokens.surfaceMuted,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      profile.apiMode.shortLabel,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppThemeTokens.primaryStrong,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      profile.normalizedBaseUrl,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppThemeTokens.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '模型：${profile.model}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PromptOptimizationProfileCard extends StatelessWidget {
-  const _PromptOptimizationProfileCard({
-    required this.profile,
-    required this.isActive,
-    required this.onTap,
-    required this.onEdit,
-  });
-
-  final PromptOptimizationProfile profile;
-  final bool isActive;
-  final VoidCallback onTap;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    final tint = isActive ? AppThemeTokens.surfaceSoft : Colors.white;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          decoration: AppDecorations.card(radius: 18, color: tint),
-          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      profile.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: AppThemeTokens.textPrimary,
-                      ),
-                    ),
-                  ),
-                  if (isActive)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            size: 14,
-                            color: AppThemeTokens.primary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '使用中',
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: '编辑',
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_rounded, size: 19),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 34,
-                      height: 34,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppThemeTokens.surfaceMuted,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      profile.protocol.label,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppThemeTokens.primaryStrong,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      profile.normalizedBaseUrl,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppThemeTokens.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '模型：${profile.model}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RequestTimeoutCard extends StatelessWidget {
-  const _RequestTimeoutCard({
-    required this.timeoutSeconds,
-    required this.onEdit,
-  });
-
-  final int timeoutSeconds;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: AppDecorations.card(radius: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.timer_outlined, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Row(
-              children: [
-                Text(
-                  '请求超时',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '$timeoutSeconds 秒',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppThemeTokens.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          FilledButton.tonal(onPressed: onEdit, child: const Text('修改')),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.actionLabel,
-    required this.onAction,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final String actionLabel;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: AppDecorations.card(radius: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppThemeTokens.surfaceSoft,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ),
-          FilledButton.tonal(onPressed: onAction, child: Text(actionLabel)),
-        ],
       ),
     );
   }

@@ -268,21 +268,63 @@ void main() {
     expect(find.byTooltip('优化提示词'), findsOneWidget);
   });
 
+  testWidgets('quality modal applies and persists quality with complexity', (
+    tester,
+  ) async {
+    GenerationRequest? submitted;
+    await _pumpInputBar(
+      tester,
+      onSubmit: (request) async => submitted = request,
+    );
+    expect(find.byKey(const Key('generation-options-button')), findsNothing);
+    await tester.tap(find.byKey(const Key('quality-settings-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('quality-option-high')));
+    await tester.tap(find.byKey(const ValueKey('complexity-option-medium')));
+    await tester.tap(find.byKey(const Key('quality-settings-apply')));
+    await tester.pumpAndSettle();
+    final settings = ProviderScope.containerOf(
+      tester.element(find.byType(BottomInputBar)),
+    ).read(settingsProvider);
+    expect(settings.lastQuality, ImageQuality.high);
+    expect(settings.lastComplexity, ImageComplexity.medium);
+    await tester.enterText(find.byKey(const Key('prompt-input')), '湖边木屋');
+    await tester.tap(find.byKey(const Key('submit-generation-button')));
+    await tester.pump();
+    expect(submitted!.quality, ImageQuality.high);
+    expect(submitted!.complexity, ImageComplexity.medium);
+  });
+
   testWidgets('edits GIF frame options and submits them', (tester) async {
     GenerationRequest? submitted;
     await _pumpInputBar(
       tester,
       settings: _settings.copyWith(
-        lastOutputFormat: ImageOutputFormat.gif,
+        lastOutputFormat: ImageOutputFormat.png,
         lastSizePreset: SizePreset.auto,
       ),
       onSubmit: (request) async => submitted = request,
     );
-    await tester.tap(find.byKey(const Key('generation-options-button')));
+    await tester.tap(find.byKey(const Key('format-settings-button')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('format-option-gif')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('gif-frame-duration')));
     await tester.enterText(find.byKey(const Key('gif-frame-count')), '12');
     await tester.enterText(find.byKey(const Key('gif-frame-duration')), '150');
-    await tester.tap(find.text('确定'));
+    await tester.tap(find.byKey(const Key('format-settings-apply')));
+    await tester.pumpAndSettle();
+    final settings = ProviderScope.containerOf(
+      tester.element(find.byType(BottomInputBar)),
+    ).read(settingsProvider);
+    expect(settings.lastOutputFormat, ImageOutputFormat.gif);
+    expect(settings.lastFrameCount, 12);
+    expect(settings.lastFrameDurationMs, 150);
+    await tester.tap(find.byKey(const Key('quality-settings-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('gif-frame-count')), findsNothing);
+    expect(find.text('规划复杂度'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('quality-settings-close')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('prompt-input')),

@@ -26,7 +26,9 @@
 
 ## 使用方式
 
-GUI：在生图配置中选择 Images API，模型填写 `gpt-image-2.6-flare` 或 `gpt-image-2.6-sunburst`。格式选择 GIF / SVG；选择 GIF 后点击帧数按钮调整动画参数，复杂度可在同一设置面板修改。
+GUI：在生图配置中选择 Images API，模型填写 `gpt-image-2.6-flare` 或 `gpt-image-2.6-sunburst`。点击质量按钮调整画质与规划复杂度；点击格式按钮选择 PNG / JPEG / WEBP / GIF / SVG，选择 GIF 时在同一面板调整帧数和帧时长，点击“应用设置”保存。
+
+UI 用小型 `2.6` 徽标标注超高／最高画质、规划复杂度和 GIF／SVG；点击或悬停查看模型与接口要求，具体可用能力以模型和 API 服务商为准。
 
 CLI：
 

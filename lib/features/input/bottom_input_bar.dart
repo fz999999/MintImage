@@ -20,7 +20,6 @@ import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
 import 'attachment_preview_strip.dart';
 import 'image_format_selector.dart';
-import 'generation_options_button.dart';
 import 'prompt_editor_page.dart';
 import 'quality_selector.dart';
 import 'quantity_selector.dart';
@@ -547,9 +546,14 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                     const SizedBox(width: 6),
                                     QualitySelector(
                                       selectedQuality: _quality,
-                                      onSelected: (quality) {
+                                      selectedComplexity: _complexity,
+                                      showComplexity:
+                                          activeProfile.apiMode !=
+                                          ImageGenerationApiMode.responses,
+                                      onSelected: (options) {
                                         setState(() {
-                                          _quality = quality;
+                                          _quality = options.quality;
+                                          _complexity = options.complexity;
                                         });
                                         _persistLastGenerationOptions();
                                       },
@@ -557,35 +561,19 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                     const SizedBox(width: 6),
                                     ImageFormatSelector(
                                       selectedFormat: _outputFormat,
-                                      onSelected: (format) {
+                                      frameCount: _frameCount,
+                                      frameDurationMs: _frameDurationMs,
+                                      onSelected: (options) {
                                         setState(() {
-                                          _outputFormat = format;
+                                          _outputFormat = options.format;
+                                          _frameCount = options.frameCount;
+                                          _frameDurationMs =
+                                              options.frameDurationMs;
                                         });
                                         _persistLastGenerationOptions();
                                       },
                                     ),
                                     const SizedBox(width: 6),
-                                    if (activeProfile.apiMode !=
-                                        ImageGenerationApiMode.responses) ...[
-                                      GenerationOptionsButton(
-                                        isGif:
-                                            _outputFormat ==
-                                            ImageOutputFormat.gif,
-                                        frameCount: _frameCount,
-                                        frameDurationMs: _frameDurationMs,
-                                        complexity: _complexity,
-                                        onSelected: (options) {
-                                          setState(() {
-                                            _frameCount = options.frameCount;
-                                            _frameDurationMs =
-                                                options.frameDurationMs;
-                                            _complexity = options.complexity;
-                                          });
-                                          _persistLastGenerationOptions();
-                                        },
-                                      ),
-                                      const SizedBox(width: 6),
-                                    ],
                                     QuantitySelector(
                                       count: _count,
                                       onSelected: (count) {
