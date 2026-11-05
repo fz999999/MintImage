@@ -91,6 +91,47 @@ enum ImageComplexity {
   }
 }
 
+enum SvgReasoningEffort {
+  none,
+  minimal,
+  low,
+  medium,
+  high,
+  xhigh,
+  max;
+
+  static SvgReasoningEffort? fromApiValue(String? value) {
+    for (final effort in values) {
+      if (effort.name == value) return effort;
+    }
+    return null;
+  }
+}
+
+/// Omit this object entirely to use the provider's default SVG author.
+class SvgOptions {
+  const SvgOptions({required this.model, this.reasoningEffort});
+
+  final String model;
+  final SvgReasoningEffort? reasoningEffort;
+
+  Map<String, dynamic> toJson() => {
+    'model': model.trim(),
+    if (reasoningEffort != null) 'reasoning': {'effort': reasoningEffort!.name},
+  };
+
+  static SvgOptions? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final reasoning = value['reasoning'];
+    return SvgOptions(
+      model: value['model'] as String? ?? '',
+      reasoningEffort: SvgReasoningEffort.fromApiValue(
+        reasoning is Map ? reasoning['effort'] as String? : null,
+      ),
+    );
+  }
+}
+
 class GenerationRequest {
   const GenerationRequest({
     required this.prompt,
@@ -103,6 +144,8 @@ class GenerationRequest {
     this.frameCount = 9,
     this.frameDurationMs = 200,
     this.complexity,
+    this.svgOptions,
+    this.markupPath,
     required this.count,
     required this.apiProfileId,
   });
@@ -117,6 +160,8 @@ class GenerationRequest {
   final int frameCount;
   final int frameDurationMs;
   final ImageComplexity? complexity;
+  final SvgOptions? svgOptions;
+  final String? markupPath;
   final int count;
   final String apiProfileId;
 
@@ -134,6 +179,18 @@ class GenerationRequest {
 
   /// Validate before submitting a paid request, including from the CLI.
   String? validate({required bool usesResponsesApi}) {
+    if (markupPath != null) {
+      if (!hasAttachments) return '标注引导需要先添加参考图。';
+      if (usesResponsesApi) return '标注引导需要使用 Images API。';
+      if (!markupPath!.toLowerCase().endsWith('.png')) {
+        return '标注图必须是带透明区域的 PNG 文件。';
+      }
+    }
+    if (outputFormat == ImageOutputFormat.svg &&
+        svgOptions != null &&
+        svgOptions!.model.trim().isEmpty) {
+      return '请填写 SVG 绘制模型，或关闭自定义模型以使用服务端默认值。';
+    }
     if (usesResponsesApi && complexity != null) {
       return '规划复杂度需要使用 Images API，请切换 API 协议。';
     }
@@ -176,6 +233,10 @@ class GenerationRequest {
     int? frameCount,
     int? frameDurationMs,
     ImageComplexity? complexity,
+    SvgOptions? svgOptions,
+    bool clearSvgOptions = false,
+    String? markupPath,
+    bool clearMarkupPath = false,
     int? count,
     String? apiProfileId,
   }) {
@@ -190,6 +251,8 @@ class GenerationRequest {
       frameCount: frameCount ?? this.frameCount,
       frameDurationMs: frameDurationMs ?? this.frameDurationMs,
       complexity: complexity ?? this.complexity,
+      svgOptions: clearSvgOptions ? null : svgOptions ?? this.svgOptions,
+      markupPath: clearMarkupPath ? null : markupPath ?? this.markupPath,
       count: count ?? this.count,
       apiProfileId: apiProfileId ?? this.apiProfileId,
     );
@@ -207,6 +270,8 @@ class GenerationRequest {
       'frameCount': frameCount,
       'frameDurationMs': frameDurationMs,
       if (complexity != null) 'complexity': complexity!.apiValue,
+      if (svgOptions != null) 'svgOptions': svgOptions!.toJson(),
+      if (markupPath != null) 'markupPath': markupPath,
       'count': count,
       'apiProfileId': apiProfileId,
     };
@@ -232,6 +297,8 @@ class GenerationRequest {
       frameCount: json['frameCount'] as int? ?? 9,
       frameDurationMs: json['frameDurationMs'] as int? ?? 200,
       complexity: ImageComplexity.fromApiValue(json['complexity'] as String?),
+      svgOptions: SvgOptions.fromJson(json['svgOptions']),
+      markupPath: json['markupPath'] as String?,
       count: json['count'] as int? ?? 1,
       apiProfileId: json['apiProfileId'] as String? ?? '',
     );

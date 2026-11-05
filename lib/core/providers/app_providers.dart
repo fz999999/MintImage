@@ -17,6 +17,7 @@ import '../services/image_save_service.dart';
 import '../services/image_storage_service.dart';
 import '../services/notification_service.dart';
 import '../services/request_log_service.dart';
+import '../services/storage_cleanup_service.dart';
 import '../services/webdav_backup_service.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>(
@@ -87,6 +88,11 @@ final backupServiceProvider = Provider<BackupService>(
     favoriteFolderDao: ref.watch(favoriteFolderDaoProvider),
     requestLogService: ref.watch(requestLogServiceProvider),
   ),
+);
+
+final storageCleanupServiceProvider = Provider<StorageCleanupService>(
+  (ref) =>
+      StorageCleanupService(imageRecordDao: ref.watch(imageRecordDaoProvider)),
 );
 
 final webDavBackupServiceProvider = Provider<WebDavBackupService>(

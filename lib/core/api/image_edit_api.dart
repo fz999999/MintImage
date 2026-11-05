@@ -4,9 +4,11 @@ import 'package:path/path.dart' as p;
 import '../models/generation_request.dart';
 import '../models/generation_result.dart';
 import '../models/settings_model.dart';
+import '../services/markup_validation.dart';
 import 'api_request_logger.dart';
 import 'image_task_api.dart';
 import 'openai_client.dart';
+import 'openrouter_image_api.dart';
 import 'responses_image_api.dart';
 
 class ImageEditApi {
@@ -27,6 +29,20 @@ class ImageEditApi {
     if (validation != null) throw ApiException(validation);
     if (request.imagePaths.isEmpty) {
       throw const ApiException('图生图请求缺少附件。');
+    }
+    if ((profile.resolvedSafetyIdentifier?.length ?? 0) > 128) {
+      throw const ApiException('安全标识最多 128 个字符。');
+    }
+    if (profile.isOpenRouterImages) {
+      final error = validateOpenRouterImageRequest(request);
+      if (error != null) throw ApiException(error);
+    }
+    if (request.markupPath != null) {
+      final error = await validateMarkupAttachment(
+        request.imagePaths.first,
+        request.markupPath!,
+      );
+      if (error != null) throw ApiException(error);
     }
 
     final client = OpenAiClient(
@@ -89,6 +105,14 @@ class ImageEditApi {
             );
       return parseResponsesImageResults(response);
     }
+    if (profile.isOpenRouterImages) {
+      return requestOpenRouterImages(
+        client,
+        request,
+        profile,
+        cancelToken: cancelToken,
+      );
+    }
 
     final useAsync = profile.apiMode == ImageGenerationApiMode.imagesAsync;
     if (useAsync) {
@@ -98,6 +122,12 @@ class ImageEditApi {
         'n': 1,
         'quality': request.quality.apiValue,
         'output_format': request.outputFormat.apiValue,
+        if (profile.resolvedSafetyIdentifier != null)
+          'safety_identifier': profile.resolvedSafetyIdentifier,
+        if (request.markupPath != null)
+          'markup': {
+            'image_url': await imagePathToDataUrl(request.markupPath!),
+          },
         if (request.complexity != null)
           'complexity': request.complexity!.apiValue,
         'async': true,
@@ -126,6 +156,8 @@ class ImageEditApi {
       MapEntry('n', '1'),
       MapEntry('quality', request.quality.apiValue),
       MapEntry('output_format', request.outputFormat.apiValue),
+      if (profile.resolvedSafetyIdentifier != null)
+        MapEntry('safety_identifier', profile.resolvedSafetyIdentifier!),
       if (request.complexity != null)
         MapEntry('complexity', request.complexity!.apiValue),
     ];
@@ -138,6 +170,18 @@ class ImageEditApi {
       fields.add(MapEntry('response_format', responseFormat));
     }
     formData.fields.addAll(fields);
+    if (request.markupPath != null) {
+      formData.files.add(
+        MapEntry(
+          'markup',
+          await MultipartFile.fromFile(
+            request.markupPath!,
+            filename: p.basename(request.markupPath!),
+            contentType: DioMediaType('image', 'png'),
+          ),
+        ),
+      );
+    }
 
     for (final path in request.imagePaths) {
       formData.files.add(
@@ -169,7 +213,7 @@ class ImageEditApi {
   }
 
   bool _isGptImage2Family(String model) {
-    final value = model.trim().toLowerCase();
+    final value = model.trim().toLowerCase().split('/').last;
     return RegExp(r'^gpt-image-2(?:\.\d+)?(?:-|$)').hasMatch(value);
   }
 

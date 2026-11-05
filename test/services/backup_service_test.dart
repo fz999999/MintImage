@@ -53,6 +53,8 @@ void main() {
     await resultImage.writeAsBytes([1, 2, 3], flush: true);
     final sourceImage = File(p.join(root.path, 'source.png'));
     await sourceImage.writeAsBytes([4, 5, 6], flush: true);
+    final markup = File(p.join(root.path, 'markup.png'));
+    await markup.writeAsBytes([7, 8, 9]);
 
     final record = ImageRecord(
       id: 'record-1',
@@ -70,6 +72,11 @@ void main() {
       frameCount: 24,
       frameDurationMs: 80,
       complexity: 'low',
+      svgOptions: const SvgOptions(
+        model: 'svg-author',
+        reasoningEffort: SvgReasoningEffort.high,
+      ),
+      markupPath: markup.path,
       model: 'gpt-image-2',
       status: ImageRecordStatus.done,
       errorMessage: null,
@@ -143,6 +150,10 @@ void main() {
     expect(records.single.frameCount, 24);
     expect(records.single.frameDurationMs, 80);
     expect(records.single.complexity, 'low');
+    expect(records.single.svgOptions!.model, 'svg-author');
+    expect(records.single.svgOptions!.reasoningEffort, SvgReasoningEffort.high);
+    expect(records.single.markupPath, isNot(markup.path));
+    expect(await File(records.single.markupPath!).readAsBytes(), [7, 8, 9]);
     expect(await File(records.single.resultImagePath!).readAsBytes(), [
       1,
       2,

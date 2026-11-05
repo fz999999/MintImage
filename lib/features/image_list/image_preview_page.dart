@@ -379,6 +379,17 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
                           ),
                         if (record.complexity != null)
                           _PreviewChip(label: '复杂度 ${record.complexity}'),
+                        if (record.svgOptions != null)
+                          _PreviewChip(
+                            label: 'SVG ${record.svgOptions!.model}',
+                          ),
+                        if (record.svgOptions?.reasoningEffort != null)
+                          _PreviewChip(
+                            label:
+                                'SVG 推理 ${record.svgOptions!.reasoningEffort!.name}',
+                          ),
+                        if (record.markupPath != null)
+                          const _PreviewChip(label: '标注引导'),
                         _PreviewChip(label: record.qualityLabel),
                         _PreviewChip(label: record.model),
                       ],

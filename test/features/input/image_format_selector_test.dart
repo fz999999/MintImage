@@ -9,6 +9,53 @@ import 'package:mint_image/shared/theme.dart';
 
 void main() {
   testWidgets(
+    'SVG author controls validate, persist and reset to provider defaults',
+    (tester) async {
+      ImageFormatSettingsSelection? selection;
+      await _pumpSelector(
+        tester,
+        format: ImageOutputFormat.svg,
+        onSelected: (value) => selection = value,
+      );
+      await _open(tester);
+      final toggle = find.byKey(const Key('svg-custom-model-toggle'));
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('format-settings-apply')));
+      await tester.pumpAndSettle();
+      expect(selection, isNull);
+      final field = find.byKey(const Key('svg-model-field'));
+      await tester.ensureVisible(field);
+      await tester.enterText(field, 'svg-author');
+      final effort = find.byKey(const Key('svg-reasoning-effort'));
+      await tester.ensureVisible(effort);
+      await tester.tap(effort);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('high').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('format-settings-apply')));
+      await tester.pumpAndSettle();
+      expect(selection!.svgOptions!.toJson(), {
+        'model': 'svg-author',
+        'reasoning': {'effort': 'high'},
+      });
+      await _pumpSelector(
+        tester,
+        format: ImageOutputFormat.svg,
+        svgOptions: selection!.svgOptions,
+        onSelected: (value) => selection = value,
+      );
+      await _open(tester);
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('format-settings-apply')));
+      await tester.pumpAndSettle();
+      expect(selection!.svgOptions, isNull);
+    },
+  );
+  testWidgets(
     'groups every format and applies selection only on confirmation',
     (tester) async {
       ImageFormatSettingsSelection? selection;
@@ -273,6 +320,7 @@ Future<void> _open(WidgetTester tester) async {
 Future<void> _pumpSelector(
   WidgetTester tester, {
   ImageOutputFormat format = ImageOutputFormat.png,
+  SvgOptions? svgOptions,
   ValueChanged<ImageFormatSettingsSelection>? onSelected,
 }) async {
   await tester.pumpWidget(
@@ -285,6 +333,7 @@ Future<void> _pumpSelector(
         body: Center(
           child: ImageFormatSelector(
             selectedFormat: format,
+            svgOptions: svgOptions,
             frameCount: 9,
             frameDurationMs: 200,
             onSelected: onSelected ?? (_) {},

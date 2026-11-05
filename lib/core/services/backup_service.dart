@@ -104,6 +104,15 @@ class BackupService {
 
     for (final record in records) {
       final fileRef = <String, dynamic>{};
+      if (record.markupPath != null) {
+        final added = await addFileIfExists(
+          source: File(record.markupPath!),
+          archivePath:
+              'files/source_attachments/${_safeFileStem(record.id)}/markup.png',
+          warningLabel: '标注图 ${record.id}',
+        );
+        if (added != null) fileRef['markup'] = added;
+      }
       final resultPath = record.resultImagePath;
       if (resultPath != null && resultPath.isNotEmpty) {
         final source = File(resultPath);
@@ -315,7 +324,17 @@ class BackupService {
       }
     }
 
+    final markupRef = refs?['markup'] as String?;
+    final markupPath = markupRef == null
+        ? null
+        : await _extractArchiveFile(
+            archive,
+            markupRef,
+            await _sourceAttachmentDestination(record.id, markupRef),
+          );
     return record.copyWith(
+      markupPath: markupPath,
+      clearMarkupPath: markupPath == null,
       sourceImagePath: sourcePaths.isEmpty ? null : sourcePaths.first,
       sourceImagePaths: sourcePaths,
       resultImagePath: resultPath,
@@ -439,6 +458,8 @@ Map<String, dynamic> _imageRecordToJson(ImageRecord record) {
     'frameCount': record.frameCount,
     'frameDurationMs': record.frameDurationMs,
     'complexity': record.complexity,
+    'svgOptions': record.svgOptions?.toJson(),
+    'markupPath': record.markupPath,
     'model': record.model,
     'status': record.status.storageValue,
     'errorMessage': record.errorMessage,
@@ -470,6 +491,8 @@ ImageRecord _imageRecordFromJson(Map<String, dynamic> json) {
     frameCount: _readNullableInt(json['frameCount']) ?? 9,
     frameDurationMs: _readNullableInt(json['frameDurationMs']) ?? 200,
     complexity: json['complexity'] as String?,
+    svgOptions: SvgOptions.fromJson(json['svgOptions']),
+    markupPath: json['markupPath'] as String?,
     model: json['model'] as String? ?? '',
     status: ImageRecordStatus.fromStorageValue(json['status'] as String? ?? ''),
     errorMessage: json['errorMessage'] as String?,

@@ -14,6 +14,7 @@ import '../../core/providers/favorite_folders_provider.dart';
 import '../../core/providers/image_list_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/backup_service.dart';
+import '../../core/services/storage_cleanup_service.dart';
 import '../../core/services/webdav_backup_service.dart';
 import '../../core/version/app_version.dart';
 import '../../shared/theme.dart';
@@ -62,8 +63,14 @@ class SettingsPage extends ConsumerWidget {
               _buildBackupGroup(context, ref, settings),
               const SizedBox(height: _sectionSpacing),
               _SettingsGroup(
-                title: '历史记录',
+                title: '历史与存储',
                 children: [
+                  _SettingsTile(
+                    icon: Icons.cleaning_services_rounded,
+                    title: '清理缓存',
+                    subtitle: '删除不再被记录使用的图片、标注图与临时文件',
+                    onTap: () => _cleanStorage(context, ref),
+                  ),
                   _SettingsTile(
                     icon: Icons.delete_sweep_rounded,
                     title: '清除历史记录',
@@ -394,7 +401,117 @@ class SettingsPage extends ConsumerWidget {
     if (!context.mounted) {
       return;
     }
-    _showSnack(context, '历史记录已清空。');
+    _showSnack(context, '历史记录已清空，可在「清理缓存」中释放图片占用的空间。');
+  }
+
+  Future<void> _cleanStorage(BuildContext context, WidgetRef ref) async {
+    final service = ref.read(storageCleanupServiceProvider);
+    final draft = ref.read(attachmentPickerServiceProvider).draftMarkupPath;
+    final StorageCleanupPlan? plan;
+    try {
+      plan = await _runWithProgress<StorageCleanupPlan>(
+        context,
+        message: '正在统计缓存...',
+        task: () => service.scan(keep: {?draft}),
+      );
+    } catch (error) {
+      if (context.mounted) _showSnack(context, '统计缓存失败：$error');
+      return;
+    }
+    if (plan == null || !context.mounted) return;
+    if (plan.isEmpty) {
+      _showSnack(context, '没有可清理的缓存。');
+      return;
+    }
+
+    final selected = <StorageCleanupCategory>{
+      for (final category in StorageCleanupCategory.values)
+        if (category.byDefault && plan.count(category) > 0) category,
+    };
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          final total = selected.fold(
+            0,
+            (sum, category) => sum + plan!.bytes(category),
+          );
+          return AlertDialog(
+            title: const Text('清理缓存'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final category in StorageCleanupCategory.values)
+                    CheckboxListTile(
+                      key: ValueKey('storage-cleanup-${category.name}'),
+                      contentPadding: EdgeInsets.zero,
+                      value: selected.contains(category),
+                      onChanged: plan!.count(category) == 0
+                          ? null
+                          : (value) => setState(() {
+                              value == true
+                                  ? selected.add(category)
+                                  : selected.remove(category);
+                            }),
+                      title: Text(category.label),
+                      subtitle: Text(
+                        '${category.description}\n'
+                        '${plan.count(category)} 个文件 · '
+                        '${_formatBytes(plan.bytes(category))}',
+                      ),
+                      isThreeLine: true,
+                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '历史记录、收藏和 API 配置不受影响；最近 10 分钟内生成的文件会保留。',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppThemeTokens.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                key: const Key('storage-cleanup-confirm'),
+                onPressed: selected.isEmpty
+                    ? null
+                    : () => Navigator.of(context).pop(true),
+                child: Text('清理 ${_formatBytes(total)}'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final result = await _runWithProgress<StorageCleanupResult>(
+      context,
+      message: '正在清理...',
+      task: () => service.clean(plan!, selected),
+    );
+    if (result == null || !context.mounted) return;
+    _showSnack(
+      context,
+      '已删除 ${result.deletedFiles} 个文件，释放 ${_formatBytes(result.freedBytes)}'
+      '${result.failedFiles > 0 ? '；${result.failedFiles} 个文件正在使用，未能删除' : ''}。',
+    );
+  }
+
+  static String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(2)} GB';
   }
 
   Future<void> _openRepository(BuildContext context) async {

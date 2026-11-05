@@ -37,6 +37,8 @@ class ImageRecord {
     this.frameCount = 9,
     this.frameDurationMs = 200,
     this.complexity,
+    this.svgOptions,
+    this.markupPath,
     required this.model,
     required this.status,
     required this.errorMessage,
@@ -72,6 +74,8 @@ class ImageRecord {
       frameCount: request.frameCount,
       frameDurationMs: request.frameDurationMs,
       complexity: request.complexity?.apiValue,
+      svgOptions: request.svgOptions,
+      markupPath: request.markupPath,
       model: model,
       status: ImageRecordStatus.pending,
       errorMessage: null,
@@ -98,6 +102,8 @@ class ImageRecord {
   final int frameCount;
   final int frameDurationMs;
   final String? complexity;
+  final SvgOptions? svgOptions;
+  final String? markupPath;
   final String model;
   final ImageRecordStatus status;
   final String? errorMessage;
@@ -171,6 +177,10 @@ class ImageRecord {
     int? frameCount,
     int? frameDurationMs,
     String? complexity,
+    SvgOptions? svgOptions,
+    bool clearSvgOptions = false,
+    String? markupPath,
+    bool clearMarkupPath = false,
     String? model,
     ImageRecordStatus? status,
     String? errorMessage,
@@ -208,6 +218,8 @@ class ImageRecord {
       frameCount: frameCount ?? this.frameCount,
       frameDurationMs: frameDurationMs ?? this.frameDurationMs,
       complexity: complexity ?? this.complexity,
+      svgOptions: clearSvgOptions ? null : svgOptions ?? this.svgOptions,
+      markupPath: clearMarkupPath ? null : markupPath ?? this.markupPath,
       model: model ?? this.model,
       status: status ?? this.status,
       errorMessage: clearErrorMessage

@@ -47,6 +47,14 @@ ArgParser createCliParser() => createProfileListParser()
     help: 'GPT Image 2.6 规划复杂度；省略时使用服务端默认值。',
   )
   ..addOption('frame-count', help: 'GIF 帧数：2–64，默认 9；仅用于 --format gif。')
+  ..addOption('svg-model', help: 'SVG 绘制模型 ID；省略时使用服务端默认值。')
+  ..addOption(
+    'svg-reasoning-effort',
+    allowed: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+    help: 'SVG 绘制模型推理强度，需同时指定 --svg-model。',
+  )
+  ..addOption('markup', help: '第一张参考图的透明 PNG 标注层；尺寸需一致。')
+  ..addOption('safety-identifier', help: '可选匿名安全标识，最多 128 字符；默认继承配置。')
   ..addOption(
     'frame-duration-ms',
     help: 'GIF 每帧时长：20–2000 毫秒，默认 200；服务端按 10 毫秒取整。',
@@ -267,6 +275,10 @@ class CliOptions {
       apiKey: key,
       model: model,
       apiMode: mode,
+      safetyIdentifier:
+          args['safety-identifier'] as String? ??
+          savedProfile?.safetyIdentifier ??
+          '',
       useStreaming: args.wasParsed('stream')
           ? args['stream'] as bool
           : savedProfile?.useStreaming ?? false,
@@ -276,7 +288,34 @@ class CliOptions {
             args.wasParsed('frame-duration-ms'))) {
       throw const CliException('invalid_arguments', '帧数和帧时长仅适用于 --format gif。');
     }
+    final svgModel = args['svg-model'] as String?;
+    if ((svgModel != null || args.wasParsed('svg-reasoning-effort')) &&
+        (format != ImageOutputFormat.svg ||
+            svgModel == null ||
+            svgModel.trim().isEmpty)) {
+      throw const CliException(
+        'invalid_arguments',
+        'SVG 参数需要 --format svg 和非空 --svg-model。',
+      );
+    }
+    if ((profile.resolvedSafetyIdentifier?.length ?? 0) > 128) {
+      throw const CliException('invalid_arguments', '安全标识最多 128 个字符。');
+    }
+    final markup = args['markup'] as String?;
+    if (markup != null &&
+        (markup.trim().isEmpty || !await File(markup).exists())) {
+      throw const CliException('invalid_input', '标注图不存在，请检查 --markup 路径。');
+    }
     final request = GenerationRequest(
+      svgOptions: svgModel == null
+          ? null
+          : SvgOptions(
+              model: svgModel.trim(),
+              reasoningEffort: SvgReasoningEffort.fromApiValue(
+                args['svg-reasoning-effort'] as String?,
+              ),
+            ),
+      markupPath: markup == null ? null : File(markup).absolute.path,
       prompt: prompt,
       imagePaths: imagePaths,
       sizePreset: size == 'auto' ? SizePreset.auto : SizePreset.custom,

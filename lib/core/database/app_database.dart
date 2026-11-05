@@ -41,6 +41,10 @@ class ImageRecordsTable extends Table {
 
   TextColumn get complexity => text().nullable()();
 
+  TextColumn get svgOptions => text().nullable()();
+
+  TextColumn get markupPath => text().nullable()();
+
   TextColumn get model => text()();
 
   TextColumn get status => text()();
@@ -129,11 +133,23 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
+      if (from < 9) {
+        await _addColumnIfMissing(
+          migrator,
+          imageRecordsTable,
+          imageRecordsTable.svgOptions,
+        );
+        await _addColumnIfMissing(
+          migrator,
+          imageRecordsTable,
+          imageRecordsTable.markupPath,
+        );
+      }
       if (from < 2) {
         await _addColumnIfMissing(
           migrator,

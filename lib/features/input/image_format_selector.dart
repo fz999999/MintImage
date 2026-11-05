@@ -11,11 +11,13 @@ class ImageFormatSelector extends StatelessWidget {
     required this.frameCount,
     required this.frameDurationMs,
     required this.onSelected,
+    this.svgOptions,
   });
 
   final ImageOutputFormat selectedFormat;
   final int frameCount;
   final int frameDurationMs;
+  final SvgOptions? svgOptions;
   final ValueChanged<ImageFormatSettingsSelection> onSelected;
 
   @override
@@ -77,6 +79,7 @@ class ImageFormatSelector extends StatelessWidget {
       format: selectedFormat,
       frameCount: frameCount,
       frameDurationMs: frameDurationMs,
+      svgOptions: svgOptions,
     );
     if (result != null) onSelected(result);
     if (context.mounted) {

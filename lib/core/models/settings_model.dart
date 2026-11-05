@@ -54,6 +54,7 @@ class ApiProfile {
     required this.model,
     this.apiMode = ImageGenerationApiMode.images,
     this.useStreaming = false,
+    this.safetyIdentifier = '',
   });
 
   factory ApiProfile.initial() {
@@ -94,6 +95,7 @@ class ApiProfile {
       model: json['model'] as String? ?? apiMode.defaultModel,
       apiMode: apiMode,
       useStreaming: json['useStreaming'] as bool? ?? false,
+      safetyIdentifier: json['safetyIdentifier'] as String? ?? '',
     );
   }
 
@@ -104,9 +106,28 @@ class ApiProfile {
   final String model;
   final ImageGenerationApiMode apiMode;
   final bool useStreaming;
+  final String safetyIdentifier;
+
+  String? get resolvedSafetyIdentifier {
+    final value = safetyIdentifier.trim();
+    return value.isEmpty ? null : value;
+  }
+
+  /// OpenRouter's unified Image API: one JSON endpoint for generation and
+  /// edits, with no async tasks or multipart uploads.
+  bool get isOpenRouterImages {
+    if (apiMode == ImageGenerationApiMode.responses) return false;
+    final uri = Uri.tryParse(baseUrl.trim());
+    return uri?.host.toLowerCase() == 'openrouter.ai';
+  }
 
   String get normalizedBaseUrl {
     final normalized = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final uri = Uri.tryParse(normalized);
+    if (isOpenRouterImages &&
+        const ['', '/api', '/api/v1', '/api/v1/images'].contains(uri!.path)) {
+      return uri.replace(path: '/api').toString();
+    }
     if (apiMode != ImageGenerationApiMode.responses &&
         normalized.endsWith('/v1')) {
       return normalized.substring(0, normalized.length - 3);
@@ -138,10 +159,17 @@ class ApiProfile {
     return normalized;
   }
 
-  String get generationEndpoint =>
-      '$normalizedBaseUrl${apiMode.generationPath}';
+  String get generationPath {
+    if (isOpenRouterImages && Uri.tryParse(normalizedBaseUrl)?.path == '/api') {
+      return '/v1/images';
+    }
+    return apiMode.generationPath;
+  }
+
+  String get generationEndpoint => '$normalizedBaseUrl$generationPath';
 
   String get editEndpoint {
+    if (isOpenRouterImages) return generationEndpoint;
     return switch (apiMode) {
       ImageGenerationApiMode.images || ImageGenerationApiMode.imagesAsync =>
         '$normalizedBaseUrl/v1/images/edits',
@@ -157,6 +185,7 @@ class ApiProfile {
     String? model,
     ImageGenerationApiMode? apiMode,
     bool? useStreaming,
+    String? safetyIdentifier,
   }) {
     return ApiProfile(
       id: id ?? this.id,
@@ -166,6 +195,7 @@ class ApiProfile {
       model: model ?? this.model,
       apiMode: apiMode ?? this.apiMode,
       useStreaming: useStreaming ?? this.useStreaming,
+      safetyIdentifier: safetyIdentifier ?? this.safetyIdentifier,
     );
   }
 
@@ -178,6 +208,7 @@ class ApiProfile {
       'model': model,
       'apiMode': apiMode.storageValue,
       'useStreaming': useStreaming,
+      'safetyIdentifier': safetyIdentifier,
     };
   }
 }
@@ -363,6 +394,7 @@ class SettingsModel {
     this.lastFrameCount = 9,
     this.lastFrameDurationMs = 200,
     this.lastComplexity,
+    this.lastSvgOptions,
     this.previewInfoCollapsed = false,
     this.webDavBackupConfig,
   });
@@ -443,6 +475,7 @@ class SettingsModel {
         fallback: _fallbackHeightForPreset(lastSizePreset),
       ),
       lastQuality: _normalizeImageQuality(json['lastQuality']),
+      lastSvgOptions: SvgOptions.fromJson(json['lastSvgOptions']),
       lastOutputFormat: _normalizeImageOutputFormat(json['lastOutputFormat']),
       lastFrameCount: (json['lastFrameCount'] as int? ?? 9).clamp(2, 64),
       lastFrameDurationMs: (json['lastFrameDurationMs'] as int? ?? 200).clamp(
@@ -473,6 +506,7 @@ class SettingsModel {
   final int lastFrameCount;
   final int lastFrameDurationMs;
   final ImageComplexity? lastComplexity;
+  final SvgOptions? lastSvgOptions;
   final bool previewInfoCollapsed;
   final WebDavBackupConfig? webDavBackupConfig;
 
@@ -538,6 +572,8 @@ class SettingsModel {
     int? lastFrameDurationMs,
     ImageComplexity? lastComplexity,
     bool clearLastComplexity = false,
+    SvgOptions? lastSvgOptions,
+    bool clearLastSvgOptions = false,
     bool? previewInfoCollapsed,
     WebDavBackupConfig? webDavBackupConfig,
     bool clearWebDavBackupConfig = false,
@@ -560,6 +596,9 @@ class SettingsModel {
       lastCustomWidth: lastCustomWidth ?? this.lastCustomWidth,
       lastCustomHeight: lastCustomHeight ?? this.lastCustomHeight,
       lastQuality: lastQuality ?? this.lastQuality,
+      lastSvgOptions: clearLastSvgOptions
+          ? null
+          : lastSvgOptions ?? this.lastSvgOptions,
       lastOutputFormat: lastOutputFormat ?? this.lastOutputFormat,
       lastFrameCount: lastFrameCount ?? this.lastFrameCount,
       lastFrameDurationMs: lastFrameDurationMs ?? this.lastFrameDurationMs,
@@ -591,6 +630,7 @@ class SettingsModel {
       'lastFrameCount': lastFrameCount,
       'lastFrameDurationMs': lastFrameDurationMs,
       'lastComplexity': lastComplexity?.apiValue,
+      'lastSvgOptions': lastSvgOptions?.toJson(),
       'previewInfoCollapsed': previewInfoCollapsed,
       'webDavBackupConfig': webDavBackupConfig?.toJson(),
     };

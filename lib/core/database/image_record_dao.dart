@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../models/image_record.dart';
+import '../models/generation_request.dart';
 import 'app_database.dart';
 
 class ImageRecordDao {
@@ -78,6 +79,10 @@ class ImageRecordDao {
       frameCount: row.frameCount,
       frameDurationMs: row.frameDurationMs,
       complexity: row.complexity,
+      svgOptions: SvgOptions.fromJson(
+        row.svgOptions == null ? null : jsonDecode(row.svgOptions!),
+      ),
+      markupPath: row.markupPath,
       model: row.model,
       status: ImageRecordStatus.fromStorageValue(row.status),
       errorMessage: row.errorMessage,
@@ -106,6 +111,12 @@ class ImageRecordDao {
       frameCount: Value(record.frameCount),
       frameDurationMs: Value(record.frameDurationMs),
       complexity: Value(record.complexity),
+      svgOptions: Value(
+        record.svgOptions == null
+            ? null
+            : jsonEncode(record.svgOptions!.toJson()),
+      ),
+      markupPath: Value(record.markupPath),
       model: Value(record.model),
       status: Value(record.status.storageValue),
       errorMessage: Value(record.errorMessage),

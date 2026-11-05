@@ -25,6 +25,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
   bool _obscureApiKey = true;
+  final _safetyIdentifierController = TextEditingController();
   bool _fetchingModels = false;
   bool _useStreaming = false;
   CancelToken? _modelListCancelToken;
@@ -46,6 +47,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
     _baseUrlController.text = profile?.baseUrl ?? 'https://api.openai.com';
     _apiKeyController.text = profile?.apiKey ?? '';
     _modelController.text = profile?.model ?? _apiMode.defaultModel;
+    _safetyIdentifierController.text = profile?.safetyIdentifier ?? '';
 
     _nameController.addListener(_refresh);
     _baseUrlController.addListener(_refresh);
@@ -62,6 +64,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
     _baseUrlController.dispose();
     _apiKeyController.dispose();
     _modelController.dispose();
+    _safetyIdentifierController.dispose();
     super.dispose();
   }
 
@@ -225,6 +228,33 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
                 ),
               ),
               const SizedBox(height: 18),
+              Container(
+                decoration: AppDecorations.card(radius: 24),
+                child: ExpansionTile(
+                  title: const Text('高级设置'),
+                  leading: const Icon(Icons.tune_rounded),
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  children: [
+                    TextFormField(
+                      key: const Key('safety-identifier-field'),
+                      controller: _safetyIdentifierController,
+                      maxLength: 128,
+                      decoration: const InputDecoration(
+                        labelText: '安全标识（可选）',
+                        helperText:
+                            'safety_identifier · 留空不发送。建议使用稳定的匿名 ID 或哈希，避免填写姓名、邮箱。',
+                        helperMaxLines: 3,
+                      ),
+                      validator: (value) => (value?.trim().length ?? 0) > 128
+                          ? '最多 128 个字符'
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
               ElevatedButton(onPressed: _save, child: const Text('保存')),
             ],
           ),
@@ -243,6 +273,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
 
     if (existing == null) {
       final created = await notifier.addProfile(
+        safetyIdentifier: _safetyIdentifierController.text.trim(),
         name: _nameController.text.trim(),
         baseUrl: _baseUrlController.text.trim(),
         apiKey: _apiKeyController.text.trim(),
@@ -255,6 +286,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
     } else {
       await notifier.updateProfile(
         existing.copyWith(
+          safetyIdentifier: _safetyIdentifierController.text.trim(),
           name: _nameController.text.trim(),
           baseUrl: _baseUrlController.text.trim(),
           apiKey: _apiKeyController.text.trim(),

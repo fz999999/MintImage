@@ -23,7 +23,12 @@ class ModelListApi {
     }
 
     final response = await _getJson(
-      url: _appendVersionPath(profile.normalizedBaseUrl, 'v1', ['models']),
+      // OpenRouter's /models lists text models; image models live apart.
+      url: _appendVersionPath(
+        profile.normalizedBaseUrl,
+        'v1',
+        profile.isOpenRouterImages ? ['images', 'models'] : ['models'],
+      ),
       headers: _bearerHeaders(apiKey),
       timeoutSeconds: timeoutSeconds,
       cancelToken: cancelToken,

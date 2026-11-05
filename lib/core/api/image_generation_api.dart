@@ -6,6 +6,7 @@ import '../models/settings_model.dart';
 import 'api_request_logger.dart';
 import 'image_task_api.dart';
 import 'openai_client.dart';
+import 'openrouter_image_api.dart';
 import 'responses_image_api.dart';
 
 class ImageGenerationApi {
@@ -24,6 +25,13 @@ class ImageGenerationApi {
       usesResponsesApi: profile.apiMode == ImageGenerationApiMode.responses,
     );
     if (validation != null) throw ApiException(validation);
+    if (profile.resolvedSafetyIdentifier != null &&
+        profile.resolvedSafetyIdentifier!.length > 128) {
+      throw const ApiException('安全标识最多 128 个字符。');
+    }
+    if (request.markupPath != null) {
+      throw const ApiException('标注引导需要通过图生图接口提交。');
+    }
     final client = OpenAiClient(
       profile,
       timeoutSeconds: timeoutSeconds,
@@ -72,6 +80,14 @@ class ImageGenerationApi {
             );
       return parseResponsesImageResults(response);
     }
+    if (profile.isOpenRouterImages) {
+      return requestOpenRouterImages(
+        client,
+        request,
+        profile,
+        cancelToken: cancelToken,
+      );
+    }
 
     final body = <String, dynamic>{
       'model': profile.model,
@@ -79,6 +95,11 @@ class ImageGenerationApi {
       'n': 1,
       'quality': request.quality.apiValue,
       'output_format': request.outputFormat.apiValue,
+      if (profile.resolvedSafetyIdentifier != null)
+        'safety_identifier': profile.resolvedSafetyIdentifier,
+      if (request.outputFormat == ImageOutputFormat.svg &&
+          request.svgOptions != null)
+        'svg': request.svgOptions!.toJson(),
       if (request.complexity != null)
         'complexity': request.complexity!.apiValue,
       if (request.outputFormat == ImageOutputFormat.gif) ...{
@@ -109,13 +130,13 @@ class ImageGenerationApi {
               !useAsync &&
               !request.outputFormat.requiresImagesGeneration
           ? client.postJsonStreaming(
-              '/v1/images/generations',
+              profile.generationPath,
               body,
               cancelToken: cancelToken,
               isImagesApi: true,
             )
           : client.postJson(
-              '/v1/images/generations',
+              profile.generationPath,
               body,
               cancelToken: cancelToken,
             ),
@@ -125,7 +146,7 @@ class ImageGenerationApi {
   }
 
   bool _isGptImage2Family(String model) {
-    final value = model.trim().toLowerCase();
+    final value = model.trim().toLowerCase().split('/').last;
     return RegExp(r'^gpt-image-2(?:\.\d+)?(?:-|$)').hasMatch(value);
   }
 

@@ -129,6 +129,8 @@ class GenerationController extends StateNotifier<GenerationState> {
         outputFormat: ImageOutputFormat.fromApiValue(record.outputFormat),
         frameCount: record.frameCount,
         frameDurationMs: record.frameDurationMs,
+        svgOptions: record.svgOptions,
+        markupPath: record.markupPath,
         complexity: ImageComplexity.fromApiValue(record.complexity),
         count: 1,
         apiProfileId: apiProfileId,

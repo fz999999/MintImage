@@ -170,6 +170,28 @@ class $ImageRecordsTableTable extends ImageRecordsTable
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _svgOptionsMeta = const VerificationMeta(
+    'svgOptions',
+  );
+  @override
+  late final GeneratedColumn<String> svgOptions = GeneratedColumn<String>(
+    'svg_options',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _markupPathMeta = const VerificationMeta(
+    'markupPath',
+  );
+  @override
+  late final GeneratedColumn<String> markupPath = GeneratedColumn<String>(
+    'markup_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _modelMeta = const VerificationMeta('model');
   @override
   late final GeneratedColumn<String> model = GeneratedColumn<String>(
@@ -279,6 +301,8 @@ class $ImageRecordsTableTable extends ImageRecordsTable
     frameCount,
     frameDurationMs,
     complexity,
+    svgOptions,
+    markupPath,
     model,
     status,
     errorMessage,
@@ -418,6 +442,18 @@ class $ImageRecordsTableTable extends ImageRecordsTable
         complexity.isAcceptableOrUnknown(data['complexity']!, _complexityMeta),
       );
     }
+    if (data.containsKey('svg_options')) {
+      context.handle(
+        _svgOptionsMeta,
+        svgOptions.isAcceptableOrUnknown(data['svg_options']!, _svgOptionsMeta),
+      );
+    }
+    if (data.containsKey('markup_path')) {
+      context.handle(
+        _markupPathMeta,
+        markupPath.isAcceptableOrUnknown(data['markup_path']!, _markupPathMeta),
+      );
+    }
     if (data.containsKey('model')) {
       context.handle(
         _modelMeta,
@@ -550,6 +586,14 @@ class $ImageRecordsTableTable extends ImageRecordsTable
         DriftSqlType.string,
         data['${effectivePrefix}complexity'],
       ),
+      svgOptions: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}svg_options'],
+      ),
+      markupPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}markup_path'],
+      ),
       model: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}model'],
@@ -608,6 +652,8 @@ class ImageRecordsTableData extends DataClass
   final int frameCount;
   final int frameDurationMs;
   final String? complexity;
+  final String? svgOptions;
+  final String? markupPath;
   final String model;
   final String status;
   final String? errorMessage;
@@ -632,6 +678,8 @@ class ImageRecordsTableData extends DataClass
     required this.frameCount,
     required this.frameDurationMs,
     this.complexity,
+    this.svgOptions,
+    this.markupPath,
     required this.model,
     required this.status,
     this.errorMessage,
@@ -670,6 +718,12 @@ class ImageRecordsTableData extends DataClass
     map['frame_duration_ms'] = Variable<int>(frameDurationMs);
     if (!nullToAbsent || complexity != null) {
       map['complexity'] = Variable<String>(complexity);
+    }
+    if (!nullToAbsent || svgOptions != null) {
+      map['svg_options'] = Variable<String>(svgOptions);
+    }
+    if (!nullToAbsent || markupPath != null) {
+      map['markup_path'] = Variable<String>(markupPath);
     }
     map['model'] = Variable<String>(model);
     map['status'] = Variable<String>(status);
@@ -717,6 +771,12 @@ class ImageRecordsTableData extends DataClass
       complexity: complexity == null && nullToAbsent
           ? const Value.absent()
           : Value(complexity),
+      svgOptions: svgOptions == null && nullToAbsent
+          ? const Value.absent()
+          : Value(svgOptions),
+      markupPath: markupPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(markupPath),
       model: Value(model),
       status: Value(status),
       errorMessage: errorMessage == null && nullToAbsent
@@ -755,6 +815,8 @@ class ImageRecordsTableData extends DataClass
       frameCount: serializer.fromJson<int>(json['frameCount']),
       frameDurationMs: serializer.fromJson<int>(json['frameDurationMs']),
       complexity: serializer.fromJson<String?>(json['complexity']),
+      svgOptions: serializer.fromJson<String?>(json['svgOptions']),
+      markupPath: serializer.fromJson<String?>(json['markupPath']),
       model: serializer.fromJson<String>(json['model']),
       status: serializer.fromJson<String>(json['status']),
       errorMessage: serializer.fromJson<String?>(json['errorMessage']),
@@ -788,6 +850,8 @@ class ImageRecordsTableData extends DataClass
       'frameCount': serializer.toJson<int>(frameCount),
       'frameDurationMs': serializer.toJson<int>(frameDurationMs),
       'complexity': serializer.toJson<String?>(complexity),
+      'svgOptions': serializer.toJson<String?>(svgOptions),
+      'markupPath': serializer.toJson<String?>(markupPath),
       'model': serializer.toJson<String>(model),
       'status': serializer.toJson<String>(status),
       'errorMessage': serializer.toJson<String?>(errorMessage),
@@ -817,6 +881,8 @@ class ImageRecordsTableData extends DataClass
     int? frameCount,
     int? frameDurationMs,
     Value<String?> complexity = const Value.absent(),
+    Value<String?> svgOptions = const Value.absent(),
+    Value<String?> markupPath = const Value.absent(),
     String? model,
     String? status,
     Value<String?> errorMessage = const Value.absent(),
@@ -849,6 +915,8 @@ class ImageRecordsTableData extends DataClass
     frameCount: frameCount ?? this.frameCount,
     frameDurationMs: frameDurationMs ?? this.frameDurationMs,
     complexity: complexity.present ? complexity.value : this.complexity,
+    svgOptions: svgOptions.present ? svgOptions.value : this.svgOptions,
+    markupPath: markupPath.present ? markupPath.value : this.markupPath,
     model: model ?? this.model,
     status: status ?? this.status,
     errorMessage: errorMessage.present ? errorMessage.value : this.errorMessage,
@@ -896,6 +964,12 @@ class ImageRecordsTableData extends DataClass
       complexity: data.complexity.present
           ? data.complexity.value
           : this.complexity,
+      svgOptions: data.svgOptions.present
+          ? data.svgOptions.value
+          : this.svgOptions,
+      markupPath: data.markupPath.present
+          ? data.markupPath.value
+          : this.markupPath,
       model: data.model.present ? data.model.value : this.model,
       status: data.status.present ? data.status.value : this.status,
       errorMessage: data.errorMessage.present
@@ -935,6 +1009,8 @@ class ImageRecordsTableData extends DataClass
           ..write('frameCount: $frameCount, ')
           ..write('frameDurationMs: $frameDurationMs, ')
           ..write('complexity: $complexity, ')
+          ..write('svgOptions: $svgOptions, ')
+          ..write('markupPath: $markupPath, ')
           ..write('model: $model, ')
           ..write('status: $status, ')
           ..write('errorMessage: $errorMessage, ')
@@ -964,6 +1040,8 @@ class ImageRecordsTableData extends DataClass
     frameCount,
     frameDurationMs,
     complexity,
+    svgOptions,
+    markupPath,
     model,
     status,
     errorMessage,
@@ -992,6 +1070,8 @@ class ImageRecordsTableData extends DataClass
           other.frameCount == this.frameCount &&
           other.frameDurationMs == this.frameDurationMs &&
           other.complexity == this.complexity &&
+          other.svgOptions == this.svgOptions &&
+          other.markupPath == this.markupPath &&
           other.model == this.model &&
           other.status == this.status &&
           other.errorMessage == this.errorMessage &&
@@ -1019,6 +1099,8 @@ class ImageRecordsTableCompanion
   final Value<int> frameCount;
   final Value<int> frameDurationMs;
   final Value<String?> complexity;
+  final Value<String?> svgOptions;
+  final Value<String?> markupPath;
   final Value<String> model;
   final Value<String> status;
   final Value<String?> errorMessage;
@@ -1044,6 +1126,8 @@ class ImageRecordsTableCompanion
     this.frameCount = const Value.absent(),
     this.frameDurationMs = const Value.absent(),
     this.complexity = const Value.absent(),
+    this.svgOptions = const Value.absent(),
+    this.markupPath = const Value.absent(),
     this.model = const Value.absent(),
     this.status = const Value.absent(),
     this.errorMessage = const Value.absent(),
@@ -1070,6 +1154,8 @@ class ImageRecordsTableCompanion
     this.frameCount = const Value.absent(),
     this.frameDurationMs = const Value.absent(),
     this.complexity = const Value.absent(),
+    this.svgOptions = const Value.absent(),
+    this.markupPath = const Value.absent(),
     required String model,
     required String status,
     this.errorMessage = const Value.absent(),
@@ -1103,6 +1189,8 @@ class ImageRecordsTableCompanion
     Expression<int>? frameCount,
     Expression<int>? frameDurationMs,
     Expression<String>? complexity,
+    Expression<String>? svgOptions,
+    Expression<String>? markupPath,
     Expression<String>? model,
     Expression<String>? status,
     Expression<String>? errorMessage,
@@ -1129,6 +1217,8 @@ class ImageRecordsTableCompanion
       if (frameCount != null) 'frame_count': frameCount,
       if (frameDurationMs != null) 'frame_duration_ms': frameDurationMs,
       if (complexity != null) 'complexity': complexity,
+      if (svgOptions != null) 'svg_options': svgOptions,
+      if (markupPath != null) 'markup_path': markupPath,
       if (model != null) 'model': model,
       if (status != null) 'status': status,
       if (errorMessage != null) 'error_message': errorMessage,
@@ -1159,6 +1249,8 @@ class ImageRecordsTableCompanion
     Value<int>? frameCount,
     Value<int>? frameDurationMs,
     Value<String?>? complexity,
+    Value<String?>? svgOptions,
+    Value<String?>? markupPath,
     Value<String>? model,
     Value<String>? status,
     Value<String?>? errorMessage,
@@ -1185,6 +1277,8 @@ class ImageRecordsTableCompanion
       frameCount: frameCount ?? this.frameCount,
       frameDurationMs: frameDurationMs ?? this.frameDurationMs,
       complexity: complexity ?? this.complexity,
+      svgOptions: svgOptions ?? this.svgOptions,
+      markupPath: markupPath ?? this.markupPath,
       model: model ?? this.model,
       status: status ?? this.status,
       errorMessage: errorMessage ?? this.errorMessage,
@@ -1246,6 +1340,12 @@ class ImageRecordsTableCompanion
     if (complexity.present) {
       map['complexity'] = Variable<String>(complexity.value);
     }
+    if (svgOptions.present) {
+      map['svg_options'] = Variable<String>(svgOptions.value);
+    }
+    if (markupPath.present) {
+      map['markup_path'] = Variable<String>(markupPath.value);
+    }
     if (model.present) {
       map['model'] = Variable<String>(model.value);
     }
@@ -1298,6 +1398,8 @@ class ImageRecordsTableCompanion
           ..write('frameCount: $frameCount, ')
           ..write('frameDurationMs: $frameDurationMs, ')
           ..write('complexity: $complexity, ')
+          ..write('svgOptions: $svgOptions, ')
+          ..write('markupPath: $markupPath, ')
           ..write('model: $model, ')
           ..write('status: $status, ')
           ..write('errorMessage: $errorMessage, ')
@@ -1972,6 +2074,8 @@ typedef $$ImageRecordsTableTableCreateCompanionBuilder =
       Value<int> frameCount,
       Value<int> frameDurationMs,
       Value<String?> complexity,
+      Value<String?> svgOptions,
+      Value<String?> markupPath,
       required String model,
       required String status,
       Value<String?> errorMessage,
@@ -1999,6 +2103,8 @@ typedef $$ImageRecordsTableTableUpdateCompanionBuilder =
       Value<int> frameCount,
       Value<int> frameDurationMs,
       Value<String?> complexity,
+      Value<String?> svgOptions,
+      Value<String?> markupPath,
       Value<String> model,
       Value<String> status,
       Value<String?> errorMessage,
@@ -2133,6 +2239,16 @@ class $$ImageRecordsTableTableFilterComposer
 
   ColumnFilters<String> get complexity => $composableBuilder(
     column: $table.complexity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get svgOptions => $composableBuilder(
+    column: $table.svgOptions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get markupPath => $composableBuilder(
+    column: $table.markupPath,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2288,6 +2404,16 @@ class $$ImageRecordsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get svgOptions => $composableBuilder(
+    column: $table.svgOptions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get markupPath => $composableBuilder(
+    column: $table.markupPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get model => $composableBuilder(
     column: $table.model,
     builder: (column) => ColumnOrderings(column),
@@ -2401,6 +2527,16 @@ class $$ImageRecordsTableTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get svgOptions => $composableBuilder(
+    column: $table.svgOptions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get markupPath => $composableBuilder(
+    column: $table.markupPath,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get model =>
       $composableBuilder(column: $table.model, builder: (column) => column);
 
@@ -2511,6 +2647,8 @@ class $$ImageRecordsTableTableTableManager
                 Value<int> frameCount = const Value.absent(),
                 Value<int> frameDurationMs = const Value.absent(),
                 Value<String?> complexity = const Value.absent(),
+                Value<String?> svgOptions = const Value.absent(),
+                Value<String?> markupPath = const Value.absent(),
                 Value<String> model = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> errorMessage = const Value.absent(),
@@ -2536,6 +2674,8 @@ class $$ImageRecordsTableTableTableManager
                 frameCount: frameCount,
                 frameDurationMs: frameDurationMs,
                 complexity: complexity,
+                svgOptions: svgOptions,
+                markupPath: markupPath,
                 model: model,
                 status: status,
                 errorMessage: errorMessage,
@@ -2563,6 +2703,8 @@ class $$ImageRecordsTableTableTableManager
                 Value<int> frameCount = const Value.absent(),
                 Value<int> frameDurationMs = const Value.absent(),
                 Value<String?> complexity = const Value.absent(),
+                Value<String?> svgOptions = const Value.absent(),
+                Value<String?> markupPath = const Value.absent(),
                 required String model,
                 required String status,
                 Value<String?> errorMessage = const Value.absent(),
@@ -2588,6 +2730,8 @@ class $$ImageRecordsTableTableTableManager
                 frameCount: frameCount,
                 frameDurationMs: frameDurationMs,
                 complexity: complexity,
+                svgOptions: svgOptions,
+                markupPath: markupPath,
                 model: model,
                 status: status,
                 errorMessage: errorMessage,

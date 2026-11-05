@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image/image.dart' as image;
 
 import 'package:mint_image/core/api/openai_client.dart';
 import 'package:mint_image/core/api/prompt_optimization_api.dart';
@@ -22,6 +23,68 @@ import 'package:mint_image/features/input/bottom_input_bar.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'history markup is submitted and cleared when the first reference changes',
+    (tester) async {
+      final directory = Directory.systemTemp.createTempSync('markup-draft-');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final bytes = image.encodePng(
+        image.Image(width: 32, height: 24, numChannels: 4),
+      );
+      final first = File('${directory.path}/first.png')
+        ..writeAsBytesSync(bytes);
+      final second = File('${directory.path}/second.png')
+        ..writeAsBytesSync(bytes);
+      final markup = File('${directory.path}/markup.png')
+        ..writeAsBytesSync(bytes);
+      final record = _webpRecord.copyWith(
+        sourceImagePath: first.path,
+        sourceImagePaths: [first.path, second.path],
+        markupPath: markup.path,
+      );
+      final key = GlobalKey<BottomInputBarState>();
+      GenerationRequest? submitted;
+      await _pumpInputBar(
+        tester,
+        inputBarKey: key,
+        onSubmit: (value) async => submitted = value,
+      );
+      await tester.runAsync(() => key.currentState!.prefillFromRecord(record));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('markup-remove-button')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('submit-generation-button')));
+      await tester.pumpAndSettle();
+      expect(submitted!.markupPath, markup.path);
+      expect(submitted!.imagePaths, [first.path, second.path]);
+      await tester.runAsync(() => key.currentState!.prefillFromRecord(record));
+      await tester.pumpAndSettle();
+      tester
+          .widget<AttachmentPreviewStrip>(find.byType(AttachmentPreviewStrip))
+          .onRemove(0);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('markup-remove-button')), findsNothing);
+      await tester.tap(find.byKey(const Key('submit-generation-button')));
+      await tester.pumpAndSettle();
+      expect(submitted!.markupPath, isNull);
+      expect(submitted!.imagePaths, [second.path]);
+      await tester.runAsync(() => key.currentState!.prefillFromRecord(record));
+      await tester.pumpAndSettle();
+      await tester.runAsync(
+        () => key.currentState!.prefillFromRecord(
+          record.copyWith(clearMarkupPath: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('markup-remove-button')), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+    },
+  );
 
   testWidgets('keeps prompt input and submit button at 40px', (tester) async {
     await _pumpInputBar(tester);

@@ -17,6 +17,8 @@ Map<String, dynamic> buildResponsesImageBody({
   return <String, dynamic>{
     'model': profile.model,
     'input': input,
+    if (profile.resolvedSafetyIdentifier != null)
+      'safety_identifier': profile.resolvedSafetyIdentifier,
     'tools': [buildResponsesImageTool(request: request, action: action)],
     'tool_choice': 'required',
   };

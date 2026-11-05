@@ -49,6 +49,7 @@ class SettingsController extends StateNotifier<SettingsModel> {
     String? model,
     ImageGenerationApiMode apiMode = ImageGenerationApiMode.images,
     bool useStreaming = false,
+    String safetyIdentifier = '',
   }) async {
     final nextIndex = state.profiles.length + 1;
     final profile = ApiProfile(
@@ -59,6 +60,7 @@ class SettingsController extends StateNotifier<SettingsModel> {
       model: model ?? apiMode.defaultModel,
       apiMode: apiMode,
       useStreaming: useStreaming,
+      safetyIdentifier: safetyIdentifier,
     );
     state = state.copyWith(
       profiles: [...state.profiles, profile],
@@ -188,6 +190,7 @@ class SettingsController extends StateNotifier<SettingsModel> {
     int frameCount = 9,
     int frameDurationMs = 200,
     ImageComplexity? complexity,
+    SvgOptions? svgOptions,
   }) async {
     state = state.copyWith(
       lastSizePreset: sizePreset,
@@ -199,6 +202,8 @@ class SettingsController extends StateNotifier<SettingsModel> {
       lastFrameDurationMs: frameDurationMs,
       lastComplexity: complexity,
       clearLastComplexity: complexity == null,
+      lastSvgOptions: svgOptions,
+      clearLastSvgOptions: svgOptions == null,
     );
     await _persist();
   }

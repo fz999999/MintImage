@@ -150,6 +150,35 @@ void main() {
     });
   }
 
+  for (final baseUrl in [
+    'https://openrouter.ai',
+    'https://openrouter.ai/api',
+    'https://openrouter.ai/api/v1/',
+    ' https://openrouter.ai/api/v1/images/ ',
+  ]) {
+    test('OpenRouter image endpoint resolves $baseUrl', () {
+      final profile = ApiProfile.initial().copyWith(baseUrl: baseUrl);
+      expect(profile.normalizedBaseUrl, 'https://openrouter.ai/api');
+      expect(profile.generationPath, '/v1/images');
+      expect(profile.generationEndpoint, 'https://openrouter.ai/api/v1/images');
+    });
+  }
+
+  test('OpenRouter route requires the exact host and Images protocol', () {
+    final profile = ApiProfile.initial().copyWith(
+      baseUrl: 'https://openrouter.ai.example.com/api/v1',
+    );
+    expect(profile.generationPath, '/v1/images/generations');
+    final responses = profile.copyWith(
+      baseUrl: 'https://openrouter.ai/api',
+      apiMode: ImageGenerationApiMode.responses,
+    );
+    expect(
+      responses.generationEndpoint,
+      'https://openrouter.ai/api/v1/responses',
+    );
+  });
+
   test('RightAPI normalization preserves Responses channel paths', () {
     final profile = ApiProfile.initial().copyWith(
       baseUrl: 'https://rightapi.ai/codex/v1/',

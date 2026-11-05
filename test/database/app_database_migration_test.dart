@@ -74,6 +74,13 @@ void main() {
     expect(animation.data['frame_count'], 9);
     expect(animation.data['frame_duration_ms'], 200);
     expect(animation.data['complexity'], isNull);
+    final advanced = await database
+        .customSelect(
+          "SELECT svg_options, markup_path FROM image_records_table WHERE id = 'record-webp'",
+        )
+        .getSingle();
+    expect(advanced.data['svg_options'], isNull);
+    expect(advanced.data['markup_path'], isNull);
 
     final favoriteTables = await database
         .customSelect(

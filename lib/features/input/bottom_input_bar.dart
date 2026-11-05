@@ -20,6 +20,7 @@ import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
 import 'attachment_preview_strip.dart';
 import 'image_format_selector.dart';
+import 'markup_editor.dart';
 import 'prompt_editor_page.dart';
 import 'quality_selector.dart';
 import 'quantity_selector.dart';
@@ -57,6 +58,15 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   int _frameCount = 9;
   int _frameDurationMs = 200;
   ImageComplexity? _complexity;
+  SvgOptions? _svgOptions;
+  String? _markupPathValue;
+  String? get _markupPath => _markupPathValue;
+  set _markupPath(String? value) {
+    _markupPathValue = value;
+    ref.read(attachmentPickerServiceProvider).draftMarkupPath = value;
+  }
+
+  bool _pickingMarkup = false;
   int _count = 1;
   int _customWidth = 0;
   int _customHeight = 0;
@@ -87,6 +97,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     _frameCount = settings.lastFrameCount;
     _frameDurationMs = settings.lastFrameDurationMs;
     _complexity = settings.lastComplexity;
+    _svgOptions = settings.lastSvgOptions;
   }
 
   @override
@@ -109,9 +120,22 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   }
 
   Future<void> prefillFromRecord(ImageRecord record) async {
+    if (mounted) setState(() => _markupPath = null);
     prefillPrompt(record.prompt);
     _applyGenerationOptionsFromRecord(record);
     await _prefillAttachments(record.sourceAttachmentPaths);
+    final markupPath = record.markupPath;
+    if (mounted &&
+        markupPath != null &&
+        record.sourceAttachmentPaths.isNotEmpty &&
+        _attachments.isNotEmpty &&
+        _attachments.first.path == record.sourceAttachmentPaths.first) {
+      if (await File(markupPath).exists()) {
+        if (mounted) setState(() => _markupPath = markupPath);
+      } else {
+        _showMessage('历史标注图已不存在，请重新导入。');
+      }
+    }
   }
 
   Future<void> prefillForEdit(ImageRecord record) async {
@@ -125,6 +149,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     }
 
     _applyGenerationOptionsFromRecord(record);
+    setState(() => _markupPath = null);
     if (_outputFormat.requiresImagesGeneration) {
       setState(() => _outputFormat = ImageOutputFormat.png);
       _persistLastGenerationOptions();
@@ -201,6 +226,11 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       return;
     }
     setState(() {
+      if (attachments.isEmpty ||
+          _attachments.isEmpty ||
+          attachments.first.path != _attachments.first.path) {
+        _markupPath = null;
+      }
       _attachments = attachments;
     });
     widget.onAttachmentCountChanged?.call(_attachments.length);
@@ -232,6 +262,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       _frameCount = record.frameCount;
       _frameDurationMs = record.frameDurationMs;
       _complexity = ImageComplexity.fromApiValue(record.complexity);
+      _svgOptions = record.svgOptions;
       _count = 1;
     });
     _persistLastGenerationOptions();
@@ -250,6 +281,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
             frameCount: _frameCount,
             frameDurationMs: _frameDurationMs,
             complexity: _complexity,
+            svgOptions: _svgOptions,
           ),
     );
   }
@@ -366,6 +398,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                               ]);
                             },
                           ),
+                          _markupControl(activeProfile),
                         ],
                         const SizedBox(height: 6),
                         Flexible(
@@ -563,12 +596,14 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                       selectedFormat: _outputFormat,
                                       frameCount: _frameCount,
                                       frameDurationMs: _frameDurationMs,
+                                      svgOptions: _svgOptions,
                                       onSelected: (options) {
                                         setState(() {
                                           _outputFormat = options.format;
                                           _frameCount = options.frameCount;
                                           _frameDurationMs =
                                               options.frameDurationMs;
+                                          _svgOptions = options.svgOptions;
                                         });
                                         _persistLastGenerationOptions();
                                       },
@@ -615,6 +650,102 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
         ),
       ),
     );
+  }
+
+  Widget _markupControl(ApiProfile profile) {
+    final usesResponses = profile.apiMode == ImageGenerationApiMode.responses;
+    final unsupported = usesResponses || profile.isOpenRouterImages;
+    if (unsupported && _markupPath == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Flexible(
+            child: Tooltip(
+              message: usesResponses
+                  ? '已选标注图需要切换到 Images API 后发送'
+                  : unsupported
+                  ? 'OpenRouter 不支持标注引导，请移除标注图或切换服务商'
+                  : '在第一张参考图上圈选、涂画修改意图。需要支持 markup 的模型与服务商。',
+              child: TextButton.icon(
+                key: const Key('markup-editor-button'),
+                onPressed: _submitting || _pickingMarkup || unsupported
+                    ? null
+                    : _pickMarkup,
+                icon: Icon(
+                  _markupPath == null
+                      ? Icons.draw_outlined
+                      : Icons.layers_outlined,
+                  size: 16,
+                ),
+                label: Text(
+                  _pickingMarkup
+                      ? '编辑标注中…'
+                      : _markupPath == null
+                      ? '绘制标注'
+                      : usesResponses
+                      ? '标注图 · 需 Images API'
+                      : unsupported
+                      ? '标注图 · OpenRouter 不支持'
+                      : '编辑标注 · 第一张参考图',
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  textStyle: const TextStyle(fontSize: 11),
+                ),
+              ),
+            ),
+          ),
+          if (_markupPath != null)
+            IconButton(
+              key: const Key('markup-remove-button'),
+              tooltip: '移除标注图',
+              onPressed: _submitting
+                  ? null
+                  : () => setState(() => _markupPath = null),
+              icon: const Icon(Icons.close_rounded, size: 15),
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickMarkup() async {
+    if (_attachments.isEmpty || _pickingMarkup) return;
+    final referencePath = _attachments.first.path;
+    final picker = ref.read(attachmentPickerServiceProvider);
+    unfocusPrompt();
+    setState(() => _pickingMarkup = true);
+    try {
+      final result = await showMarkupEditor(
+        context,
+        referencePath: referencePath,
+        markupPath: _markupPath,
+        picker: picker,
+      );
+      if (!mounted || result == null) return;
+      if (_attachments.isEmpty || _attachments.first.path != referencePath) {
+        return;
+      }
+      final storedPath = result.pngBytes == null
+          ? null
+          : await picker.storeMarkupBytes(result.pngBytes!);
+      if (mounted &&
+          _attachments.isNotEmpty &&
+          _attachments.first.path == referencePath) {
+        setState(() => _markupPath = storedPath);
+      }
+    } catch (error) {
+      if (mounted) _showMessage('保存标注图失败：$error');
+    } finally {
+      if (mounted) setState(() => _pickingMarkup = false);
+    }
   }
 
   void _resizePrompt(DragUpdateDetails details) {
@@ -789,7 +920,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   }
 
   Future<void> _submit({String? apiProfileId}) async {
-    if (_submitting || _optimizingPrompt) {
+    if (_submitting || _optimizingPrompt || _pickingMarkup) {
       return;
     }
 
@@ -828,6 +959,8 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
         outputFormat: _outputFormat,
         frameCount: _frameCount,
         frameDurationMs: _frameDurationMs,
+        svgOptions: _outputFormat == ImageOutputFormat.svg ? _svgOptions : null,
+        markupPath: _markupPath,
         complexity: activeProfile.apiMode == ImageGenerationApiMode.responses
             ? null
             : _complexity,

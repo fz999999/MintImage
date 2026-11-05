@@ -10,6 +10,7 @@ typedef ImageFormatSettingsSelection = ({
   ImageOutputFormat format,
   int frameCount,
   int frameDurationMs,
+  SvgOptions? svgOptions,
 });
 
 Future<ImageFormatSettingsSelection?> showImageFormatSettingsModal(
@@ -17,12 +18,14 @@ Future<ImageFormatSettingsSelection?> showImageFormatSettingsModal(
   required ImageOutputFormat format,
   required int frameCount,
   required int frameDurationMs,
+  SvgOptions? svgOptions,
 }) => showGenerationSettingsModal<ImageFormatSettingsSelection>(
   context,
   builder: (compact) => _ImageFormatSettingsPanel(
     format: format,
     frameCount: frameCount,
     frameDurationMs: frameDurationMs,
+    svgOptions: svgOptions,
     compact: compact,
   ),
 );
@@ -33,12 +36,14 @@ class _ImageFormatSettingsPanel extends StatefulWidget {
     required this.frameCount,
     required this.frameDurationMs,
     required this.compact,
+    this.svgOptions,
   });
 
   final ImageOutputFormat format;
   final int frameCount;
   final int frameDurationMs;
   final bool compact;
+  final SvgOptions? svgOptions;
 
   @override
   State<_ImageFormatSettingsPanel> createState() =>
@@ -48,6 +53,11 @@ class _ImageFormatSettingsPanel extends StatefulWidget {
 class _ImageFormatSettingsPanelState extends State<_ImageFormatSettingsPanel> {
   final _formKey = GlobalKey<FormState>();
   late ImageOutputFormat _format = widget.format;
+  late bool _customSvg = widget.svgOptions != null;
+  late final _svgModel = TextEditingController(
+    text: widget.svgOptions?.model ?? '',
+  );
+  late SvgReasoningEffort? _svgEffort = widget.svgOptions?.reasoningEffort;
   late final _frames = TextEditingController(text: '${widget.frameCount}');
   late final _duration = TextEditingController(
     text: '${widget.frameDurationMs}',
@@ -57,18 +67,25 @@ class _ImageFormatSettingsPanelState extends State<_ImageFormatSettingsPanel> {
   void dispose() {
     _frames.dispose();
     _duration.dispose();
+    _svgModel.dispose();
     super.dispose();
   }
 
   void _apply() {
     final isGif = _format == ImageOutputFormat.gif;
-    if (isGif && !_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
     Navigator.pop(context, (
       format: _format,
       frameCount: isGif ? int.parse(_frames.text) : widget.frameCount,
       frameDurationMs: isGif
           ? int.parse(_duration.text)
           : widget.frameDurationMs,
+      svgOptions: _customSvg
+          ? SvgOptions(
+              model: _svgModel.text.trim(),
+              reasoningEffort: _svgEffort,
+            )
+          : null,
     ));
   }
 
@@ -76,7 +93,7 @@ class _ImageFormatSettingsPanelState extends State<_ImageFormatSettingsPanel> {
   Widget build(BuildContext context) => GenerationSettingsPanel(
     keyPrefix: 'format-settings',
     title: '图片格式',
-    subtitle: '选择输出格式与动画参数',
+    subtitle: '选择输出格式，按需调整动画与矢量参数',
     icon: Icons.image_rounded,
     compact: widget.compact,
     onApply: _apply,
@@ -119,6 +136,13 @@ class _ImageFormatSettingsPanelState extends State<_ImageFormatSettingsPanel> {
             ),
             _animationSettings(),
           ],
+          if (_format == ImageOutputFormat.svg) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(height: 1, color: AppThemeTokens.border),
+            ),
+            _svgSettings(),
+          ],
         ],
       ),
     ),
@@ -154,6 +178,70 @@ class _ImageFormatSettingsPanelState extends State<_ImageFormatSettingsPanel> {
       },
     );
   }
+
+  Widget _svgSettings() => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppThemeTokens.surfaceSoft,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppThemeTokens.border),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile.adaptive(
+          key: const Key('svg-custom-model-toggle'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('自定义 SVG 绘制模型'),
+          subtitle: const Text('默认交由服务端选择；开启后需有对应模型权限'),
+          value: _customSvg,
+          onChanged: (value) => setState(() => _customSvg = value),
+        ),
+        if (_customSvg) ...[
+          const SizedBox(height: 12),
+          TextFormField(
+            key: const Key('svg-model-field'),
+            controller: _svgModel,
+            decoration: const InputDecoration(
+              labelText: 'SVG 绘制模型',
+              hintText: '填写服务商支持的模型 ID',
+              helperText: '与主生图模型分开，用于编写 SVG',
+              helperMaxLines: 2,
+              filled: true,
+              fillColor: AppThemeTokens.surface,
+            ),
+            validator: (value) =>
+                _format == ImageOutputFormat.svg &&
+                    _customSvg &&
+                    (value == null || value.trim().isEmpty)
+                ? '请输入模型 ID，或关闭自定义模型'
+                : null,
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
+            key: const Key('svg-reasoning-effort'),
+            initialValue: _svgEffort?.name ?? 'default',
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'SVG 推理强度',
+              helperText: '可用档位取决于绘制模型与服务商',
+              helperMaxLines: 2,
+              filled: true,
+              fillColor: AppThemeTokens.surface,
+            ),
+            items: [
+              const DropdownMenuItem(value: 'default', child: Text('服务端默认')),
+              for (final effort in SvgReasoningEffort.values)
+                DropdownMenuItem(value: effort.name, child: Text(effort.name)),
+            ],
+            onChanged: (value) => setState(() {
+              _svgEffort = SvgReasoningEffort.fromApiValue(value);
+            }),
+          ),
+        ],
+      ],
+    ),
+  );
 
   Widget _animationSettings() {
     final frames = int.tryParse(_frames.text);
