@@ -15,6 +15,7 @@
 #include <shlobj_core.h>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -369,6 +370,31 @@ std::optional<std::wstring> ReadImageFileFromClipboard(HWND hwnd) {
   return path;
 }
 
+std::vector<std::string> ReadDroppedFilePaths(HDROP drop) {
+  std::vector<std::string> paths;
+  if (!drop) {
+    return paths;
+  }
+
+  const UINT file_count = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+  paths.reserve(file_count);
+  for (UINT index = 0; index < file_count; ++index) {
+    const UINT path_length = DragQueryFileW(drop, index, nullptr, 0);
+    if (path_length == 0) {
+      continue;
+    }
+
+    std::wstring wide_path(path_length + 1, L'\0');
+    DragQueryFileW(drop, index, wide_path.data(), path_length + 1);
+    wide_path.resize(path_length);
+    std::string utf8_path = WideStringToUtf8(wide_path);
+    if (!utf8_path.empty()) {
+      paths.push_back(std::move(utf8_path));
+    }
+  }
+  return paths;
+}
+
 void HandleImageClipboardMethod(
     HWND hwnd,
     const flutter::MethodCall<flutter::EncodableValue>& method_call,
@@ -462,6 +488,19 @@ bool FlutterWindow::OnCreate() {
       });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  file_drop_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "mint_image/file_drop",
+          &flutter::StandardMethodCodec::GetInstance());
+  if (HWND handle = GetHandle()) {
+    DragAcceptFiles(handle, TRUE);
+    // Allow file drop messages across UIPI if elevated.
+    ChangeWindowMessageFilterEx(handle, WM_DROPFILES, MSGFLT_ALLOW, nullptr);
+    ChangeWindowMessageFilterEx(handle, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
+    ChangeWindowMessageFilterEx(handle, 0x0049 /* WM_COPYGLOBALDATA */,
+                                MSGFLT_ALLOW, nullptr);
+  }
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });
@@ -475,6 +514,10 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  if (HWND handle = GetHandle()) {
+    DragAcceptFiles(handle, FALSE);
+  }
+  file_drop_channel_ = nullptr;
   image_clipboard_channel_ = nullptr;
   window_lifecycle_channel_ = nullptr;
   if (flutter_controller_) {
@@ -541,6 +584,27 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
               [this]() { close_request_in_flight_ = false; }));
     }
     // Swallow this close request; the real close happens after Dart responds.
+    return 0;
+  }
+
+  if (message == WM_DROPFILES) {
+    auto* drop = reinterpret_cast<HDROP>(wparam);
+    const std::vector<std::string> dropped_paths = ReadDroppedFilePaths(drop);
+    DragFinish(drop);
+
+    if (file_drop_channel_ && !dropped_paths.empty()) {
+      flutter::EncodableList path_list;
+      path_list.reserve(dropped_paths.size());
+      for (const auto& path : dropped_paths) {
+        path_list.emplace_back(path);
+      }
+      file_drop_channel_->InvokeMethod(
+          "onFilesDropped",
+          std::make_unique<flutter::EncodableValue>(flutter::EncodableMap{
+              {flutter::EncodableValue("paths"),
+               flutter::EncodableValue(std::move(path_list))},
+          }));
+    }
     return 0;
   }
 

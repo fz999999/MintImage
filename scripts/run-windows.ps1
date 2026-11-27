@@ -1,4 +1,4 @@
-# 默认工作流：构建 Release 并直接运行给用户看（不打包）
+﻿# 默认工作流：构建 Release 并直接运行给用户看（不打包）
 #
 # 用法：
 #   pwsh -File scripts/run-windows.ps1              # 增量构建 + 启动
@@ -30,6 +30,15 @@ if (-not $NoBuild) {
 
 if (-not (Test-Path $exe)) {
     throw "找不到 $exe，先执行不带 -NoBuild 的命令"
+}
+
+$aclOutput = & icacls $exe 2>&1 | Out-String
+if ($aclOutput -match 'Low Mandatory Level') {
+    Write-Host "`n[警告] 检测到 mint_image.exe 带有 Low Mandatory Level（低完整性标签）！" -ForegroundColor Yellow
+    Write-Host "这会导致「保存到本地」无法写入普通（Medium 完整性）目录，系统将提示无权限。" -ForegroundColor Yellow
+    Write-Host "请以管理员身份运行 PowerShell 修复工作区目录 ACL：" -ForegroundColor Yellow
+    Write-Host "  icacls `"$repo`" /setintegritylevel `"(OI)(CI)M`"" -ForegroundColor Gray
+    Write-Host "  icacls `"$repo`" /remove:d Everyone /remove `"S-1-4-99528519-685015440`" /T" -ForegroundColor Gray
 }
 
 Get-Process -Name mint_image -ErrorAction SilentlyContinue | Stop-Process -Force

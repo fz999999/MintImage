@@ -29,12 +29,26 @@ class HomePage extends ConsumerStatefulWidget {
   final VoidCallback? onOpenSettings;
 
   @override
-  ConsumerState<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> {
+class HomePageState extends ConsumerState<HomePage> {
   final GlobalKey<BottomInputBarState> _inputBarKey =
       GlobalKey<BottomInputBarState>();
+
+  Future<void> appendDroppedFiles(List<String> paths) async {
+    if (!mounted || paths.isEmpty) {
+      return;
+    }
+    final inputBar = _inputBarKey.currentState;
+    if (inputBar != null) {
+      await inputBar.appendDroppedFiles(paths);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('请先在设置中填写 API Key 后再拖入参考图。')),
+    );
+  }
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   bool _selectionMode = false;

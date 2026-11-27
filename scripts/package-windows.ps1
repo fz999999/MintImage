@@ -1,4 +1,4 @@
-# Windows 分发包打包（仅在明确要求交付时才用）
+﻿# Windows 分发包打包（仅在明确要求交付时才用）
 #
 # 用法：
 #   pwsh -File scripts/package-windows.ps1           # 用已有 Release 产物打包
@@ -129,3 +129,13 @@ if ($leaked) {
     throw "打包内容不干净，终止"
 }
 Write-Host "自检通过：包内无用户数据" -ForegroundColor Green
+
+$stagedExe = Join-Path $staging 'mint_image.exe'
+$aclOutput = & icacls $stagedExe 2>&1 | Out-String
+if ($aclOutput -match 'Low Mandatory Level') {
+    Write-Host "`n[提示] $stagedExe 继承了工作区的 Low Mandatory Level 标签。" -ForegroundColor Yellow
+    Write-Host "请勿直接在工作区 dist\ 目录双击运行，请将生成的 .zip 解压到工作区外的正常目录运行，" -ForegroundColor Yellow
+    Write-Host "或先以管理员身份运行 PowerShell 清理工作区目录 ACL：" -ForegroundColor Yellow
+    Write-Host "  icacls `"$repo`" /setintegritylevel `"(OI)(CI)M`"" -ForegroundColor Gray
+    Write-Host "  icacls `"$repo`" /remove:d Everyone /remove `"S-1-4-99528519-685015440`" /T" -ForegroundColor Gray
+}

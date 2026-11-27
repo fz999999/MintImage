@@ -3,7 +3,7 @@ class AppVersion {
 
   static const current = String.fromEnvironment(
     'APP_VERSION',
-    defaultValue: 'v1.0.0',
+    defaultValue: 'v1.1.1',
   );
 
   // 本仓库（fork 自上游 aiqinxuancai/MintImage）。

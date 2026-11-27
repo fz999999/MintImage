@@ -37,6 +37,9 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       window_lifecycle_channel_;
 
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      file_drop_channel_;
+
   // When true, the next WM_CLOSE is allowed to proceed without asking Dart.
   // Set after Dart confirms the user wants to exit via "performClose".
   bool force_close_ = false;

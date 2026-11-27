@@ -116,6 +116,14 @@ pwsh -File scripts/package-windows.ps1 -Build
 （继承 `SharedPreferencesStorePlatform`，写 `data\shared_preferences.json`，首次运行从旧 `%APPDATA%` 迁移一次）。
 改这些文件时不要退回 `getApplicationSupportDirectory()` / `getApplicationDocumentsDirectory()`。
 
+补充排查（2026-11）：若工作区目录本身被沙盒工具挂上了 `Mandatory Label\Low Mandatory Level:(OI)(CI)(NW)`，
+新构建的 `mint_image.exe` 和 `dist\` 产物都会自动继承该标签。虽然便携 `data\` 同级可写，但点击「保存到本地」
+写入普通 Medium 完整性目录时仍会被 Windows MIC 拦截并提示「你没有权限在此位置中保存文件」。
+排查与修复：`icacls <exe>` 若看到 `Low Mandatory Level`，将 `.zip` 解压到工作区外正常目录即可恢复；
+彻底清理工作区需在**管理员 PowerShell** 执行：
+`icacls "<repo>" /setintegritylevel "(OI)(CI)M"` 与 `icacls "<repo>" /remove:d Everyone /remove "S-1-4-99528519-685015440" /T`。
+`scripts/run-windows.ps1` 与 `scripts/package-windows.ps1` 已内置该标签检测提醒。
+
 ### 坑 7：`part` 写成 `import` 会炸掉 drift
 症状：`'$composableBuilder' isn't defined`、`'Value' isn't a type`、`Method not found: 'PrefetchHooks'`（全在 `app_database.g.dart`）。
 原因：把 `lib/core/database/app_database.dart` 顶部的 `part 'app_database.g.dart';` 改成了 `import`。

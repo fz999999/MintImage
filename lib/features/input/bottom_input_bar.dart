@@ -718,6 +718,58 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       return;
     }
 
+    _appendPickedAttachments(picked);
+  }
+
+  /// 追加从系统窗口拖入的图片文件到参考图列表。
+  Future<void> appendDroppedFiles(List<String> paths) async {
+    if (!mounted || paths.isEmpty) {
+      return;
+    }
+
+    final candidates = <PickedAttachment>[];
+    var unsupportedCount = 0;
+
+    for (final rawPath in paths) {
+      final path = rawPath.trim();
+      if (path.isEmpty || !_isSupportedImageExtension(path)) {
+        unsupportedCount++;
+        continue;
+      }
+
+      final attachment = await PickedAttachment.fromExistingPath(path);
+      if (!mounted) {
+        return;
+      }
+      if (attachment == null) {
+        unsupportedCount++;
+        continue;
+      }
+      candidates.add(attachment);
+    }
+
+    if (candidates.isEmpty) {
+      if (unsupportedCount > 0) {
+        _showMessage('仅支持拖入 PNG、JPG、JPEG、WEBP 图片。');
+      }
+      return;
+    }
+
+    final hasOversized = _appendPickedAttachments(candidates);
+    if (!hasOversized && unsupportedCount > 0) {
+      _showMessage('已忽略 $unsupportedCount 个不支持的文件。');
+    }
+  }
+
+  bool _isSupportedImageExtension(String path) {
+    final lower = path.toLowerCase();
+    return lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.webp');
+  }
+
+  bool _appendPickedAttachments(List<PickedAttachment> picked) {
     final valid = <PickedAttachment>[];
     final oversized = <PickedAttachment>[];
 
@@ -734,19 +786,20 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     }
 
     if (valid.isEmpty) {
-      return;
+      return oversized.isNotEmpty;
     }
 
     final remaining = _maxAttachmentCount - _attachments.length;
     if (remaining <= 0) {
       _showMessage('最多添加 $_maxAttachmentCount 张参考图');
-      return;
+      return oversized.isNotEmpty;
     }
     if (valid.length > remaining) {
       _showMessage('最多添加 $_maxAttachmentCount 张参考图');
     }
 
     _setAttachments([..._attachments, ...valid.take(remaining)]);
+    return oversized.isNotEmpty;
   }
 
   Future<void> _submit({String? apiProfileId}) async {

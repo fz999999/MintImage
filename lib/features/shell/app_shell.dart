@@ -1,5 +1,10 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/services/file_drop_service.dart';
 import '../../shared/theme.dart';
 import '../home/home_page.dart';
 import '../logs/request_log_page.dart';
@@ -20,6 +25,34 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   /// 0 主界面 / 1 日志 / 2 设置。
   int _index = 0;
+  final GlobalKey<HomePageState> _homePageKey = GlobalKey<HomePageState>();
+  StreamSubscription<List<String>>? _fileDropSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+      _fileDropSubscription = FileDropService.instance.onFilesDropped.listen(
+        _handleDroppedFiles,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _fileDropSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _handleDroppedFiles(List<String> paths) {
+    if (!mounted || paths.isEmpty) {
+      return;
+    }
+    if (_index != 0) {
+      _selectTab(0);
+    }
+    unawaited(_homePageKey.currentState?.appendDroppedFiles(paths));
+  }
 
   void _selectTab(int index) {
     if (index == _index) {
@@ -43,7 +76,10 @@ class _AppShellState extends State<AppShell> {
             child: IndexedStack(
               index: _index,
               children: [
-                HomePage(onOpenSettings: () => _selectTab(2)),
+                HomePage(
+                  key: _homePageKey,
+                  onOpenSettings: () => _selectTab(2),
+                ),
                 const RequestLogPage(),
                 const SettingsPage(),
               ],
