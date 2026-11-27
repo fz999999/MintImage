@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 
 import '../../core/api/openai_client.dart';
 import '../../core/api/prompt_optimization_api.dart';
@@ -16,6 +18,7 @@ import '../../core/models/model_capabilities.dart';
 import '../../core/models/settings_model.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/services/app_paths.dart';
 import '../../core/services/attachment_picker_service.dart';
 import '../../core/services/image_clipboard_service.dart';
 import '../../shared/theme.dart';
@@ -24,6 +27,7 @@ import 'attachment_preview_strip.dart';
 import 'background_selector.dart';
 import 'channel_balance.dart';
 import 'image_format_selector.dart';
+import 'markup_editor.dart';
 import 'quality_selector.dart';
 import 'quantity_selector.dart';
 import 'selector_chip_label.dart';
@@ -62,7 +66,6 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   final GlobalKey _modelSwitchKey = GlobalKey();
   final GlobalKey _optimizeButtonKey = GlobalKey();
   final GlobalKey _sendButtonKey = GlobalKey();
-  final GlobalKey _sendMenuKey = GlobalKey();
 
   bool get _usesDesktopPopups => !kIsWeb && Platform.isWindows;
 
@@ -100,6 +103,10 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
   SizePreset _sizePreset = SizePreset.auto;
   ImageQuality _quality = ImageQuality.auto;
   ImageOutputFormat _outputFormat = ImageOutputFormat.png;
+  int _frameCount = 9;
+  int _frameDurationMs = 200;
+  SvgOptions? _svgOptions;
+  String? _markupPath;
   ImageBackground _background = ImageBackground.auto;
   int _count = 1;
   int _customWidth = 0;
@@ -239,8 +246,13 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
     if (!mounted) {
       return;
     }
+    final previousFirst = _attachments.isEmpty ? null : _attachments.first.path;
+    final nextFirst = attachments.isEmpty ? null : attachments.first.path;
     setState(() {
       _attachments = attachments;
+      if (nextFirst == null || nextFirst != previousFirst) {
+        _markupPath = null;
+      }
     });
     widget.onAttachmentCountChanged?.call(_attachments.length);
   }
@@ -327,6 +339,8 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                       if (_attachments.isNotEmpty) ...[
                         AttachmentPreviewStrip(
                           attachments: _attachments,
+                          hasMarkup: _markupPath != null,
+                          onEditMarkup: _openMarkupEditor,
                           onRemove: (index) {
                             _setAttachments([
                               for (int i = 0; i < _attachments.length; i++)
@@ -437,28 +451,6 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                             onTap: _submit,
                             onLongPress: _showApiProfileSendSheet,
                           ),
-                          if (_usesDesktopPopups) ...[
-                            const SizedBox(width: 2),
-                            IconButton(
-                              tooltip: '切换 API 并发送',
-                              onPressed: canUseSendButton && !_submitting
-                                  ? () => _showApiProfileSendSheet(
-                                      anchorKey: _sendMenuKey,
-                                    )
-                                  : null,
-                              constraints: const BoxConstraints(
-                                minWidth: 28,
-                                minHeight: _barButtonSize,
-                              ),
-                              padding: EdgeInsets.zero,
-                              icon: SizedBox(
-                                key: _sendMenuKey,
-                                width: 28,
-                                height: _barButtonSize,
-                                child: const Icon(Icons.arrow_drop_down_rounded),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                       const SizedBox(height: AppSpace.xs),
@@ -499,11 +491,29 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                                 ),
                                 ImageFormatSelector(
                                   selectedFormat: _outputFormat,
+                                  frameCount: _frameCount,
+                                  frameDurationMs: _frameDurationMs,
+                                  svgOptions: _svgOptions,
                                   onSelected: (format) {
                                     setState(() {
                                       _outputFormat = format;
                                       // JPEG 没有 alpha 通道，透明背景会被接口拒绝。
                                       if (format == ImageOutputFormat.jpeg &&
+                                          _background.isTransparent) {
+                                        _background = ImageBackground.auto;
+                                      }
+                                    });
+                                    _persistLastGenerationOptions();
+                                  },
+                                  onSettingsChanged: (selection) {
+                                    setState(() {
+                                      _outputFormat = selection.format;
+                                      _frameCount = selection.frameCount;
+                                      _frameDurationMs =
+                                          selection.frameDurationMs;
+                                      _svgOptions = selection.svgOptions;
+                                      if (selection.format ==
+                                              ImageOutputFormat.jpeg &&
                                           _background.isTransparent) {
                                         _background = ImageBackground.auto;
                                       }
@@ -555,9 +565,7 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
                         Text(
                           otherProfiles.isEmpty
                               ? '当前配置缺少 API Key，发送按钮已禁用。'
-                              : _usesDesktopPopups
-                                  ? '当前配置缺少 API Key，可点击发送旁箭头或长按发送切换其他配置。'
-                                  : '当前配置缺少 API Key，可长按发送切换其他配置。',
+                              : '当前配置缺少 API Key，可长按发送或在底部切换渠道。',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: AppColors.dangerText(b),
                             fontWeight: FontWeight.w700,
@@ -677,10 +685,6 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
           _showMessage('剪贴板图片文件不存在，无法加入附件。');
           return;
         }
-        if (attachment.sizeBytes > AttachmentPickerService.maxFileSizeBytes) {
-          _showMessage('已忽略 1 张超过 25MB 的剪贴板图片。');
-          return;
-        }
         if (_attachments.length >= _maxAttachmentCount) {
           _showMessage('最多添加 $_maxAttachmentCount 张参考图');
           return;
@@ -755,8 +759,8 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
       return;
     }
 
-    final hasOversized = _appendPickedAttachments(candidates);
-    if (!hasOversized && unsupportedCount > 0) {
+    _appendPickedAttachments(candidates);
+    if (unsupportedCount > 0) {
       _showMessage('已忽略 $unsupportedCount 个不支持的文件。');
     }
   }
@@ -769,37 +773,21 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
         lower.endsWith('.webp');
   }
 
-  bool _appendPickedAttachments(List<PickedAttachment> picked) {
-    final valid = <PickedAttachment>[];
-    final oversized = <PickedAttachment>[];
-
-    for (final item in picked) {
-      if (item.sizeBytes > AttachmentPickerService.maxFileSizeBytes) {
-        oversized.add(item);
-      } else {
-        valid.add(item);
-      }
-    }
-
-    if (oversized.isNotEmpty) {
-      _showMessage('已忽略 ${oversized.length} 张超过 25MB 的图片。');
-    }
-
-    if (valid.isEmpty) {
-      return oversized.isNotEmpty;
+  void _appendPickedAttachments(List<PickedAttachment> picked) {
+    if (picked.isEmpty) {
+      return;
     }
 
     final remaining = _maxAttachmentCount - _attachments.length;
     if (remaining <= 0) {
       _showMessage('最多添加 $_maxAttachmentCount 张参考图');
-      return oversized.isNotEmpty;
+      return;
     }
-    if (valid.length > remaining) {
+    if (picked.length > remaining) {
       _showMessage('最多添加 $_maxAttachmentCount 张参考图');
     }
 
-    _setAttachments([..._attachments, ...valid.take(remaining)]);
-    return oversized.isNotEmpty;
+    _setAttachments([..._attachments, ...picked.take(remaining)]);
   }
 
   Future<void> _submit({String? apiProfileId}) async {
@@ -847,6 +835,10 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
           customHeight: _customHeight,
           quality: effectiveQuality,
           outputFormat: _outputFormat,
+          frameCount: _frameCount,
+          frameDurationMs: _frameDurationMs,
+          svgOptions: _svgOptions,
+          markupPath: _markupPath,
           background: _background,
           count: _count,
           apiProfileId: selectedProfileId,
@@ -855,6 +847,9 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
 
       _promptController.clear();
       _setAttachments(const []);
+      if (mounted) {
+        setState(() => _markupPath = null);
+      }
     } on ApiException catch (error) {
       _showMessage(error.message);
     } catch (error) {
@@ -1482,6 +1477,33 @@ class BottomInputBarState extends ConsumerState<BottomInputBar> {
         });
       }
     }
+  }
+
+  Future<void> _openMarkupEditor() async {
+    if (_attachments.isEmpty || !mounted) {
+      return;
+    }
+    unfocusPrompt();
+    final result = await showMarkupEditor(
+      context,
+      referencePath: _attachments.first.path,
+      markupPath: _markupPath,
+      picker: ref.read(attachmentPickerServiceProvider),
+    );
+    if (!mounted || result == null) {
+      return;
+    }
+    if (result.pngBytes == null) {
+      setState(() => _markupPath = null);
+      return;
+    }
+    final dir = await AppPaths.subDirectory('markup_attachments');
+    final file = File(p.join(dir.path, '${const Uuid().v4()}.png'));
+    await file.writeAsBytes(result.pngBytes!, flush: true);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _markupPath = file.path);
   }
 
   void _showMessage(String message) {

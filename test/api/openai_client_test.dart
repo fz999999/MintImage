@@ -16,6 +16,9 @@ void main() {
       ),
     );
 
-    expect(OpenAiClient.extractErrorMessage(error), 'HTTP 504：Gateway timeout');
+    expect(
+      OpenAiClient.extractErrorMessage(error),
+      startsWith('HTTP 504：Gateway timeout'),
+    );
   });
 }

@@ -23,7 +23,12 @@ class ModelListApi {
     }
 
     final response = await _getJson(
-      url: _appendVersionPath(profile.normalizedBaseUrl, 'v1', ['models']),
+      // OpenRouter 的 /models 返回的是文本模型，图像模型在 /images/models。
+      url: _appendVersionPath(
+        profile.normalizedBaseUrl,
+        'v1',
+        profile.isOpenRouterImages ? ['images', 'models'] : ['models'],
+      ),
       headers: _bearerHeaders(apiKey),
       timeoutSeconds: timeoutSeconds,
       cancelToken: cancelToken,

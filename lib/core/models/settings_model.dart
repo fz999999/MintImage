@@ -9,6 +9,12 @@ const _uuid = Uuid();
 
 enum ImageGenerationApiMode {
   images('images', 'Images API (/v1/images)', 'Images API', 'gpt-image-2'),
+  imagesAsync(
+    'images_async',
+    'Images API（异步任务）',
+    'Images 异步',
+    'gpt-image-2',
+  ),
   responses(
     'responses',
     'Responses API (/v1/responses)',
@@ -30,7 +36,8 @@ enum ImageGenerationApiMode {
 
   String get generationPath {
     return switch (this) {
-      ImageGenerationApiMode.images => '/v1/images/generations',
+      ImageGenerationApiMode.images ||
+      ImageGenerationApiMode.imagesAsync => '/v1/images/generations',
       ImageGenerationApiMode.responses => '/v1/responses',
     };
   }
@@ -42,6 +49,22 @@ enum ImageGenerationApiMode {
       orElse: () => ImageGenerationApiMode.images,
     );
   }
+}
+
+enum ResponsesReasoningEffort {
+  defaultValue,
+  none,
+  minimal,
+  low,
+  medium,
+  high,
+  xhigh,
+  max;
+
+  String get value => this == defaultValue ? 'default' : name;
+
+  static ResponsesReasoningEffort parse(Object? value) =>
+      values.firstWhere((e) => e.value == value, orElse: () => defaultValue);
 }
 
 List<String> _normalizeModels(
@@ -83,6 +106,9 @@ class ApiProfile {
     String? model,
     this.apiMode = ImageGenerationApiMode.images,
     this.useStreaming = false,
+    this.includeSizeInPrompt = false,
+    this.reasoningEffort = ResponsesReasoningEffort.defaultValue,
+    this.safetyIdentifier = '',
     this.balanceQuery = const BalanceQueryConfig(),
   }) : models = _normalizeModels(
          models,
@@ -111,7 +137,15 @@ class ApiProfile {
   }
 
   factory ApiProfile.fromJson(Map<String, dynamic> json) {
-    final apiMode = ImageGenerationApiMode.fromStorageValue(json['apiMode']);
+    var apiMode = ImageGenerationApiMode.fromStorageValue(json['apiMode']);
+    var baseUrl = json['baseUrl'] as String? ?? 'https://api.openai.com';
+    if (apiMode == ImageGenerationApiMode.images) {
+      final legacyUrl = _legacyRightApiBaseUrl(baseUrl);
+      if (legacyUrl != null) {
+        apiMode = ImageGenerationApiMode.imagesAsync;
+        baseUrl = legacyUrl;
+      }
+    }
     final rawModels = json['models'];
     final models = rawModels is List
         ? [
@@ -122,14 +156,28 @@ class ApiProfile {
     return ApiProfile(
       id: json['id'] as String,
       name: json['name'] as String? ?? '默认',
-      baseUrl: json['baseUrl'] as String? ?? 'https://api.openai.com',
+      baseUrl: baseUrl,
       apiKey: json['apiKey'] as String? ?? '',
       models: models,
       model: json['model'] as String? ?? apiMode.defaultModel,
       apiMode: apiMode,
       useStreaming: json['useStreaming'] as bool? ?? false,
+      includeSizeInPrompt: json['includeSizeInPrompt'] == true,
+      reasoningEffort: ResponsesReasoningEffort.parse(json['reasoningEffort']),
+      safetyIdentifier: json['safetyIdentifier'] as String? ?? '',
       balanceQuery: BalanceQueryConfig.fromJson(json['balanceQuery']),
     );
+  }
+
+  static String? _legacyRightApiBaseUrl(String baseUrl) {
+    final normalized = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final uri = Uri.tryParse(normalized);
+    if (uri != null &&
+        uri.host.toLowerCase() == 'www.rightapi.ai' &&
+        uri.path.toLowerCase().endsWith('/draw')) {
+      return normalized.substring(0, normalized.length - '/draw'.length);
+    }
+    return null;
   }
 
   final String id;
@@ -141,6 +189,9 @@ class ApiProfile {
   final List<String> models;
   final ImageGenerationApiMode apiMode;
   final bool useStreaming;
+  final bool includeSizeInPrompt;
+  final ResponsesReasoningEffort reasoningEffort;
+  final String safetyIdentifier;
 
   /// 该中转站的余额查询设置（主页右下角的余额就靠它取数）。
   final BalanceQueryConfig balanceQuery;
@@ -148,14 +199,38 @@ class ApiProfile {
   /// 兼容旧入口：等价于 [models] 的第一个模型。
   String get model => models.first;
 
-  String get normalizedBaseUrl => baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+  String? get resolvedSafetyIdentifier {
+    final value = safetyIdentifier.trim();
+    return value.isEmpty ? null : value;
+  }
 
-  String get generationEndpoint =>
-      '$normalizedBaseUrl${apiMode.generationPath}';
+  /// OpenRouter 统一图像接口：生图和改图都走同一个 JSON 端点。
+  bool get isOpenRouterImages {
+    if (apiMode == ImageGenerationApiMode.responses) return false;
+    final uri = Uri.tryParse(baseUrl.trim());
+    return uri?.host.toLowerCase() == 'openrouter.ai';
+  }
+
+  String get normalizedBaseUrl {
+    final normalized = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final uri = Uri.tryParse(normalized);
+    if (isOpenRouterImages &&
+        const ['', '/api', '/api/v1', '/api/v1/images'].contains(uri!.path)) {
+      return uri.replace(path: '/api').toString();
+    }
+    return normalized;
+  }
+
+  String get generationPath =>
+      isOpenRouterImages ? '/v1/images' : apiMode.generationPath;
+
+  String get generationEndpoint => '$normalizedBaseUrl$generationPath';
 
   String get editEndpoint {
+    if (isOpenRouterImages) return generationEndpoint;
     return switch (apiMode) {
-      ImageGenerationApiMode.images => '$normalizedBaseUrl/v1/images/edits',
+      ImageGenerationApiMode.images ||
+      ImageGenerationApiMode.imagesAsync => '$normalizedBaseUrl/v1/images/edits',
       ImageGenerationApiMode.responses => '$normalizedBaseUrl/v1/responses',
     };
   }
@@ -169,6 +244,9 @@ class ApiProfile {
     String? model,
     ImageGenerationApiMode? apiMode,
     bool? useStreaming,
+    bool? includeSizeInPrompt,
+    ResponsesReasoningEffort? reasoningEffort,
+    String? safetyIdentifier,
     BalanceQueryConfig? balanceQuery,
   }) {
     return ApiProfile(
@@ -179,6 +257,9 @@ class ApiProfile {
       models: models ?? (model != null ? <String>[model] : this.models),
       apiMode: apiMode ?? this.apiMode,
       useStreaming: useStreaming ?? this.useStreaming,
+      includeSizeInPrompt: includeSizeInPrompt ?? this.includeSizeInPrompt,
+      reasoningEffort: reasoningEffort ?? this.reasoningEffort,
+      safetyIdentifier: safetyIdentifier ?? this.safetyIdentifier,
       balanceQuery: balanceQuery ?? this.balanceQuery,
     );
   }
@@ -194,6 +275,11 @@ class ApiProfile {
       'model': model,
       'apiMode': apiMode.storageValue,
       'useStreaming': useStreaming,
+      if (includeSizeInPrompt) 'includeSizeInPrompt': true,
+      if (reasoningEffort != ResponsesReasoningEffort.defaultValue)
+        'reasoningEffort': reasoningEffort.value,
+      if (safetyIdentifier.trim().isNotEmpty)
+        'safetyIdentifier': safetyIdentifier.trim(),
       'balanceQuery': balanceQuery.toJson(),
     };
   }

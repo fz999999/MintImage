@@ -198,6 +198,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('JPEG').last);
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('format-settings-apply')));
+    await tester.pumpAndSettle();
 
     expect(_chipText('自动', BackgroundSelector), findsOneWidget);
 
@@ -286,6 +288,27 @@ void main() {
       tester.element(find.byType(BottomInputBar)),
     );
     expect(container.read(settingsProvider).activeProfileId, 'api-2');
+  });
+
+  testWidgets('does not show dropdown arrow next to send button', (
+    tester,
+  ) async {
+    await _pumpInputBar(
+      tester,
+      settings: _settingsWithTwoProfiles.copyWith(
+        profiles: [
+          _apiProfile.copyWith(apiKey: ''),
+          _apiProfile2,
+        ],
+      ),
+    );
+
+    expect(find.byTooltip('切换 API 并发送'), findsNothing);
+    expect(find.byIcon(Icons.arrow_drop_down_rounded), findsNothing);
+    expect(
+      find.text('当前配置缺少 API Key，可长按发送或在底部切换渠道。'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('long pressing send switches api profile and submits', (

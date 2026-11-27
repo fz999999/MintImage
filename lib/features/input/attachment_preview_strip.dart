@@ -1,19 +1,27 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../../core/services/attachment_picker_service.dart';
 import '../../shared/theme.dart';
 
+const double _thumbnailSize = 44;
+
 class AttachmentPreviewStrip extends StatelessWidget {
   const AttachmentPreviewStrip({
     super.key,
     required this.attachments,
     required this.onRemove,
+    this.hasMarkup = false,
+    this.onEditMarkup,
   });
 
   final List<PickedAttachment> attachments;
   final ValueChanged<int> onRemove;
+  final bool hasMarkup;
+  final VoidCallback? onEditMarkup;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +61,22 @@ class AttachmentPreviewStrip extends StatelessWidget {
               ),
             ),
           ),
+          if (onEditMarkup != null) ...[
+            const SizedBox(width: AppSpace.xs),
+            Tooltip(
+              message: hasMarkup ? '编辑标注（已添加）' : '在参考图上标注',
+              child: IconButton(
+                onPressed: onEditMarkup,
+                icon: Icon(
+                  Icons.draw_rounded,
+                  size: AppIconSize.md,
+                  color: hasMarkup
+                      ? AppColors.primary(b)
+                      : AppColors.textSecondary(b),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(width: AppSpace.xxs),
         ],
       ),
@@ -71,21 +95,27 @@ class _AttachmentThumb extends StatelessWidget {
     final b = Theme.of(context).brightness;
 
     return SizedBox(
-      width: 44,
-      height: 44,
+      width: _thumbnailSize,
+      height: _thumbnailSize,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.sm),
-            child: Image.file(
-              File(attachment.path),
-              width: 44,
-              height: 44,
+            child: Image(
+              image: _AttachmentImage(
+                File(attachment.path),
+                pixelSize:
+                    (_thumbnailSize * MediaQuery.devicePixelRatioOf(context))
+                        .ceil(),
+              ),
+              width: _thumbnailSize,
+              height: _thumbnailSize,
               fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
               errorBuilder: (context, error, stackTrace) => Container(
-                width: 44,
-                height: 44,
+                width: _thumbnailSize,
+                height: _thumbnailSize,
                 color: AppColors.surfaceSoft(b),
                 alignment: Alignment.center,
                 child: Icon(
@@ -120,4 +150,37 @@ class _AttachmentThumb extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AttachmentImage extends FileImage {
+  const _AttachmentImage(super.file, {required this.pixelSize});
+
+  final int pixelSize;
+
+  @override
+  ImageStreamCompleter loadImage(FileImage key, ImageDecoderCallback decode) {
+    return super.loadImage(key, (buffer, {getTargetSize}) {
+      return decode(
+        buffer,
+        getTargetSize: (width, height) {
+          // BoxFit.cover needs enough pixels on the shorter side so cropping
+          // a landscape image into a square never enlarges a tiny decode.
+          final scale = math.min(1.0, pixelSize / math.min(width, height));
+          return ui.TargetImageSize(
+            width: (width * scale).ceil(),
+            height: (height * scale).ceil(),
+          );
+        },
+      );
+    });
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is _AttachmentImage &&
+      super == other &&
+      pixelSize == other.pixelSize;
+
+  @override
+  int get hashCode => Object.hash(super.hashCode, pixelSize);
 }

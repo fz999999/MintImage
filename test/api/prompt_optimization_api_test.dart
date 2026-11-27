@@ -163,6 +163,188 @@ void main() {
         expect(result, 'gemini prompt');
       },
     );
+
+    test(
+      'ignores reasoning deltas in OpenAI Responses SSE stream',
+      () async {
+        final server = await _startServer((request) async {
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          request.response.write(
+            'data: ${jsonEncode({'type': 'response.reasoning_summary_text.delta', 'delta': '思考摘要 '})}\n\n'
+            'data: ${jsonEncode({'type': 'response.reasoning_text.delta', 'delta': '我们需要回答中文...'})}\n\n'
+            'data: ${jsonEncode({'type': 'response.output_text.delta', 'delta': '最终提示词正文'})}\n\n'
+            'data: [DONE]\n\n',
+          );
+          await request.response.close();
+        });
+        addTearDown(server.close);
+
+        final result = await const PromptOptimizationApi().optimize(
+          prompt: '小女孩跳舞',
+          direction: PromptOptimizationDirection.strengthen,
+          profile: _profileFor(
+            server,
+            protocol: PromptOptimizationProtocol.openAiResponses,
+          ),
+          timeoutSeconds: 30,
+        );
+
+        expect(result, '最终提示词正文');
+      },
+    );
+
+    test(
+      'ignores reasoning output items in OpenAI Responses completed payload',
+      () async {
+        final server = await _startServer((request) async {
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          request.response.write(
+            'data: ${jsonEncode({
+              'type': 'response.completed',
+              'response': {
+                'output': [
+                  {
+                    'type': 'reasoning',
+                    'content': [
+                      {'type': 'reasoning_text', 'text': '内部推理过程'},
+                    ],
+                  },
+                  {
+                    'type': 'message',
+                    'content': [
+                      {'type': 'output_text', 'text': '纯净优化提示词'},
+                    ],
+                  },
+                ],
+              },
+            })}\n\n'
+            'data: [DONE]\n\n',
+          );
+          await request.response.close();
+        });
+        addTearDown(server.close);
+
+        final result = await const PromptOptimizationApi().optimize(
+          prompt: '小女孩跳舞',
+          direction: PromptOptimizationDirection.strengthen,
+          profile: _profileFor(
+            server,
+            protocol: PromptOptimizationProtocol.openAiResponses,
+          ),
+          timeoutSeconds: 30,
+        );
+
+        expect(result, '纯净优化提示词');
+      },
+    );
+
+    test('ignores thought parts in Gemini response', () async {
+      final server = await _startServer((request) async {
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'candidates': [
+              {
+                'content': {
+                  'parts': [
+                    {'thought': true, 'text': 'Let me think carefully...'},
+                    {'text': '真正输出的提示词'},
+                  ],
+                },
+              },
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+      addTearDown(server.close);
+
+      final result = await const PromptOptimizationApi().optimize(
+        prompt: '小女孩跳舞',
+        direction: PromptOptimizationDirection.strengthen,
+        profile: _profileFor(
+          server,
+          protocol: PromptOptimizationProtocol.geminiGenerateContent,
+        ),
+        timeoutSeconds: 30,
+      );
+
+      expect(result, '真正输出的提示词');
+    });
+
+    test(
+      'ignores Claude thinking deltas and strips <think> tags from Chat',
+      () async {
+        final claudeServer = await _startServer((request) async {
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          request.response.write(
+            'data: ${jsonEncode({
+              'type': 'content_block_delta',
+              'delta': {'type': 'thinking_delta', 'thinking': '内部思考'},
+            })}\n\n'
+            'data: ${jsonEncode({
+              'type': 'content_block_delta',
+              'delta': {'type': 'text_delta', 'text': 'Claude 净正文'},
+            })}\n\n'
+            'data: [DONE]\n\n',
+          );
+          await request.response.close();
+        });
+        addTearDown(claudeServer.close);
+
+        final claudeResult = await const PromptOptimizationApi().optimize(
+          prompt: '小女孩跳舞',
+          direction: PromptOptimizationDirection.strengthen,
+          profile: _profileFor(
+            claudeServer,
+            protocol: PromptOptimizationProtocol.claudeMessages,
+          ),
+          timeoutSeconds: 30,
+        );
+        expect(claudeResult, 'Claude 净正文');
+
+        final chatServer = await _startServer((request) async {
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'content':
+                        '<think>我们需要回答中文，不要输出解释</think>\n一位小女孩在舞蹈教室起舞',
+                  },
+                },
+              ],
+            }),
+          );
+          await request.response.close();
+        });
+        addTearDown(chatServer.close);
+
+        final chatResult = await const PromptOptimizationApi().optimize(
+          prompt: '小女孩跳舞',
+          direction: PromptOptimizationDirection.strengthen,
+          profile: _profileFor(
+            chatServer,
+            protocol: PromptOptimizationProtocol.openAiChatCompletions,
+          ),
+          timeoutSeconds: 30,
+        );
+        expect(chatResult, '一位小女孩在舞蹈教室起舞');
+      },
+    );
   });
 }
 

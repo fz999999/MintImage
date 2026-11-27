@@ -52,6 +52,10 @@ class SettingsController extends StateNotifier<SettingsModel> {
     List<String>? models,
     ImageGenerationApiMode apiMode = ImageGenerationApiMode.images,
     bool useStreaming = false,
+    bool includeSizeInPrompt = false,
+    ResponsesReasoningEffort reasoningEffort =
+        ResponsesReasoningEffort.defaultValue,
+    String safetyIdentifier = '',
     BalanceQueryConfig balanceQuery = const BalanceQueryConfig(),
   }) async {
     final nextIndex = state.profiles.length + 1;
@@ -63,6 +67,9 @@ class SettingsController extends StateNotifier<SettingsModel> {
       models: models ?? <String>[model ?? apiMode.defaultModel],
       apiMode: apiMode,
       useStreaming: useStreaming,
+      includeSizeInPrompt: includeSizeInPrompt,
+      reasoningEffort: reasoningEffort,
+      safetyIdentifier: safetyIdentifier,
       balanceQuery: balanceQuery,
     );
     state = state.copyWith(

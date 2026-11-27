@@ -4,6 +4,7 @@ import '../../shared/widgets/desktop/desktop_menu.dart';
 
 import '../../core/models/generation_request.dart';
 import '../../shared/theme.dart';
+import 'image_format_settings_modal.dart';
 import 'selector_chip_label.dart';
 
 class ImageFormatSelector extends StatelessWidget {
@@ -11,10 +12,18 @@ class ImageFormatSelector extends StatelessWidget {
     super.key,
     required this.selectedFormat,
     required this.onSelected,
+    this.frameCount = 9,
+    this.frameDurationMs = 200,
+    this.svgOptions,
+    this.onSettingsChanged,
   });
 
   final ImageOutputFormat selectedFormat;
   final ValueChanged<ImageOutputFormat> onSelected;
+  final int frameCount;
+  final int frameDurationMs;
+  final SvgOptions? svgOptions;
+  final ValueChanged<ImageFormatSettingsSelection>? onSettingsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +49,19 @@ class ImageFormatSelector extends StatelessWidget {
   }
 
   Future<void> _showSheet(BuildContext context) async {
+    if (onSettingsChanged != null) {
+      final result = await showImageFormatSettingsModal(
+        context,
+        format: selectedFormat,
+        frameCount: frameCount,
+        frameDurationMs: frameDurationMs,
+        svgOptions: svgOptions,
+      );
+      if (context.mounted && result != null) {
+        onSettingsChanged!(result);
+      }
+      return;
+    }
     if (defaultTargetPlatform == TargetPlatform.windows) {
       final selected = await showDesktopMenu<ImageOutputFormat>(
         context: context,

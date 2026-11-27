@@ -1,8 +1,12 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
+
+import 'app_paths.dart';
 
 class PickedAttachment {
   const PickedAttachment({
@@ -31,9 +35,30 @@ class PickedAttachment {
 class AttachmentPickerService {
   AttachmentPickerService() : _imagePicker = ImagePicker();
 
-  static const int maxFileSizeBytes = 25 * 1024 * 1024;
-
   final ImagePicker _imagePicker;
+
+  /// 草稿中尚未发送的标注图路径；存储清理时需保留。
+  String? draftMarkupPath;
+
+  Future<PickedAttachment?> pickMarkup() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['png'],
+    );
+    final path = result?.files.single.path;
+    return path == null ? null : PickedAttachment.fromExistingPath(path);
+  }
+
+  Future<String> storeMarkup(String path) async {
+    return storeMarkupBytes(await File(path).readAsBytes());
+  }
+
+  Future<String> storeMarkupBytes(Uint8List bytes) async {
+    final directory = await AppPaths.subDirectory('markup_attachments');
+    final target = File(p.join(directory.path, '${const Uuid().v4()}.png'));
+    await target.writeAsBytes(bytes, flush: true);
+    return target.path;
+  }
 
   Future<List<PickedAttachment>> pickImages() async {
     if (Platform.isAndroid || Platform.isIOS) {

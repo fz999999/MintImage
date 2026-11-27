@@ -54,7 +54,9 @@ enum ImageQuality {
 enum ImageOutputFormat {
   png('png', 'PNG'),
   jpeg('jpeg', 'JPEG'),
-  webp('webp', 'WEBP');
+  webp('webp', 'WEBP'),
+  gif('gif', 'GIF'),
+  svg('svg', 'SVG');
 
   const ImageOutputFormat(this.apiValue, this.label);
 
@@ -63,10 +65,72 @@ enum ImageOutputFormat {
 
   String get fileExtension => apiValue;
 
+  bool get requiresImagesGeneration =>
+      this == ImageOutputFormat.gif || this == ImageOutputFormat.svg;
+
   static ImageOutputFormat fromApiValue(String value) {
     return ImageOutputFormat.values.firstWhere(
       (format) => format.apiValue == value,
       orElse: () => ImageOutputFormat.png,
+    );
+  }
+}
+
+enum ImageComplexity {
+  low('low', '低'),
+  medium('medium', '中'),
+  high('high', '高');
+
+  const ImageComplexity(this.apiValue, this.label);
+
+  final String apiValue;
+  final String label;
+
+  static ImageComplexity? fromApiValue(String? value) {
+    for (final complexity in values) {
+      if (complexity.apiValue == value) return complexity;
+    }
+    return null;
+  }
+}
+
+enum SvgReasoningEffort {
+  none,
+  minimal,
+  low,
+  medium,
+  high,
+  xhigh,
+  max;
+
+  static SvgReasoningEffort? fromApiValue(String? value) {
+    for (final effort in values) {
+      if (effort.name == value) return effort;
+    }
+    return null;
+  }
+}
+
+/// 留空时由服务端使用默认 SVG 绘制模型。
+class SvgOptions {
+  const SvgOptions({required this.model, this.reasoningEffort});
+
+  final String model;
+  final SvgReasoningEffort? reasoningEffort;
+
+  Map<String, dynamic> toJson() => {
+    'model': model.trim(),
+    if (reasoningEffort != null) 'reasoning': {'effort': reasoningEffort!.name},
+  };
+
+  static SvgOptions? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final reasoning = value['reasoning'];
+    return SvgOptions(
+      model: value['model'] as String? ?? '',
+      reasoningEffort: SvgReasoningEffort.fromApiValue(
+        reasoning is Map ? reasoning['effort'] as String? : null,
+      ),
     );
   }
 }
@@ -104,6 +168,11 @@ class GenerationRequest {
     required this.customHeight,
     required this.quality,
     this.outputFormat = ImageOutputFormat.png,
+    this.frameCount = 9,
+    this.frameDurationMs = 200,
+    this.complexity,
+    this.svgOptions,
+    this.markupPath,
     this.background = ImageBackground.auto,
     required this.count,
     required this.apiProfileId,
@@ -116,6 +185,11 @@ class GenerationRequest {
   final int customHeight;
   final ImageQuality quality;
   final ImageOutputFormat outputFormat;
+  final int frameCount;
+  final int frameDurationMs;
+  final ImageComplexity? complexity;
+  final SvgOptions? svgOptions;
+  final String? markupPath;
   final ImageBackground background;
   final int count;
   final String apiProfileId;
@@ -135,16 +209,63 @@ class GenerationRequest {
   /// 实际发给接口的 background 值。
   ///
   /// - `auto` 不发该字段，让模型自己决定；
-  /// - 透明背景在 JPEG 下不发送（没有 alpha 通道，接口会拒）。
+  /// - 透明背景在 JPEG/GIF/SVG 下不发送。
   String? get apiBackground {
     if (background == ImageBackground.auto) {
       return null;
     }
     if (background == ImageBackground.transparent &&
-        outputFormat == ImageOutputFormat.jpeg) {
+        (outputFormat == ImageOutputFormat.jpeg ||
+            outputFormat == ImageOutputFormat.gif ||
+            outputFormat == ImageOutputFormat.svg)) {
       return null;
     }
     return background.apiValue;
+  }
+
+  /// 提交付费请求前做本地参数校验。
+  String? validate({required bool usesResponsesApi}) {
+    if (markupPath != null) {
+      if (!hasAttachments) return '标注引导需要先添加参考图。';
+      if (usesResponsesApi) return '标注引导需要使用 Images API。';
+      if (!markupPath!.toLowerCase().endsWith('.png')) {
+        return '标注图必须是带透明区域的 PNG 文件。';
+      }
+    }
+    if (outputFormat == ImageOutputFormat.svg &&
+        svgOptions != null &&
+        svgOptions!.model.trim().isEmpty) {
+      return '请填写 SVG 绘制模型，或关闭自定义模型以使用服务端默认值。';
+    }
+    if (usesResponsesApi && complexity != null) {
+      return '规划复杂度需要使用 Images API，请切换 API 协议。';
+    }
+    if (imagePaths.any((path) => path.toLowerCase().endsWith('.svg'))) {
+      return 'SVG 不支持作为图生图参考图，请先导出为 PNG。';
+    }
+    if (!outputFormat.requiresImagesGeneration) return null;
+    if (hasAttachments) {
+      return '${outputFormat.label} 仅支持文生图，请移除参考图或选择 PNG/JPEG/WEBP。';
+    }
+    if (usesResponsesApi) {
+      return '${outputFormat.label} 需要使用 Images API，请切换 API 协议。';
+    }
+    if (outputFormat == ImageOutputFormat.gif) {
+      if (frameCount < 2 || frameCount > 64) {
+        return 'GIF 帧数必须在 2–64 之间。';
+      }
+      if (frameDurationMs < 20 || frameDurationMs > 2000) {
+        return 'GIF 每帧时长必须在 20–2000 毫秒之间。';
+      }
+      if (!isAutoSize &&
+          (resolvedWidth <= 0 ||
+              resolvedHeight <= 0 ||
+              resolvedWidth % 16 != 0 ||
+              resolvedHeight % 16 != 0)) {
+        return 'GIF 每帧宽高必须为 16 的正整数倍，或选择自动尺寸。';
+      }
+    }
+    return null;
   }
 
   GenerationRequest copyWith({
@@ -155,6 +276,13 @@ class GenerationRequest {
     int? customHeight,
     ImageQuality? quality,
     ImageOutputFormat? outputFormat,
+    int? frameCount,
+    int? frameDurationMs,
+    ImageComplexity? complexity,
+    SvgOptions? svgOptions,
+    bool clearSvgOptions = false,
+    String? markupPath,
+    bool clearMarkupPath = false,
     ImageBackground? background,
     int? count,
     String? apiProfileId,
@@ -167,6 +295,11 @@ class GenerationRequest {
       customHeight: customHeight ?? this.customHeight,
       quality: quality ?? this.quality,
       outputFormat: outputFormat ?? this.outputFormat,
+      frameCount: frameCount ?? this.frameCount,
+      frameDurationMs: frameDurationMs ?? this.frameDurationMs,
+      complexity: complexity ?? this.complexity,
+      svgOptions: clearSvgOptions ? null : svgOptions ?? this.svgOptions,
+      markupPath: clearMarkupPath ? null : markupPath ?? this.markupPath,
       background: background ?? this.background,
       count: count ?? this.count,
       apiProfileId: apiProfileId ?? this.apiProfileId,
@@ -182,6 +315,11 @@ class GenerationRequest {
       'customHeight': customHeight,
       'quality': quality.apiValue,
       'outputFormat': outputFormat.apiValue,
+      'frameCount': frameCount,
+      'frameDurationMs': frameDurationMs,
+      if (complexity != null) 'complexity': complexity!.apiValue,
+      if (svgOptions != null) 'svgOptions': svgOptions!.toJson(),
+      if (markupPath != null) 'markupPath': markupPath,
       'background': background.apiValue,
       'count': count,
       'apiProfileId': apiProfileId,
@@ -205,6 +343,11 @@ class GenerationRequest {
       outputFormat: ImageOutputFormat.fromApiValue(
         json['outputFormat'] as String? ?? ImageOutputFormat.png.apiValue,
       ),
+      frameCount: json['frameCount'] as int? ?? 9,
+      frameDurationMs: json['frameDurationMs'] as int? ?? 200,
+      complexity: ImageComplexity.fromApiValue(json['complexity'] as String?),
+      svgOptions: SvgOptions.fromJson(json['svgOptions']),
+      markupPath: json['markupPath'] as String?,
       background: ImageBackground.fromApiValue(
         json['background'] as String? ?? ImageBackground.auto.apiValue,
       ),

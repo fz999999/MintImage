@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../models/generation_request.dart';
 import '../models/image_record.dart';
 import 'app_database.dart';
 
@@ -75,6 +76,11 @@ class ImageRecordDao {
       height: row.height,
       quality: row.quality,
       outputFormat: row.outputFormat,
+      frameCount: row.frameCount,
+      frameDurationMs: row.frameDurationMs,
+      complexity: row.complexity,
+      svgOptions: _decodeSvgOptions(row.svgOptions),
+      markupPath: row.markupPath,
       model: row.model,
       status: ImageRecordStatus.fromStorageValue(row.status),
       errorMessage: row.errorMessage,
@@ -100,6 +106,11 @@ class ImageRecordDao {
       height: Value(record.height),
       quality: Value(record.quality),
       outputFormat: Value(record.outputFormat),
+      frameCount: Value(record.frameCount),
+      frameDurationMs: Value(record.frameDurationMs),
+      complexity: Value(record.complexity),
+      svgOptions: Value(_encodeSvgOptions(record.svgOptions)),
+      markupPath: Value(record.markupPath),
       model: Value(record.model),
       status: Value(record.status.storageValue),
       errorMessage: Value(record.errorMessage),
@@ -135,5 +146,23 @@ class ImageRecordDao {
     }
 
     return jsonEncode(paths);
+  }
+
+  SvgOptions? _decodeSvgOptions(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    try {
+      return SvgOptions.fromJson(jsonDecode(value));
+    } on FormatException {
+      return null;
+    }
+  }
+
+  String? _encodeSvgOptions(SvgOptions? options) {
+    if (options == null) {
+      return null;
+    }
+    return jsonEncode(options.toJson());
   }
 }

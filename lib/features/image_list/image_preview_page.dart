@@ -13,6 +13,7 @@ import '../../core/models/image_record.dart';
 import '../../core/providers/app_providers.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets/checkerboard_background.dart';
+import '../../shared/widgets/record_svg_image.dart';
 
 class ImagePreviewPage extends ConsumerStatefulWidget {
   const ImagePreviewPage({
@@ -495,6 +496,18 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
   ) {
     final record = _records[index];
     final controller = _photoControllers[index];
+    if (record.outputFormat.toLowerCase() == 'svg' || (record.resultImagePath?.toLowerCase().endsWith('.svg') ?? false)) {
+      return PhotoViewGalleryPageOptions.customChild(
+        child: RecordSvgImage(record: record, fit: BoxFit.contain),
+        heroAttributes: PhotoViewHeroAttributes(tag: 'image-'),
+        controller: controller.photoViewController,
+        scaleStateController: controller.scaleStateController,
+        minScale: PhotoViewComputedScale.contained * _minScaleFactor,
+        maxScale: PhotoViewComputedScale.contained * _maxScaleFactor,
+        initialScale: PhotoViewComputedScale.contained,
+      );
+    }
+
     final provider = _previewImageProvider(record);
 
     if (provider == null) {
@@ -524,6 +537,16 @@ class _ImagePreviewPageState extends ConsumerState<ImagePreviewPage> {
   }
 
   Future<String?> _resolveActualSizeLabel() async {
+    final record = _currentRecord;
+    if (record.outputFormat.toLowerCase() == 'svg' || (record.resultImagePath?.toLowerCase().endsWith('.svg') ?? false)) {
+      try {
+        final size = await svgSizeForRecord(record);
+        if (size != null && size.width > 0 && size.height > 0) {
+          return '实际尺寸x';
+        }
+      } catch (_) {}
+      return null;
+    }
     final provider = _previewImageProvider();
     if (provider == null) {
       return null;

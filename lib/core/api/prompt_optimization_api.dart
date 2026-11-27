@@ -50,11 +50,12 @@ class PromptOptimizationApi {
       timeoutSeconds: timeoutSeconds,
       cancelToken: cancelToken,
     );
-    final optimized = _parseTextResponse(response, profile.protocol).trim();
-    if (optimized.isEmpty) {
+    final rawText = _parseTextResponse(response, profile.protocol);
+    final cleaned = _stripCodeFence(_stripReasoningBlocks(rawText)).trim();
+    if (cleaned.isEmpty) {
       throw const ApiException('提示词优化接口没有返回有效文本。');
     }
-    return _stripCodeFence(optimized);
+    return cleaned;
   }
 
   _PromptOptimizationRequest _buildRequest({
@@ -364,11 +365,18 @@ class PromptOptimizationApi {
         continue;
       }
       final event = Map<String, dynamic>.from(decoded);
+      final eventType = event['type'] as String?;
       final delta = event['delta'];
       if (delta is String) {
-        textBuffer.write(delta);
-      } else if (delta is Map && delta['text'] is String) {
-        textBuffer.write(delta['text'] as String);
+        if (eventType == null || eventType == 'response.output_text.delta') {
+          textBuffer.write(delta);
+        }
+      } else if (delta is Map) {
+        final deltaType = delta['type'] as String?;
+        if ((deltaType == null || deltaType == 'text_delta') &&
+            delta['text'] is String) {
+          textBuffer.write(delta['text'] as String);
+        }
       }
 
       final response = event['response'];
@@ -437,6 +445,10 @@ class PromptOptimizationApi {
         if (item is! Map) {
           continue;
         }
+        final itemType = item['type'] as String?;
+        if (itemType == 'reasoning' || itemType == 'summary') {
+          continue;
+        }
         final content = item['content'];
         final text = _extractContentText(content);
         if (text.isNotEmpty) {
@@ -496,6 +508,18 @@ class PromptOptimizationApi {
           continue;
         }
         if (item is! Map) {
+          continue;
+        }
+        if (item['thought'] == true) {
+          continue;
+        }
+        final itemType = item['type'] as String?;
+        if (itemType == 'thinking' ||
+            itemType == 'redacted_thinking' ||
+            itemType == 'reasoning' ||
+            itemType == 'reasoning_text' ||
+            itemType == 'summary_text' ||
+            itemType == 'thought') {
           continue;
         }
         final text = switch (item['text']) {
@@ -566,6 +590,19 @@ class PromptOptimizationApi {
       ...segments,
     ];
     return '$normalizedBaseUrl/${normalizedSegments.join('/')}$suffix';
+  }
+
+  String _stripReasoningBlocks(String text) {
+    return text
+        .replaceAll(
+          RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false),
+          '',
+        )
+        .replaceAll(
+          RegExp(r'<thinking>[\s\S]*?</thinking>', caseSensitive: false),
+          '',
+        )
+        .trim();
   }
 
   String _stripCodeFence(String text) {

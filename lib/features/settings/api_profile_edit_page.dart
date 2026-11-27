@@ -28,13 +28,17 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
   final TextEditingController _baseUrlController = TextEditingController();
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _modelInputController = TextEditingController();
+  final TextEditingController _safetyIdController = TextEditingController();
   bool _obscureApiKey = true;
   bool _fetchingModels = false;
   bool _useStreaming = false;
+  bool _includeSizeInPrompt = false;
   CancelToken? _modelListCancelToken;
   List<String> _modelOptions = const [];
   List<String> _models = const [];
   late ImageGenerationApiMode _apiMode;
+  ResponsesReasoningEffort _reasoningEffort =
+      ResponsesReasoningEffort.defaultValue;
   late BalanceQueryConfig _balanceQuery;
 
   ApiProfile? get _editingProfile => widget.profile;
@@ -49,6 +53,10 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
         profile?.name ?? '配置 ${settings.profiles.length + 1}';
     _apiMode = profile?.apiMode ?? ImageGenerationApiMode.images;
     _useStreaming = profile?.useStreaming ?? false;
+    _includeSizeInPrompt = profile?.includeSizeInPrompt ?? false;
+    _reasoningEffort =
+        profile?.reasoningEffort ?? ResponsesReasoningEffort.defaultValue;
+    _safetyIdController.text = profile?.safetyIdentifier ?? '';
     _balanceQuery = profile?.balanceQuery ?? const BalanceQueryConfig();
     _baseUrlController.text = profile?.baseUrl ?? 'https://api.openai.com';
     _apiKeyController.text = profile?.apiKey ?? '';
@@ -71,6 +79,7 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
     _baseUrlController.dispose();
     _apiKeyController.dispose();
     _modelInputController.dispose();
+    _safetyIdController.dispose();
     super.dispose();
   }
 
@@ -247,6 +256,49 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
                         onChanged: (v) => setState(() => _useStreaming = v),
                       ),
                     ),
+                    if (_apiMode == ImageGenerationApiMode.responses) ...[
+                      const SizedBox(height: AppSpace.sm),
+                      DropdownButtonFormField<ResponsesReasoningEffort>(
+                        initialValue: _reasoningEffort,
+                        isExpanded: true,
+                        isDense: true,
+                        decoration: _fieldDecoration('推理强度 (Responses)'),
+                        items: [
+                          for (final effort in ResponsesReasoningEffort.values)
+                            DropdownMenuItem(
+                              value: effort,
+                              child: Text(effort == ResponsesReasoningEffort.defaultValue ? '默认 (不传)' : effort.value),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _reasoningEffort = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: AppSpace.xs),
+                      Material(
+                        color: Colors.transparent,
+                        child: SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('在提示词中附带目标尺寸'),
+                          subtitle: const Text(
+                            '部分 Responses 渠道会忽略工具 size 参数，开启后可提高尺寸遵循率。',
+                          ),
+                          value: _includeSizeInPrompt,
+                          onChanged: (v) => setState(() => _includeSizeInPrompt = v),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: AppSpace.sm),
+                    TextFormField(
+                      controller: _safetyIdController,
+                      decoration: _fieldDecoration(
+                        '安全标识 (safety_identifier，选填)',
+                        hint: '用于服务商风控追踪，最多 128 个字符',
+                      ),
+                      maxLength: 128,
+                    ),
                   ],
                 ),
               ),
@@ -359,6 +411,9 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
         models: _models,
         apiMode: _apiMode,
         useStreaming: _useStreaming,
+        includeSizeInPrompt: _includeSizeInPrompt,
+        reasoningEffort: _reasoningEffort,
+        safetyIdentifier: _safetyIdController.text.trim(),
         balanceQuery: _balanceQuery,
       );
       await notifier.setActiveProfile(created.id);
@@ -371,6 +426,9 @@ class _ApiProfileEditPageState extends ConsumerState<ApiProfileEditPage> {
           models: _models,
           apiMode: _apiMode,
           useStreaming: _useStreaming,
+          includeSizeInPrompt: _includeSizeInPrompt,
+          reasoningEffort: _reasoningEffort,
+          safetyIdentifier: _safetyIdController.text.trim(),
           balanceQuery: _balanceQuery,
         ),
       );

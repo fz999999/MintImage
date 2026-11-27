@@ -90,7 +90,7 @@ void main() {
         'customWidth': 1024,
         'customHeight': 1024,
         'quality': ImageQuality.auto.apiValue,
-        'outputFormat': 'gif',
+        'outputFormat': 'bmp',
         'count': 1,
         'apiProfileId': 'default',
       });

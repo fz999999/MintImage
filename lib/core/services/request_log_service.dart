@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import '../api/api_request_logger.dart';
 import 'app_paths.dart';
 
 enum RequestLogLevel { info, request, response, error }
@@ -44,7 +45,7 @@ class RequestLogEntry {
   }
 }
 
-class RequestLogService extends ChangeNotifier {
+class RequestLogService extends ChangeNotifier implements ApiRequestLogger {
   RequestLogService._(this._file);
 
   static const int _maxEntries = 1000;

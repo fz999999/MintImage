@@ -14,6 +14,7 @@ import '../../core/providers/favorite_folders_provider.dart';
 import '../../core/providers/image_list_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/backup_service.dart';
+import '../../core/services/storage_cleanup_service.dart';
 import '../../core/services/webdav_backup_service.dart';
 import '../../core/version/app_version.dart';
 import '../../shared/theme.dart';
@@ -168,6 +169,17 @@ class SettingsPage extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpace.sm),
             _SettingsActionRow(
+              title: '清理存储空间',
+              description: '扫描并删除未被引用的标注图、孤立图片与临时文件。',
+              action: OutlinedButton.icon(
+                onPressed: () => _cleanUnusedStorage(context, ref),
+                icon: const Icon(Icons.cleaning_services_rounded),
+                label: const Text('扫描清理'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+              ),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            _SettingsActionRow(
               title: '清除历史记录',
               description: '删除所有生成记录，保留 API 配置。',
               action: OutlinedButton.icon(
@@ -281,6 +293,66 @@ class SettingsPage extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _cleanUnusedStorage(BuildContext context, WidgetRef ref) async {
+    final service = ref.read(storageCleanupServiceProvider);
+    final plan = await service.scan();
+    if (!context.mounted) {
+      return;
+    }
+    if (plan.isEmpty) {
+      _showSnack(context, '没有可清理的冗余文件。');
+      return;
+    }
+
+    final selected = {
+      for (final category in StorageCleanupCategory.values)
+        if (category.byDefault && plan.count(category) > 0) category,
+    };
+    final summary = [
+      for (final category in StorageCleanupCategory.values)
+        if (plan.count(category) > 0)
+          '• ${category.label}：${plan.count(category)} 个（${(plan.bytes(category) / 1024 / 1024).toStringAsFixed(2)} MB）',
+    ].join('\n');
+
+    final confirmed = _isWindows
+        ? await showDesktopConfirm(
+            context: context,
+            title: '清理存储空间',
+            message: '检测到以下可清理文件：\n$summary\n\n将按默认规则清理未引用文件与临时缓存。',
+            confirmLabel: '开始清理',
+          )
+        : await showDialog<bool>(
+            context: context,
+            builder: (ctx) => _settingsDialog(
+              title: '清理存储空间',
+              content: Text('检测到以下可清理文件：\n$summary'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: const Text('开始清理'),
+                ),
+              ],
+            ),
+          );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    final result = await service.clean(
+      plan,
+      selected.isEmpty ? plan.files.keys.toSet() : selected,
+    );
+    if (!context.mounted) {
+      return;
+    }
+    final freedMb = (result.freedBytes / 1024 / 1024).toStringAsFixed(2);
+    _showSnack(context, '已清理 ${result.deletedFiles} 个文件，释放 $freedMb MB。');
   }
 
   Future<void> _exportBackupToFile(

@@ -3,14 +3,16 @@ import 'package:dio/dio.dart';
 import '../models/generation_request.dart';
 import '../models/generation_result.dart';
 import '../models/settings_model.dart';
-import '../services/request_log_service.dart';
+import 'api_request_logger.dart';
+import 'image_task_api.dart';
 import 'openai_client.dart';
+import 'openrouter_image_api.dart';
 import 'responses_image_api.dart';
 
 class ImageGenerationApi {
   const ImageGenerationApi({this.requestLogService});
 
-  final RequestLogService? requestLogService;
+  final ApiRequestLogger? requestLogService;
 
   Future<List<GenerationResult>> generate(
     GenerationRequest request,
@@ -20,12 +22,48 @@ class ImageGenerationApi {
     CancelToken? cancelToken,
     void Function(String b64Json)? onPartialImage,
   }) async {
+    final validation = request.validate(
+      usesResponsesApi: profile.apiMode == ImageGenerationApiMode.responses,
+    );
+    if (validation != null) throw ApiException(validation);
+    if (profile.resolvedSafetyIdentifier != null &&
+        profile.resolvedSafetyIdentifier!.length > 128) {
+      throw const ApiException('安全标识最多 128 个字符。');
+    }
+    if (request.markupPath != null) {
+      throw const ApiException('标注引导需要通过图生图接口提交。');
+    }
+
     final client = OpenAiClient(
       profile,
       timeoutSeconds: timeoutSeconds,
       requestLogService: requestLogService,
     );
 
+    try {
+      return await _generate(
+        client,
+        request,
+        profile,
+        responseFormat: responseFormat,
+        timeoutSeconds: timeoutSeconds,
+        cancelToken: cancelToken,
+        onPartialImage: onPartialImage,
+      );
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<List<GenerationResult>> _generate(
+    OpenAiClient client,
+    GenerationRequest request,
+    ApiProfile profile, {
+    String? responseFormat,
+    required int timeoutSeconds,
+    CancelToken? cancelToken,
+    void Function(String b64Json)? onPartialImage,
+  }) async {
     // 想要过程图就必须走流式：非流式要等最终图才返回。
     final wantsStreaming = profile.useStreaming || onPartialImage != null;
 
@@ -33,7 +71,6 @@ class ImageGenerationApi {
       final body = buildResponsesImageBody(
         request: request,
         profile: profile,
-        input: request.prompt,
         action: 'generate',
       );
       final response = wantsStreaming
@@ -50,6 +87,14 @@ class ImageGenerationApi {
             );
       return parseResponsesImageResults(response);
     }
+    if (profile.isOpenRouterImages) {
+      return requestOpenRouterImages(
+        client,
+        request,
+        profile,
+        cancelToken: cancelToken,
+      );
+    }
 
     final body = <String, dynamic>{
       'model': profile.model,
@@ -57,51 +102,59 @@ class ImageGenerationApi {
       'n': 1,
       'quality': request.quality.apiValue,
       'output_format': request.outputFormat.apiValue,
+      if (profile.resolvedSafetyIdentifier != null)
+        'safety_identifier': profile.resolvedSafetyIdentifier,
+      if (request.outputFormat == ImageOutputFormat.svg &&
+          request.svgOptions != null)
+        'svg': request.svgOptions!.toJson(),
+      if (request.complexity != null)
+        'complexity': request.complexity!.apiValue,
+      if (request.outputFormat == ImageOutputFormat.gif) ...{
+        'frame_count': request.frameCount,
+        'frame_duration_ms': request.frameDurationMs,
+      },
     };
+    final useAsync = profile.apiMode == ImageGenerationApiMode.imagesAsync;
+    if (useAsync) {
+      body['async'] = true;
+    }
     if (request.apiSize != null) {
       body['size'] = request.apiSize;
     }
-    // 透明背景：只有 PNG / WEBP 才有效，apiBackground 已把 JPEG 过滤掉。
+    // 透明背景：只有 PNG / WEBP 才有效，apiBackground 已把 JPEG/GIF/SVG 过滤掉。
     if (request.apiBackground != null) {
       body['background'] = request.apiBackground;
     }
     if (responseFormat != null && responseFormat.trim().isNotEmpty) {
-      // GPT Image 2/2.5 and RightAPI reject the legacy response_format field.
-      if (!_isGptImage2Family(profile.model) && !_isRightApiDraw(profile)) {
+      // GPT Image 2+ 省略旧版 response_format；异步任务接口返回 URL。
+      if (!_isGptImage2Family(profile.model) && !useAsync) {
         body['response_format'] = responseFormat;
       }
     }
 
-    if (_isRightApiDraw(profile)) {
-      if (_isGptImage25Family(profile.model)) {
-        // RightAPI currently interprets `size` as an aspect-ratio token for
-        // the 2.5 channels. Those channels require the separate imageSize
-        // selector instead (1K/2K/4K).
-        body.remove('size');
-        body['imageSize'] = _rightApiImageSize(request);
-      }
-      body['async'] = true;
-      return _submitAndPollRightApi(
-        client,
-        body,
-        timeoutSeconds: timeoutSeconds,
-        cancelToken: cancelToken,
-      );
-    }
-
-    final response = await _requestImages(
-      client,
-      body,
-      useStreaming: wantsStreaming,
-      onPartialImage: onPartialImage,
+    final response = await requestImageResult(
+      client: client,
+      timeoutSeconds: timeoutSeconds,
       cancelToken: cancelToken,
+      submit: () => _submitImages(
+        client,
+        profile,
+        body,
+        useStreaming:
+            wantsStreaming &&
+            !useAsync &&
+            !request.outputFormat.requiresImagesGeneration,
+        onPartialImage: onPartialImage,
+        cancelToken: cancelToken,
+      ),
     );
 
-    return _parseResults(response);
+    return parseImagesApiResults(response);
   }
 
-  Future<Map<String, dynamic>> _requestImages(
+  Future<Map<String, dynamic>> _submitImages(
     OpenAiClient client,
+    ApiProfile profile,
     Map<String, dynamic> body, {
     required bool useStreaming,
     required void Function(String b64Json)? onPartialImage,
@@ -109,7 +162,7 @@ class ImageGenerationApi {
   }) async {
     if (!useStreaming) {
       return client.postJson(
-        '/v1/images/generations',
+        profile.generationPath,
         body,
         cancelToken: cancelToken,
       );
@@ -117,23 +170,21 @@ class ImageGenerationApi {
 
     try {
       return await client.postJsonStreaming(
-        '/v1/images/generations',
+        profile.generationPath,
         body,
         cancelToken: cancelToken,
         isImagesApi: true,
-        // 过程图：让界面在等最终图时先看到画面。1 张足够，要太多反而拖慢。
         partialImages: onPartialImage == null ? 0 : 1,
         onPartialImage: onPartialImage,
       );
     } on ApiException catch (error) {
-      // 少数中转站不认 stream / partial_images，会在出图之前直接 400。
-      // 这种错误发生在生成之前，回退成普通请求不会重复计费。
-      if (!_looksLikeStreamUnsupported(error.message)) {
+      if (error is MissingImageDataException ||
+          !_looksLikeStreamUnsupported(error.message)) {
         rethrow;
       }
 
       return client.postJson(
-        '/v1/images/generations',
+        profile.generationPath,
         body,
         cancelToken: cancelToken,
       );
@@ -142,8 +193,6 @@ class ImageGenerationApi {
 
   bool _looksLikeStreamUnsupported(String message) {
     final value = message.toLowerCase();
-    // 注意别用 contains('stream')：'upstream request failed' 里也含 stream，
-    // 会把上游的真实失败误判成“不支持流式”，白白再发一次请求（可能重复计费）。
     if (RegExp(r'\bstream(ing)?\b').hasMatch(value) ||
         value.contains('partial_image') ||
         value.contains('unsupported parameter') ||
@@ -152,8 +201,6 @@ class ImageGenerationApi {
       return true;
     }
 
-    // 中转站拒绝 stream 时不一定提“stream”这个词，常见就是 400 / 415 / 422。
-    // 这些状态说明请求在生成之前就被拒了，回退成普通请求不会重复计费。
     final status = _statusCodeOf(message);
     return status == 400 || status == 415 || status == 422;
   }
@@ -163,112 +210,8 @@ class ImageGenerationApi {
     return match == null ? null : int.tryParse(match.group(1)!);
   }
 
-  bool _isRightApiDraw(ApiProfile profile) {
-    final uri = Uri.tryParse(profile.normalizedBaseUrl);
-    return uri != null &&
-        uri.host.toLowerCase() == 'www.rightapi.ai' &&
-        uri.path.toLowerCase().endsWith('/draw');
-  }
-
   bool _isGptImage2Family(String model) {
-    final value = model.trim().toLowerCase();
-    return value == 'gpt-image-2' || value.startsWith('gpt-image-2.5-');
-  }
-
-  bool _isGptImage25Family(String model) {
-    return model.trim().toLowerCase().startsWith('gpt-image-2.5-');
-  }
-
-  String _rightApiImageSize(GenerationRequest request) {
-    final longestEdge = request.resolvedWidth > request.resolvedHeight
-        ? request.resolvedWidth
-        : request.resolvedHeight;
-    if (longestEdge <= 1024) {
-      return '1K';
-    }
-    if (longestEdge <= 2048) {
-      return '2K';
-    }
-    return '4K';
-  }
-
-  Future<List<GenerationResult>> _submitAndPollRightApi(
-    OpenAiClient client,
-    Map<String, dynamic> body, {
-    required int timeoutSeconds,
-    CancelToken? cancelToken,
-  }) async {
-    final submitted = await client.postJson(
-      '/v1/images/generations',
-      body,
-      cancelToken: cancelToken,
-    );
-    final taskId = submitted['task_id'];
-    if (taskId is! String || taskId.trim().isEmpty) {
-      // Some deployments return a synchronous Images response despite async=true.
-      if (submitted['data'] is List) {
-        return _parseResults(submitted);
-      }
-      throw const ApiException('RightAPI 异步提交未返回 task_id。');
-    }
-
-    final deadline = DateTime.now().add(Duration(seconds: timeoutSeconds));
-    while (DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(const Duration(seconds: 2));
-      final task = await client.getJson(
-        _rightApiTaskPath(taskId),
-        cancelToken: cancelToken,
-      );
-      // RightAPI returns the final Images payload without a status field.
-      if (task['data'] is List) {
-        return _parseResults(task);
-      }
-      final status = task['status']?.toString().toLowerCase();
-      if (status == 'completed') {
-        return _parseResults(task);
-      }
-      if (status == 'failed' || status == 'cancelled') {
-        throw ApiException(_rightApiTaskError(task));
-      }
-    }
-    throw const ApiException('RightAPI 异步任务轮询超时。');
-  }
-
-  String _rightApiTaskPath(String taskId) {
-    // OpenAiClient's base URL is /draw; task lookup is site-level, so use an
-    // absolute URL understood by Dio.
-    return 'https://www.rightapi.ai/v1/tasks/${Uri.encodeComponent(taskId)}';
-  }
-
-  String _rightApiTaskError(Map<String, dynamic> task) {
-    final error = task['error'];
-    if (error is Map && error['message'] is String) {
-      return 'RightAPI 任务失败：${error['message']}';
-    }
-    return 'RightAPI 任务失败。';
-  }
-
-  List<GenerationResult> _parseResults(Map<String, dynamic> response) {
-    final payload = response['data'];
-    if (payload is! List) {
-      throw const ApiException('接口响应缺少图片数据。');
-    }
-    if (payload.isEmpty) {
-      throw const ApiException(
-        '接口返回成功，但响应里没有图片数据。'
-        '常见原因是提示词被审核拒绝，或该模型不支持当前参数。',
-      );
-    }
-
-    return payload.map((item) {
-      final map = Map<String, dynamic>.from(item as Map);
-      final rawResponseValue =
-          map['b64_json'] as String? ?? map['url'] as String?;
-      return GenerationResult(
-        b64Json: map['b64_json'] as String?,
-        imageUrl: map['url'] as String?,
-        rawResponseValue: rawResponseValue,
-      );
-    }).toList();
+    final value = model.trim().toLowerCase().split('/').last;
+    return RegExp(r'^gpt-image-2(?:\.\d+)?(?:-|$)').hasMatch(value);
   }
 }

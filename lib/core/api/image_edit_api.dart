@@ -4,14 +4,17 @@ import 'package:path/path.dart' as p;
 import '../models/generation_request.dart';
 import '../models/generation_result.dart';
 import '../models/settings_model.dart';
-import '../services/request_log_service.dart';
+import '../services/markup_validation.dart';
+import 'api_request_logger.dart';
+import 'image_task_api.dart';
 import 'openai_client.dart';
+import 'openrouter_image_api.dart';
 import 'responses_image_api.dart';
 
 class ImageEditApi {
   const ImageEditApi({this.requestLogService});
 
-  final RequestLogService? requestLogService;
+  final ApiRequestLogger? requestLogService;
 
   Future<List<GenerationResult>> edit(
     GenerationRequest request,
@@ -21,8 +24,26 @@ class ImageEditApi {
     CancelToken? cancelToken,
     void Function(String b64Json)? onPartialImage,
   }) async {
+    final validation = request.validate(
+      usesResponsesApi: profile.apiMode == ImageGenerationApiMode.responses,
+    );
+    if (validation != null) throw ApiException(validation);
     if (request.imagePaths.isEmpty) {
       throw const ApiException('图生图请求缺少附件。');
+    }
+    if ((profile.resolvedSafetyIdentifier?.length ?? 0) > 128) {
+      throw const ApiException('安全标识最多 128 个字符。');
+    }
+    if (profile.isOpenRouterImages) {
+      final error = validateOpenRouterImageRequest(request);
+      if (error != null) throw ApiException(error);
+    }
+    if (request.markupPath != null) {
+      final error = await validateMarkupAttachment(
+        request.imagePaths.first,
+        request.markupPath!,
+      );
+      if (error != null) throw ApiException(error);
     }
 
     final client = OpenAiClient(
@@ -31,6 +52,30 @@ class ImageEditApi {
       requestLogService: requestLogService,
     );
 
+    try {
+      return await _edit(
+        client,
+        request,
+        profile,
+        responseFormat: responseFormat,
+        timeoutSeconds: timeoutSeconds,
+        cancelToken: cancelToken,
+        onPartialImage: onPartialImage,
+      );
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<List<GenerationResult>> _edit(
+    OpenAiClient client,
+    GenerationRequest request,
+    ApiProfile profile, {
+    String? responseFormat,
+    required int timeoutSeconds,
+    CancelToken? cancelToken,
+    void Function(String b64Json)? onPartialImage,
+  }) async {
     // 想要过程图就必须走流式：非流式要等最终图才返回。
     final wantsStreaming = profile.useStreaming || onPartialImage != null;
 
@@ -38,18 +83,12 @@ class ImageEditApi {
       final body = buildResponsesImageBody(
         request: request,
         profile: profile,
-        input: [
-          {
-            'role': 'user',
-            'content': [
-              {'type': 'input_text', 'text': request.prompt},
-              for (final path in request.imagePaths)
-                {
-                  'type': 'input_image',
-                  'image_url': await imagePathToDataUrl(path),
-                },
-            ],
-          },
+        inputImages: [
+          for (final path in request.imagePaths)
+            {
+              'type': 'input_image',
+              'image_url': await imagePathToDataUrl(path),
+            },
         ],
         action: 'edit',
       );
@@ -67,28 +106,50 @@ class ImageEditApi {
             );
       return parseResponsesImageResults(response);
     }
+    if (profile.isOpenRouterImages) {
+      return requestOpenRouterImages(
+        client,
+        request,
+        profile,
+        cancelToken: cancelToken,
+      );
+    }
 
-    if (_isRightApiDraw(profile)) {
+    final useAsync = profile.apiMode == ImageGenerationApiMode.imagesAsync;
+    if (useAsync) {
       final body = <String, dynamic>{
         'model': profile.model,
         'prompt': request.prompt,
         'n': 1,
+        'quality': request.quality.apiValue,
+        'output_format': request.outputFormat.apiValue,
+        if (profile.resolvedSafetyIdentifier != null)
+          'safety_identifier': profile.resolvedSafetyIdentifier,
+        if (request.markupPath != null)
+          'markup': {
+            'image_url': await imagePathToDataUrl(request.markupPath!),
+          },
+        if (request.complexity != null)
+          'complexity': request.complexity!.apiValue,
         'async': true,
         'image': [
           for (final path in request.imagePaths) await imagePathToDataUrl(path),
         ],
       };
-      if (_isGptImage25Family(profile.model)) {
-        body['imageSize'] = _rightApiImageSize(request);
-      } else if (request.apiSize != null) {
+      if (request.apiSize != null) {
         body['size'] = request.apiSize;
       }
-      final submitted = await client.postJson(
-        '/v1/images/generations',
-        body,
+      if (request.apiBackground != null) {
+        body['background'] = request.apiBackground;
+      }
+      final response = await requestImageResult(
+        client: client,
+        submit: () =>
+            client.postJson('/v1/images/edits', body, cancelToken: cancelToken),
+        timeoutSeconds: timeoutSeconds,
         cancelToken: cancelToken,
       );
-      return _pollRightApi(client, submitted, timeoutSeconds, cancelToken);
+      return parseImagesApiResults(response);
     }
 
     final formData = FormData();
@@ -99,11 +160,15 @@ class ImageEditApi {
       MapEntry('n', '1'),
       MapEntry('quality', request.quality.apiValue),
       MapEntry('output_format', request.outputFormat.apiValue),
+      if (profile.resolvedSafetyIdentifier != null)
+        MapEntry('safety_identifier', profile.resolvedSafetyIdentifier!),
+      if (request.complexity != null)
+        MapEntry('complexity', request.complexity!.apiValue),
     ];
     if (request.apiSize != null) {
       fields.add(MapEntry('size', request.apiSize!));
     }
-    // 透明背景：只有 PNG / WEBP 才有效，apiBackground 已把 JPEG 过滤掉。
+    // 透明背景：只有 PNG / WEBP 才有效，apiBackground 已把 JPEG/GIF/SVG 过滤掉。
     if (request.apiBackground != null) {
       fields.add(MapEntry('background', request.apiBackground!));
     }
@@ -113,6 +178,18 @@ class ImageEditApi {
       fields.add(MapEntry('response_format', responseFormat));
     }
     formData.fields.addAll(fields);
+    if (request.markupPath != null) {
+      formData.files.add(
+        MapEntry(
+          'markup',
+          await MultipartFile.fromFile(
+            request.markupPath!,
+            filename: p.basename(request.markupPath!),
+            contentType: DioMediaType('image', 'png'),
+          ),
+        ),
+      );
+    }
 
     for (final path in request.imagePaths) {
       formData.files.add(
@@ -123,96 +200,30 @@ class ImageEditApi {
       );
     }
 
-    final response = wantsStreaming
-        ? await client.postMultipartStreaming(
-            '/v1/images/edits',
-            formData,
-            cancelToken: cancelToken,
-            // 过程图：让界面在等最终图时先看到画面。
-            partialImages: onPartialImage == null ? 0 : 1,
-            onPartialImage: onPartialImage,
-          )
-        : await client.postMultipart(
-            '/v1/images/edits',
-            formData,
-            cancelToken: cancelToken,
-          );
+    final response = await requestImageResult(
+      client: client,
+      timeoutSeconds: timeoutSeconds,
+      cancelToken: cancelToken,
+      submit: () => wantsStreaming
+          ? client.postMultipartStreaming(
+              '/v1/images/edits',
+              formData,
+              cancelToken: cancelToken,
+              partialImages: onPartialImage == null ? 0 : 1,
+              onPartialImage: onPartialImage,
+            )
+          : client.postMultipart(
+              '/v1/images/edits',
+              formData,
+              cancelToken: cancelToken,
+            ),
+    );
 
-    return _parseResults(response);
+    return parseImagesApiResults(response);
   }
 
   bool _isGptImage2Family(String model) {
-    final value = model.trim().toLowerCase();
-    return value == 'gpt-image-2' || value.startsWith('gpt-image-2.5-');
-  }
-
-  bool _isRightApiDraw(ApiProfile profile) {
-    final uri = Uri.tryParse(profile.normalizedBaseUrl);
-    return uri != null &&
-        uri.host.toLowerCase() == 'www.rightapi.ai' &&
-        uri.path.toLowerCase().endsWith('/draw');
-  }
-
-  bool _isGptImage25Family(String model) {
-    return model.trim().toLowerCase().startsWith('gpt-image-2.5-');
-  }
-
-  String _rightApiImageSize(GenerationRequest request) {
-    final longestEdge = request.resolvedWidth > request.resolvedHeight
-        ? request.resolvedWidth
-        : request.resolvedHeight;
-    if (longestEdge <= 1024) return '1K';
-    if (longestEdge <= 2048) return '2K';
-    return '4K';
-  }
-
-  Future<List<GenerationResult>> _pollRightApi(
-    OpenAiClient client,
-    Map<String, dynamic> submitted,
-    int timeoutSeconds,
-    CancelToken? cancelToken,
-  ) async {
-    final taskId = submitted['task_id'];
-    if (taskId is! String || taskId.trim().isEmpty) {
-      if (submitted['data'] is List) return _parseResults(submitted);
-      throw const ApiException('RightAPI 异步提交未返回 task_id。');
-    }
-    final deadline = DateTime.now().add(Duration(seconds: timeoutSeconds));
-    while (DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(const Duration(seconds: 2));
-      final task = await client.getJson(
-        'https://www.rightapi.ai/v1/tasks/${Uri.encodeComponent(taskId)}',
-        cancelToken: cancelToken,
-      );
-      if (task['data'] is List) return _parseResults(task);
-      final status = task['status']?.toString().toLowerCase();
-      if (status == 'completed') return _parseResults(task);
-      if (status == 'failed' || status == 'cancelled') {
-        final error = task['error'];
-        if (error is Map && error['message'] is String) {
-          throw ApiException('RightAPI 任务失败：${error['message']}');
-        }
-        throw const ApiException('RightAPI 任务失败。');
-      }
-    }
-    throw const ApiException('RightAPI 异步任务轮询超时。');
-  }
-
-  List<GenerationResult> _parseResults(Map<String, dynamic> response) {
-    final payload = response['data'];
-    if (payload is! List) {
-      throw const ApiException('接口响应缺少图片数据。');
-    }
-
-    return payload.map((item) {
-      final map = Map<String, dynamic>.from(item as Map);
-      final rawResponseValue =
-          map['b64_json'] as String? ?? map['url'] as String?;
-      return GenerationResult(
-        b64Json: map['b64_json'] as String?,
-        imageUrl: map['url'] as String?,
-        rawResponseValue: rawResponseValue,
-      );
-    }).toList();
+    final value = model.trim().toLowerCase().split('/').last;
+    return RegExp(r'^gpt-image-2(?:\.\d+)?(?:-|$)').hasMatch(value);
   }
 }

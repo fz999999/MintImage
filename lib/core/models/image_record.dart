@@ -34,6 +34,11 @@ class ImageRecord {
     required this.height,
     required this.quality,
     required this.outputFormat,
+    this.frameCount = 9,
+    this.frameDurationMs = 200,
+    this.complexity,
+    this.svgOptions,
+    this.markupPath,
     required this.model,
     required this.status,
     required this.errorMessage,
@@ -66,6 +71,11 @@ class ImageRecord {
       height: request.resolvedHeight,
       quality: request.quality.apiValue,
       outputFormat: request.outputFormat.apiValue,
+      frameCount: request.frameCount,
+      frameDurationMs: request.frameDurationMs,
+      complexity: request.complexity?.apiValue,
+      svgOptions: request.svgOptions,
+      markupPath: request.markupPath,
       model: model,
       status: ImageRecordStatus.pending,
       errorMessage: null,
@@ -89,6 +99,11 @@ class ImageRecord {
   final int height;
   final String quality;
   final String outputFormat;
+  final int frameCount;
+  final int frameDurationMs;
+  final String? complexity;
+  final SvgOptions? svgOptions;
+  final String? markupPath;
   final String model;
   final ImageRecordStatus status;
   final String? errorMessage;
@@ -151,6 +166,11 @@ class ImageRecord {
     int? height,
     String? quality,
     String? outputFormat,
+    int? frameCount,
+    int? frameDurationMs,
+    String? complexity,
+    SvgOptions? svgOptions,
+    String? markupPath,
     String? model,
     ImageRecordStatus? status,
     String? errorMessage,
@@ -185,6 +205,11 @@ class ImageRecord {
       height: height ?? this.height,
       quality: quality ?? this.quality,
       outputFormat: outputFormat ?? this.outputFormat,
+      frameCount: frameCount ?? this.frameCount,
+      frameDurationMs: frameDurationMs ?? this.frameDurationMs,
+      complexity: complexity ?? this.complexity,
+      svgOptions: svgOptions ?? this.svgOptions,
+      markupPath: markupPath ?? this.markupPath,
       model: model ?? this.model,
       status: status ?? this.status,
       errorMessage: clearErrorMessage

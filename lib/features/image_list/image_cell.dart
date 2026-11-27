@@ -15,6 +15,7 @@ import '../../shared/theme.dart';
 import '../../shared/widgets/checkerboard_background.dart';
 import '../../shared/widgets/desktop/desktop_dialog.dart';
 import '../../shared/widgets/desktop/desktop_menu.dart';
+import '../../shared/widgets/record_svg_image.dart';
 import '../favorites/favorite_folder_sheet.dart';
 import 'image_preview_page.dart';
 
@@ -523,6 +524,13 @@ class _ImageCellState extends ConsumerState<ImageCell> {
     if (_record.status == ImageRecordStatus.loading ||
         _record.status == ImageRecordStatus.pending) {
       return _LoadingThumb(preview: partialImage);
+    }
+
+    if (_record.outputFormat.toLowerCase() == 'svg' ||
+        (_record.resultImagePath?.toLowerCase().endsWith('.svg') ?? false)) {
+      return CheckerboardBackground(
+        child: RecordSvgImage(record: _record, fit: widget.imageFit),
+      );
     }
 
     if (_record.resultImagePath != null &&
